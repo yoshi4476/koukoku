@@ -30,6 +30,8 @@
     "iconv-lite": "^0.7.3",
     "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
+    "playwright": "^1.62.1",
+    "pptxgenjs": "^4.0.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "zod": "^4.4.3"

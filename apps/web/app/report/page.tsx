@@ -30,7 +30,19 @@ function ReportView({ report, clientName }: { report: ReportRunDto; clientName: 
             target="_blank"
             rel="noopener"
           >
-            印刷 / PDF保存
+            印刷ビュー
+          </a>
+          <a
+            className="btn sm sec"
+            href={`${process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:4000'}/reports/${encodeURIComponent(report.id)}/pdf`}
+          >
+            PDFをダウンロード
+          </a>
+          <a
+            className="btn sm sec"
+            href={`${process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:4000'}/reports/${encodeURIComponent(report.id)}/pptx`}
+          >
+            スライドをダウンロード
           </a>
         </div>
         <div className="c-body">

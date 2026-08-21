@@ -22,6 +22,7 @@ import { UsageController } from './usage/usage.controller';
 import { SchedulerService } from './scheduler/scheduler.service';
 import { AlertsService } from './alerts/alerts.service';
 import { AlertsController } from './alerts/alerts.controller';
+import { ReportExportService } from './exports/report-export.service';
 
 @Module({
   imports: [PrismaModule],
@@ -44,6 +45,7 @@ import { AlertsController } from './alerts/alerts.controller';
     TrailService,
     AlertsService,
     SchedulerService,
+    ReportExportService,
     MetricsService,
     LlmService,
     AuditService,
