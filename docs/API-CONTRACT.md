@@ -56,6 +56,9 @@ Base URL: `http://localhost:4000`。DTO の型定義は `@adgrid/shared` (`packa
 | GET | `/knowledge?industryCode=&objective=` | 勝ちパターン検索 (B-1。own=自社/shared=匿名共有) | `KnowledgeSearchDto` |
 | POST | `/knowledge/promote` body `PromoteAbTestInput` | A/Bテスト勝者を勝ちパターンに昇格 (shareAnonymized=trueで共有にも) | `KnowledgeAssetDto` |
 | GET | `/knowledge/calibration` | 確信度較正の状況 (A-4。カテゴリ別採用率とeffect) | `CalibrationDto[]` |
+| GET | `/changelog?adAccountId=&clientId=` | 変更履歴タイムライン (B-2。ADGRID経由+媒体側の統合) | `ChangeLogDto[]` |
+| GET | `/eval` | eval回帰スコア (A-2。プロンプト/辞書の品質可視化) | `{suites, allOk}` |
+| POST | `/slack/command` | Slackスラッシュコマンド (B-6。署名検証・summary/alerts/help) | Slack応答JSON |
 | GET/PUT | `/proposals/settings` body `{applyEnabled}` | kill switch (テナント単位の適用停止) | `{applyEnabled}` |
 | GET | `/home` | 今日の司令室 (優先度順タスク) | `HomeDto` |
 | GET | `/clients` | クライアント一覧 | `ClientDto[]` |

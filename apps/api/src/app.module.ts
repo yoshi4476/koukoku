@@ -36,6 +36,10 @@ import { AbTestsController } from './abtests/abtests.controller';
 import { CalibrationService } from './calibration/calibration.service';
 import { KnowledgeService } from './knowledge/knowledge.service';
 import { KnowledgeController } from './knowledge/knowledge.controller';
+import { EvalController } from './eval/eval.controller';
+import { ChangeLogService } from './changelog/changelog.service';
+import { ChangeLogController } from './changelog/changelog.controller';
+import { SlackController } from './slack/slack.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -51,6 +55,9 @@ import { KnowledgeController } from './knowledge/knowledge.controller';
     BenchmarkController,
     AbTestsController,
     KnowledgeController,
+    EvalController,
+    ChangeLogController,
+    SlackController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -72,6 +79,7 @@ import { KnowledgeController } from './knowledge/knowledge.controller';
     AbTestsService,
     CalibrationService,
     KnowledgeService,
+    ChangeLogService,
     MetricsService,
     LlmService,
     AuditService,

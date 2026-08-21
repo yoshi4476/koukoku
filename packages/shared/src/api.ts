@@ -247,6 +247,23 @@ export interface AlertRunResultDto {
   notified: number;
 }
 
+/* ---- 変更履歴 (B-2 / F-15) ---- */
+export interface ChangeLogDto {
+  id: string;
+  adAccountId: string;
+  accountName: string;
+  clientName: string;
+  platform: Platform;
+  changedAt: string;
+  actor: 'adgrid' | 'media_console' | 'api';
+  actorName: string;
+  entity: string;
+  field: string;
+  oldValue: string;
+  newValue: string;
+  note: string;
+}
+
 /* ---- 勝ちパターン資産集 (B-1 / F-17) ---- */
 export type KnowledgeObjective = 'conversion' | 'awareness' | 'traffic';
 

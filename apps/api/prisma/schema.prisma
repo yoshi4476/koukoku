@@ -63,8 +63,31 @@ model Tenant {
   proposals   Proposal[]
   abTests     AbTest[]
   knowledge   KnowledgeAsset[]
+  changeLogs  ChangeLog[]
 
   @@map("tenants")
+}
+
+// 変更履歴 (ロードマップ B-2 / 要件書 F-15)。
+// ADGRID経由の変更 (承認実行) と媒体側変更を統合タイムライン化し、実績変動と突合する。
+model ChangeLog {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  adAccountId String   @map("ad_account_id")
+  changedAt   DateTime @default(now()) @map("changed_at")
+  actor       String // adgrid / media_console / api
+  actorName   String   @default("") @map("actor_name")
+  entity      String // campaign / adgroup / ad / account
+  field       String // budget / bid / status
+  oldValue    String   @default("") @map("old_value")
+  newValue    String   @default("") @map("new_value")
+  note        String   @default("")
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  adAccount AdAccount @relation(fields: [adAccountId], references: [id])
+
+  @@index([tenantId, adAccountId, changedAt])
+  @@map("change_logs")
 }
 
 // 勝ちパターン資産集 (ロードマップ B-1 / 要件書 F-17)。
@@ -250,6 +273,7 @@ model AdAccount {
   audits     Audit[]
   csvImports CsvImport[]
   proposals  Proposal[]
+  changeLogs ChangeLog[]
 
   @@index([tenantId, clientId])
   @@map("ad_accounts")

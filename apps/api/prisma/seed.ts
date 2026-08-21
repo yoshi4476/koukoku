@@ -79,6 +79,7 @@ async function seedFacts(
 async function main() {
   console.log('Seeding ADGRID demo data...');
   // 子テーブルから順に削除 (FK制約対応)
+  await prisma.changeLog.deleteMany({});
   await prisma.knowledgeAsset.deleteMany({});
   await prisma.calibrationStat.deleteMany({});
   await prisma.proposal.deleteMany({});
@@ -243,6 +244,15 @@ async function main() {
       { category: 'bidding', adopted: 6, dismissed: 6 },
       { category: 'structure', adopted: 2, dismissed: 9 },
       { category: 'creative', adopted: 5, dismissed: 4 },
+    ],
+  });
+
+  // 変更履歴のデモ (B-2): ADGRID経由の変更と媒体側変更の混在
+  await prisma.changeLog.createMany({
+    data: [
+      { tenantId: TENANT_ID, adAccountId: accAGoogle.id, actor: 'adgrid', actorName: 'デモ 運用者', entity: 'account', field: 'budget', oldValue: '800000', newValue: '700000', note: '承認提案「予算最適化」により変更', changedAt: daysAgo(3) },
+      { tenantId: TENANT_ID, adAccountId: accBMeta.id, actor: 'media_console', actorName: '媒体管理画面', entity: 'campaign', field: 'bid', oldValue: '150', newValue: '180', note: '媒体側で入札を手動変更', changedAt: daysAgo(2) },
+      { tenantId: TENANT_ID, adAccountId: accBMeta.id, actor: 'media_console', actorName: '媒体管理画面', entity: 'campaign', field: 'status', oldValue: 'active', newValue: 'paused', note: '審査落ちにより一時停止', changedAt: daysAgo(1) },
     ],
   });
 

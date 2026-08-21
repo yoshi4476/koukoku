@@ -8,6 +8,7 @@ import { readSettings, patchSettings } from '../common/tenant-settings';
 import { TrailService } from '../common/trail.service';
 import type { SessionInfoValue } from '../common/tenant';
 import { MediaSyncService } from '../media-connector/sync.service';
+import { ChangeLogService } from '../changelog/changelog.service';
 
 type ProposalRow = {
   id: string;
@@ -36,6 +37,7 @@ export class ProposalsService {
     private readonly prisma: PrismaService,
     private readonly trail: TrailService,
     private readonly media: MediaSyncService,
+    private readonly changelog: ChangeLogService,
   ) {}
 
   /* ---------------- kill switch (tenant.settings.applyEnabled) ---------------- */
@@ -196,6 +198,18 @@ export class ProposalsService {
         );
         rollbackPayload = { monthlyBudget: old };
         note = `月予算を${old !== null ? `${fmtYen(old)}→` : ''}${fmtYen(newBudget)}に変更しました。`;
+        // B-2: 変更履歴に記録 (実績変動との突合用)
+        await this.changelog.record({
+          tenantId,
+          adAccountId: proposal.adAccountId,
+          actor: 'adgrid',
+          actorName: user.userId ?? '承認者',
+          entity: 'account',
+          field: 'budget',
+          oldValue: old !== null ? String(old) : '',
+          newValue: String(newBudget),
+          note: `承認提案「${proposal.title}」により変更`,
+        });
       } else {
         // 媒体書込はコネクタ経由 (デモ接続はシミュレート実行)
         const conn = await this.prisma.withTenant(tenantId, (tx) =>
@@ -283,7 +297,7 @@ export class ProposalsService {
 
   async rollback(tenantId: string, user: SessionInfoValue, id: string): Promise<ProposalDto> {
     this.assertApprover(user);
-    await this.prisma.withTenant(tenantId, async (tx) => {
+    const reverted = await this.prisma.withTenant(tenantId, async (tx) => {
       // executed→rolled_back をアトミックに確保してから復元 (二重ロールバック防止)
       const claimed = await tx.proposal.updateMany({
         where: { id, status: 'executed' },
@@ -293,20 +307,33 @@ export class ProposalsService {
         throw new AppError(HttpStatus.CONFLICT, 'ロールバックできるのは実行済みの提案のみです。', '一覧を再読込してください。');
       }
       const p = await tx.proposal.findUnique({ where: { id } });
-      if (!p) return;
+      if (!p) return null;
       const rb = (p.rollbackPayload ?? {}) as Record<string, unknown>;
+      let restored: number | null = null;
       if (p.actionType === 'adjust_budget' && 'monthlyBudget' in rb) {
-        await tx.adAccount.update({
-          where: { id: p.adAccountId },
-          data: { monthlyBudget: rb.monthlyBudget === null ? null : Number(rb.monthlyBudget) },
-        });
+        restored = rb.monthlyBudget === null ? null : Number(rb.monthlyBudget);
+        await tx.adAccount.update({ where: { id: p.adAccountId }, data: { monthlyBudget: restored } });
       }
       await tx.proposal.update({
         where: { id },
         data: { executionNote: `${p.executionNote} → 変更前の値に戻しました。` },
       });
+      return { adAccountId: p.adAccountId, actionType: p.actionType, restored };
     });
     await this.trail.record({ tenantId, userId: user.userId, action: 'proposal_rollback', resource: id });
+    // B-2: ロールバックも変更履歴に記録
+    if (reverted && reverted.actionType === 'adjust_budget') {
+      await this.changelog.record({
+        tenantId,
+        adAccountId: reverted.adAccountId,
+        actor: 'adgrid',
+        actorName: user.userId ?? '承認者',
+        entity: 'account',
+        field: 'budget',
+        newValue: reverted.restored !== null ? String(reverted.restored) : '',
+        note: 'ロールバックにより変更前の値に復元',
+      });
+    }
     return this.getOne(tenantId, id);
   }
 

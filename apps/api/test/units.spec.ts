@@ -4,6 +4,7 @@ import { limitsFor, widthUnits } from '../src/ai/copy-limits';
 import { scanLawDictionary } from '../src/ai/law-dictionary';
 import { normalizeHeader, parseCsv, parseDate, parseNumber } from '../src/imports/csv.service';
 import { readSettings } from '../src/common/tenant-settings';
+import { runAllSuites } from '../src/eval/runner';
 
 describe('widthUnits (全角=2/半角=1)', () => {
   it('半角英数は1、全角は2で数える', () => {
@@ -106,6 +107,15 @@ describe('業種ベンチマーク判定 (A-3)', () => {
     expect(benchmarkFor('unknown').code).toBe('other');
     expect(benchmarkFor('ec').label).toBe('EC・物販');
   });
+});
+
+describe('eval回帰 (A-2 ゴールデンセット)', () => {
+  const suites = runAllSuites();
+  for (const s of suites) {
+    it(`${s.suite} が基準を満たす (${s.passed}/${s.total})`, () => {
+      expect(s.ok, s.failures.join('; ')).toBe(true);
+    });
+  }
 });
 
 describe('CSVパーサ', () => {

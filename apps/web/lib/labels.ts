@@ -7,6 +7,7 @@ import type {
   ProposalStatus,
   KnowledgeObjective,
   CalibrationDto,
+  ChangeLogDto,
 } from '@adgrid/shared';
 
 /* 媒体色はダークモードで反転するため hex ではなく CSS 変数で参照する */
@@ -127,6 +128,13 @@ export const CALIBRATION_EFFECT_META: Record<CalibrationDto['effect'], { label: 
   penalty: { label: '確信度を抑制', cls: 'down' },
   neutral: { label: '中立', cls: 'flat' },
   insufficient: { label: 'データ蓄積中', cls: 'flat' },
+};
+
+/* 変更履歴 (B-2) の実行主体バッジ (cls は .pill バリアント) */
+export const CHANGELOG_ACTOR_META: Record<ChangeLogDto['actor'], { label: string; cls: string }> = {
+  adgrid: { label: 'ADGRID', cls: 'ai' },
+  media_console: { label: '媒体管理画面', cls: 'flat' },
+  api: { label: 'API同期', cls: 'flat' },
 };
 
 export const INDUSTRY_LABEL: Record<string, string> = {

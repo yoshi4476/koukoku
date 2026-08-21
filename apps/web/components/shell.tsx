@@ -158,6 +158,16 @@ const NAV_DATA: NavItem[] = [
       </svg>
     ),
   },
+  {
+    href: '/changelog',
+    label: '変更履歴',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M7 4v3l2 1.4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
 ];
 
 const NAV_SETTINGS: NavItem[] = [
