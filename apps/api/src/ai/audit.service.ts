@@ -2,11 +2,12 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditResultSchema } from '@adgrid/shared';
 import type { AuditFinding, AuditResult, AuditRunDto } from '@adgrid/shared';
 import { PrismaService, Tx } from '../prisma/prisma.service';
+import { benchmarkFor } from '@adgrid/shared';
 import { AppError } from '../common/errors';
 import { TrailService } from '../common/trail.service';
 import { MetricsService, Totals, daysAgo, isoDate } from '../metrics/metrics.service';
 import { LlmService } from './llm.service';
-import { OUTPUT_SCHEMAS, PROMPTS } from './prompt-registry';
+import { AUDIT_VERIFIER, OUTPUT_SCHEMAS, PROMPTS } from './prompt-registry';
 
 interface CampaignWindow {
   campaignId: string;
@@ -18,6 +19,8 @@ interface CampaignWindow {
 
 interface AuditInput {
   account: { id: string; name: string; platform: string; monthlyBudget: number | null };
+  /** 業種別ベンチマーク (A-3)。診断の判断軸を「時系列」から「業種相場比」に広げる */
+  industryBenchmark: { label: string; ctr: number; cvr: number; cpa: number };
   period: { since: string; until: string };
   monthToDateCost: number;
   monthElapsedRatio: number;
@@ -46,7 +49,7 @@ export class AuditService {
   /* ---------------- 入力データ構築 ---------------- */
 
   private async buildInput(tx: Tx, adAccountId: string): Promise<AuditInput> {
-    const account = await tx.adAccount.findUnique({ where: { id: adAccountId } });
+    const account = await tx.adAccount.findUnique({ where: { id: adAccountId }, include: { client: true } });
     if (!account) {
       throw new AppError(
         HttpStatus.NOT_FOUND,
@@ -54,6 +57,7 @@ export class AuditService {
         'アカウントを選び直してください。',
       );
     }
+    const bm = benchmarkFor(account.client.industryCode);
     const [last7, prior7, last28] = await Promise.all([
       this.metrics.totals(tx, { adAccountId }, daysAgo(6), daysAgo(0)),
       this.metrics.totals(tx, { adAccountId }, daysAgo(13), daysAgo(7)),
@@ -109,6 +113,7 @@ export class AuditService {
         platform: account.platform,
         monthlyBudget: account.monthlyBudget ? Number(account.monthlyBudget) : null,
       },
+      industryBenchmark: { label: bm.label, ctr: bm.ctr, cvr: bm.cvr, cpa: bm.cpa },
       period: { since: isoDate(daysAgo(27)), until: isoDate(daysAgo(0)) },
       monthToDateCost: mtd.cost,
       monthElapsedRatio: +(now.getDate() / daysInMonth).toFixed(2),
@@ -224,6 +229,32 @@ export class AuditService {
       }
     }
 
+    // A-3: 業種ベンチマークとの乖離 (CVRが相場を大きく下回る)
+    const accCvr = input.accountLast28.clicks > 0
+      ? +((input.accountLast28.conversions / input.accountLast28.clicks) * 100).toFixed(2)
+      : null;
+    const bm = input.industryBenchmark;
+    if (accCvr !== null && input.accountLast28.clicks >= 300 && accCvr < bm.cvr * 0.7) {
+      findings.push({
+        priority_rank: 0,
+        category: 'structure',
+        title: `CVRが業種相場を下回る — ${bm.label}平均${bm.cvr}%に対し${accCvr}%`,
+        body: `直近28日のCVR (クリック→CV率) は${accCvr}%で、${bm.label}の相場${bm.cvr}%を約${Math.round((1 - accCvr / bm.cvr) * 100)}%下回っています。広告とLP (ランディングページ) の訴求一致、フォーム離脱、計測設定を確認してください。クリック後の体験に改善余地がある可能性が高い状態です。`,
+        evidence: {
+          metrics_cited: [
+            { name: 'CVR', value: `${accCvr}%`, period: '直近28日' },
+            { name: '業種相場CVR', value: `${bm.cvr}%`, period: bm.label },
+          ],
+          reasoning: `業種ベンチマーク比0.7倍未満かつ十分なクリック量 (${input.accountLast28.clicks})。アカウント内時系列では見えない相場乖離。`,
+        },
+        expected_impact: `CVRを相場水準まで戻せれば、同じ費用でCV数が最大約${Math.round((bm.cvr / accCvr - 1) * 100)}%増える余地`,
+        risk: 'LP改善は制作コストと時間を要する。まず計測の正しさを確認すること',
+        confidence: 'mid',
+        impact_level: 3,
+        ease_level: 1,
+      });
+    }
+
     // 5. テスト設計: 1キャンペーン集中
     if (input.campaigns.length === 1 && input.accountLast28.cost > 100000) {
       findings.push({
@@ -302,7 +333,7 @@ export class AuditService {
   private async llmAudit(tenantId: string, input: AuditInput): Promise<AuditResult> {
     const user = [
       `以下のスキーマのJSONのみを出力してください:\n${OUTPUT_SCHEMAS.audit}`,
-      `<tenant_context>\n月予算: ${input.account.monthlyBudget ?? '未設定'} / 媒体: ${input.account.platform}\n</tenant_context>`,
+      `<tenant_context>\n月予算: ${input.account.monthlyBudget ?? '未設定'} / 媒体: ${input.account.platform}\n業種相場 (${input.industryBenchmark.label}): CTR ${input.industryBenchmark.ctr}% / CVR ${input.industryBenchmark.cvr}% / CPA ¥${input.industryBenchmark.cpa}。実績を業種相場と比較した指摘も行うこと。\n</tenant_context>`,
       `<account_data>\n${JSON.stringify(input, null, 1)}\n</account_data>`,
     ].join('\n\n');
     const text = await this.llm.completeText({
@@ -321,7 +352,48 @@ export class AuditService {
         'もう一度実行してください。続く場合はモック診断をご利用ください。',
       );
     }
-    return this.verifyCitations(parsed.data, input);
+    // 1段目: アプリ層の数値実在チェック / 2段目: LLM自己検証 (A-1)
+    const citationChecked = this.verifyCitations(parsed.data, input);
+    return this.selfVerify(tenantId, citationChecked, input);
+  }
+
+  /** A-1 LLM自己検証パス: 生成診断を別プロンプトで批判的に再チェックし、捏造・飛躍を除外 */
+  private async selfVerify(tenantId: string, result: AuditResult, input: AuditInput): Promise<AuditResult> {
+    if (result.findings.length === 0) return result;
+    try {
+      const user = [
+        `検証対象の診断結果:\n${JSON.stringify({ findings: result.findings })}`,
+        `<account_data>\n${JSON.stringify(input, null, 1)}\n</account_data>`,
+        `以下のスキーマのJSONのみを出力してください:\n${AUDIT_VERIFIER.schema}`,
+      ].join('\n\n');
+      const text = await this.llm.completeText({
+        tenantId,
+        feature: 'audit',
+        model: AUDIT_VERIFIER.model,
+        system: AUDIT_VERIFIER.system,
+        user,
+        promptVersion: AUDIT_VERIFIER.version,
+      });
+      const v = LlmService.parseJson(text) as {
+        verified_ranks?: number[];
+        rejected?: Array<{ rank: number }>;
+        confidence_downgrade?: number[];
+      };
+      const rejected = new Set((v.rejected ?? []).map((r) => r.rank));
+      const downgrade = new Set(v.confidence_downgrade ?? []);
+      const kept = result.findings
+        .filter((f) => !rejected.has(f.priority_rank))
+        .map((f) =>
+          downgrade.has(f.priority_rank) && f.confidence !== 'low'
+            ? { ...f, confidence: (f.confidence === 'high' ? 'mid' : 'low') as AuditFinding['confidence'] }
+            : f,
+        );
+      kept.forEach((f, i) => (f.priority_rank = i + 1));
+      return { ...result, findings: kept };
+    } catch {
+      // 検証パスの失敗で診断全体を落とさない (1段目の数値チェックは通過済み)
+      return result;
+    }
   }
 
   /* ---------------- 実行・取得 ---------------- */

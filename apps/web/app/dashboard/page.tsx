@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { CampaignBreakdownDto, DailyPointDto, DashboardDto, Platform } from '@adgrid/shared';
+import type { BenchmarkDto, CampaignBreakdownDto, DailyPointDto, DashboardDto, Platform } from '@adgrid/shared';
 import { ALL_PLATFORMS } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
@@ -71,6 +71,60 @@ function KpiCards({ data }: { data: DashboardDto }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+type Verdict = 'good' | 'avg' | 'poor' | 'na';
+
+const VERDICT_META: Record<Verdict, { pill: string; label: string }> = {
+  good: { pill: 'up', label: '相場を上回る' },
+  avg: { pill: 'flat', label: '相場並み' },
+  poor: { pill: 'down', label: '相場を下回る' },
+  na: { pill: 'flat', label: 'データ不足' },
+};
+
+/* ---- 業種ベンチマーク比較 (A-3。単一クライアント選択時のみ) ---- */
+function BenchmarkCard({ clientId }: { clientId: string }) {
+  const { data, loading, error, retry } = useApi<BenchmarkDto>(`/benchmark?clientId=${encodeURIComponent(clientId)}`);
+
+  if (loading) {
+    return (
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="c-body"><SkeletonLines count={3} /></div>
+      </div>
+    );
+  }
+  if (error) return <ErrorCard error={error} onRetry={retry} />;
+  if (!data) return null;
+
+  const rows: Array<{ key: string; label: string; value: string; benchmark: string; verdict: Verdict }> = [
+    { key: 'ctr', label: 'CTR', value: formatPercent(data.metrics.ctr.value, 2), benchmark: formatPercent(data.metrics.ctr.benchmark, 2), verdict: data.metrics.ctr.verdict },
+    { key: 'cvr', label: 'CVR', value: formatPercent(data.metrics.cvr.value, 2), benchmark: formatPercent(data.metrics.cvr.benchmark, 2), verdict: data.metrics.cvr.verdict },
+    { key: 'cpa', label: 'CPA', value: formatYen(data.metrics.cpa.value), benchmark: formatYen(data.metrics.cpa.benchmark), verdict: data.metrics.cpa.verdict },
+  ];
+
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <div className="c-head">
+        <h2>業種ベンチマーク比較</h2>
+        <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--muted)' }}>{data.industryLabel} · 直近30日</span>
+      </div>
+      <div className="c-body">
+        <div className="bench-grid">
+          {rows.map((r) => {
+            const meta = VERDICT_META[r.verdict];
+            return (
+              <div className="bench-metric" key={r.key}>
+                <div className="bm-label">{r.label}</div>
+                <div className="bm-val num">{r.value}</div>
+                <div className="bm-bench num">業種相場 {r.benchmark}</div>
+                <span className={`pill ${meta.pill}`}>{meta.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -175,6 +229,8 @@ export default function DashboardPage() {
       {data && hasData ? (
         <>
           <KpiCards data={data} />
+
+          {selectedClientId ? <BenchmarkCard clientId={selectedClientId} /> : null}
 
           <div className="card" style={{ marginBottom: 16 }}>
             <div className="c-head">

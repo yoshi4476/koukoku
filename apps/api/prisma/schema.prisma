@@ -61,8 +61,36 @@ model Tenant {
   alertRules  AlertRule[]
   alertEvents AlertEvent[]
   proposals   Proposal[]
+  abTests     AbTest[]
 
   @@map("tenants")
+}
+
+// A/Bテスト管理 (ロードマップ B-3)。2アームのCVR差を two-proportion z-test で判定
+model AbTest {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id")
+  clientId    String   @map("client_id")
+  name        String
+  hypothesis  String   @default("")
+  metric      String   @default("cvr") // cvr / ctr
+  status      String   @default("running") // running / concluded
+  aLabel      String   @map("a_label")
+  aImpr       Int      @default(0) @map("a_impr")
+  aClicks     Int      @default(0) @map("a_clicks")
+  aConv       Int      @default(0) @map("a_conv")
+  bLabel      String   @map("b_label")
+  bImpr       Int      @default(0) @map("b_impr")
+  bClicks     Int      @default(0) @map("b_clicks")
+  bConv       Int      @default(0) @map("b_conv")
+  winner      String   @default("") // a / b / none
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@map("ab_tests")
 }
 
 // AI提案の承認・実行 (F-16)。status遷移: pending → approved/rejected → executed/failed → rolled_back
@@ -163,6 +191,7 @@ model Client {
   adAccounts AdAccount[]
   reports    Report[]
   copyJobs   CopyJob[]
+  abTests    AbTest[]
 
   @@index([tenantId])
   @@map("clients")

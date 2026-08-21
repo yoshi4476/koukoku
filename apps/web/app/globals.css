@@ -471,6 +471,72 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
   @page { size: A4; margin: 16mm 14mm; }
 }
 
+/* ---------- 業種ベンチマーク比較 (A-3) ---------- */
+.bench-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.bench-metric { background: var(--bg-sub); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 3px; }
+.bench-metric .bm-label { font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.bench-metric .bm-val { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.bench-metric .bm-bench { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; margin-bottom: 4px; }
+.bench-metric .pill { align-self: flex-start; }
+
+/* ---------- A/Bテスト (B-3) ---------- */
+.ab-list { display: flex; flex-direction: column; gap: 12px; }
+.ab-card { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-1); padding: 14px 16px; }
+.ab-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ab-head .ab-name { font-size: 14px; font-weight: 700; }
+.ab-head .ab-client { font-size: 11.5px; color: var(--muted); margin-left: auto; }
+.ab-hyp { font-size: 12px; color: var(--ink-2); margin-top: 6px; }
+.ab-arms { display: flex; align-items: stretch; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.ab-arm { flex: 1 1 200px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--bg-sub); padding: 10px 12px; }
+.ab-arm.win { border-color: var(--good); background: var(--good-soft); }
+.ab-arm .ab-arm-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ab-arm .ab-arm-key { font-size: 11px; font-weight: 700; color: var(--primary); border: 1px solid var(--line-strong); border-radius: 6px; padding: 0 6px; flex: none; }
+.ab-arm.win .ab-arm-key { color: var(--good); border-color: var(--good); }
+.ab-arm .ab-arm-label { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+.ab-arm .ab-arm-rate { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; margin-top: 4px; }
+.ab-arm .ab-arm-sub { font-size: 11px; color: var(--muted); }
+.ab-vs { align-self: center; font-size: 11px; font-weight: 700; color: var(--muted); flex: none; }
+.ab-summary { display: block; width: 100%; margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.ab-summary .f-label { font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--muted); display: block; }
+.ab-summary .ab-summary-text { margin: 3px 0 0; font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.6; }
+.ab-summary .ab-summary-meta { display: flex; gap: 14px; margin-top: 6px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.ab-summary.sig { border-color: var(--good); background: var(--good-soft); }
+.ab-summary.sig .f-label, .ab-summary.sig .ab-summary-text { color: var(--good); }
+.ab-summary.amber { border-color: var(--warn); background: var(--warn-soft); }
+.ab-summary.amber .f-label, .ab-summary.amber .ab-summary-text { color: var(--warn); }
+.ab-summary.flat { border-color: var(--line); background: var(--bg-sub); }
+.ab-arm-forms { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 640px) { .ab-arm-forms { grid-template-columns: 1fr; } }
+.ab-arm-form { border: 1px solid var(--line); border-radius: 10px; background: var(--surface); padding: 10px 12px; display: flex; flex-direction: column; gap: 10px; }
+.ab-arm-form .ab-arm-form-h { font-size: 12px; font-weight: 700; color: var(--ink-2); }
+.ab-arm-form .input.num { width: 100%; text-align: right; }
+
+/* ---------- 予算ペース (B-4) ---------- */
+.pace-summary { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.pace-list { display: flex; flex-direction: column; gap: 12px; }
+.pace-card { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-1); padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.pace-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pace-head .pace-name { font-size: 14px; font-weight: 700; }
+.pace-head .pace-client { font-size: 11.5px; color: var(--muted); margin-left: auto; }
+.pace-figs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.pace-figs.sub { background: var(--bg-sub); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.pace-fig .pf-label { font-size: 11px; color: var(--muted); }
+.pace-fig .pf-val { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; display: flex; align-items: center; flex-wrap: wrap; }
+.pace-fig .pf-val.sm { font-size: 13px; }
+.pace-viz { display: flex; flex-direction: column; gap: 8px; }
+.pace-row { display: flex; align-items: center; gap: 10px; }
+.pace-row .pace-tag { font-size: 11px; color: var(--muted); flex: 0 0 66px; }
+.pace-row .pace-pct { font-size: 11.5px; font-weight: 600; color: var(--ink-2); font-variant-numeric: tabular-nums; flex: 0 0 44px; text-align: right; }
+.pace-track { position: relative; flex: 1 1 auto; height: 14px; background: var(--bg-sub); border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.pace-seg { position: absolute; top: 0; left: 0; height: 100%; border-radius: 999px 0 0 999px; }
+.pace-seg.spent { background: var(--primary); }
+.pace-seg.proj.on { background: var(--good); }
+.pace-seg.proj.under { background: var(--warn); }
+.pace-seg.proj.over { background: var(--bad); }
+.pace-100 { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--ink); opacity: .55; }
+.pace-legend { font-size: 10.5px; color: var(--muted); }
+.pace-runout { font-size: 12px; font-weight: 600; color: var(--warn); background: var(--warn-soft); border-radius: 8px; padding: 6px 10px; }
+
 @media (prefers-reduced-motion: reduce) {
   .skel::after { animation: none; }
   * { transition-duration: 0s !important; }

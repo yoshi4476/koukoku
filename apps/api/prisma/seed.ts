@@ -78,6 +78,12 @@ async function seedFacts(
 
 async function main() {
   console.log('Seeding ADGRID demo data...');
+  // 子テーブルから順に削除 (FK制約対応)
+  await prisma.proposal.deleteMany({});
+  await prisma.abTest.deleteMany({});
+  await prisma.alertEvent.deleteMany({});
+  await prisma.alertRule.deleteMany({});
+  await prisma.auditTrail.deleteMany({});
   await prisma.factAdPerformance.deleteMany({});
   await prisma.audit.deleteMany({});
   await prisma.report.deleteMany({});
@@ -195,6 +201,24 @@ async function main() {
       { tenantId: TENANT_ID, platform: 'meta', status: 'connected', lastSyncedAt: new Date() },
       { tenantId: TENANT_ID, platform: 'yahoo_search', status: 'needs_reauth', lastSyncedAt: daysAgo(2) },
       { tenantId: TENANT_ID, platform: 'line_ads', status: 'not_connected' },
+    ],
+  });
+
+  // A/Bテストのデモ (B-3): 有意差ありと継続中の2件
+  await prisma.abTest.createMany({
+    data: [
+      {
+        tenantId: TENANT_ID, clientId: clientA.id,
+        name: '訴求軸テスト: 便益 vs 損失回避', hypothesis: '損失回避訴求の方がCVRが高い', metric: 'cvr',
+        aLabel: '便益訴求', aImpr: 50000, aClicks: 1000, aConv: 50,
+        bLabel: '損失回避訴求', bImpr: 50000, bClicks: 1000, bConv: 88,
+      },
+      {
+        tenantId: TENANT_ID, clientId: clientB.id,
+        name: 'バナー色テスト: 青 vs 赤', hypothesis: '赤バナーのCTRが高い', metric: 'ctr',
+        aLabel: '青バナー', aImpr: 8000, aClicks: 80, aConv: 4,
+        bLabel: '赤バナー', bImpr: 8000, bClicks: 95, bConv: 5,
+      },
     ],
   });
 

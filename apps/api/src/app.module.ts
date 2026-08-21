@@ -29,6 +29,10 @@ import { MediaSyncService } from './media-connector/sync.service';
 import { ConnectionsController } from './media-connector/connections.controller';
 import { ProposalsService } from './proposals/proposals.service';
 import { ProposalsController } from './proposals/proposals.controller';
+import { PacingController } from './insights/pacing.controller';
+import { BenchmarkController } from './insights/benchmark.controller';
+import { AbTestsService } from './abtests/abtests.service';
+import { AbTestsController } from './abtests/abtests.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -40,6 +44,9 @@ import { ProposalsController } from './proposals/proposals.controller';
     BillingController,
     ConnectionsController,
     ProposalsController,
+    PacingController,
+    BenchmarkController,
+    AbTestsController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -58,6 +65,7 @@ import { ProposalsController } from './proposals/proposals.controller';
     BillingService,
     MediaSyncService,
     ProposalsService,
+    AbTestsService,
     MetricsService,
     LlmService,
     AuditService,

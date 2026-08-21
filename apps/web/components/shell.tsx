@@ -71,6 +71,27 @@ const NAV_MAIN: NavItem[] = [
     ),
   },
   {
+    href: '/abtests',
+    label: 'A/Bテスト',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <path d="M5.5 1.5v4L2.6 10.6A1 1 0 0 0 3.5 12h7a1 1 0 0 0 .9-1.4L8.5 5.5v-4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M4.5 1.5h5M4.6 8h4.8" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    href: '/pacing',
+    label: '予算ペース',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <path d="M2 10.5a5 5 0 1 1 10 0" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        <path d="M7 10.5 9.7 6.3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        <circle cx="7" cy="10.5" r="1.1" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
     href: '/portal',
     label: '媒体窓口',
     icon: (

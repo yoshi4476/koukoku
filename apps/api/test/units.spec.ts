@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isApprover } from '@adgrid/shared';
+import { isApprover, twoProportionPValue, verdictHigherBetter, verdictLowerBetter, benchmarkFor } from '@adgrid/shared';
 import { limitsFor, widthUnits } from '../src/ai/copy-limits';
 import { scanLawDictionary } from '../src/ai/law-dictionary';
 import { normalizeHeader, parseCsv, parseDate, parseNumber } from '../src/imports/csv.service';
@@ -53,6 +53,39 @@ describe('権限・設定 (承認フローのガード)', () => {
     expect(readSettings(null).applyEnabled).toBeUndefined();
     // 文字列 'false' 等の壊れた値は boolean false ではないので「無効化」に倒れない
     expect(readSettings({ applyEnabled: 'false' }).applyEnabled as unknown).not.toBe(false);
+  });
+});
+
+describe('A/Bテスト統計 (B-3)', () => {
+  it('明確な差は有意 (p<0.05)', () => {
+    // 1000クリックでCVR 5% vs 10% は有意差あり
+    const p = twoProportionPValue(50, 1000, 100, 1000);
+    expect(p).not.toBeNull();
+    expect(p!).toBeLessThan(0.05);
+  });
+  it('わずかな差・小サンプルは有意でない', () => {
+    const p = twoProportionPValue(5, 100, 6, 100);
+    expect(p!).toBeGreaterThan(0.05);
+  });
+  it('分母0はnull', () => {
+    expect(twoProportionPValue(0, 0, 5, 100)).toBeNull();
+  });
+});
+
+describe('業種ベンチマーク判定 (A-3)', () => {
+  it('相場+20%以上はgood、-20%以下はpoor (高いほど良い指標)', () => {
+    expect(verdictHigherBetter(2.5, 2.0)).toBe('good');
+    expect(verdictHigherBetter(1.5, 2.0)).toBe('poor');
+    expect(verdictHigherBetter(2.0, 2.0)).toBe('avg');
+    expect(verdictHigherBetter(null, 2.0)).toBe('na');
+  });
+  it('CPAは低いほど良い', () => {
+    expect(verdictLowerBetter(3000, 5000)).toBe('good');
+    expect(verdictLowerBetter(7000, 5000)).toBe('poor');
+  });
+  it('未知業種はotherにフォールバック', () => {
+    expect(benchmarkFor('unknown').code).toBe('other');
+    expect(benchmarkFor('ec').label).toBe('EC・物販');
   });
 });
 

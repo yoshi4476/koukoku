@@ -48,6 +48,11 @@ Base URL: `http://localhost:4000`。DTO の型定義は `@adgrid/shared` (`packa
 | POST | `/proposals/:id/reject` | 却下 (owner/adminのみ) | `ProposalDto` |
 | POST | `/proposals/:id/rollback` | 実行済みadjust_budgetを変更前値に戻す | `ProposalDto` |
 | POST | `/proposals/:id/requeue` | 失敗した提案を承認待ちに戻す (再試行) | `ProposalDto` |
+| GET | `/pacing` | 予算ペーシング予測 (B-4。月予算のあるアカウントの着地予測・推奨日予算) | `PacingDto[]` |
+| GET | `/benchmark?clientId=` | 業種別ベンチマーク比較 (A-3。直近30日 vs 業種相場) | `BenchmarkDto` |
+| GET | `/abtests?clientId=` | A/Bテスト一覧 (B-3) | `AbTestDto[]` |
+| POST | `/abtests` body `CreateAbTestInput` | A/Bテスト作成 (two-proportion z-test で自動判定) | `AbTestDto` |
+| POST | `/abtests/:id/conclude` | テストを終了 (勝者を確定) | `AbTestDto` |
 | GET/PUT | `/proposals/settings` body `{applyEnabled}` | kill switch (テナント単位の適用停止) | `{applyEnabled}` |
 | GET | `/home` | 今日の司令室 (優先度順タスク) | `HomeDto` |
 | GET | `/clients` | クライアント一覧 | `ClientDto[]` |

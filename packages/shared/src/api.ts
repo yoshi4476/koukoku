@@ -247,6 +247,81 @@ export interface AlertRunResultDto {
   notified: number;
 }
 
+/* ---- 予算ペーシング予測 (B-4) ---- */
+export interface PacingDto {
+  adAccountId: string;
+  accountName: string;
+  clientName: string;
+  platform: Platform;
+  monthlyBudget: number;
+  monthToDateCost: number;
+  /** 現ペースでの月末着地予測額 */
+  projectedMonthEnd: number;
+  /** 予算に対する着地予測% */
+  projectedPct: number;
+  /** 予算内に着地させる推奨日予算 */
+  recommendedDailyBudget: number;
+  currentDailyAvg: number;
+  status: 'over' | 'under' | 'on_track';
+  /** 予算に到達/枯渇する予測日 (YYYY-MM-DD、しない場合null) */
+  runOutDate: string | null;
+  daysLeft: number;
+}
+
+/* ---- 業種別ベンチマーク (A-3) ---- */
+export interface BenchmarkDto {
+  industryCode: string;
+  industryLabel: string;
+  metrics: {
+    ctr: { value: number | null; benchmark: number; verdict: 'good' | 'avg' | 'poor' | 'na' };
+    cvr: { value: number | null; benchmark: number; verdict: 'good' | 'avg' | 'poor' | 'na' };
+    cpa: { value: number | null; benchmark: number; verdict: 'good' | 'avg' | 'poor' | 'na' };
+  };
+}
+
+/* ---- A/Bテスト管理 (B-3) ---- */
+export interface AbArmInput {
+  label: string;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+}
+
+export interface AbTestDto {
+  id: string;
+  clientId: string;
+  clientName: string;
+  name: string;
+  hypothesis: string;
+  metric: 'cvr' | 'ctr';
+  status: 'running' | 'concluded';
+  a: { label: string; impressions: number; clicks: number; conversions: number; rate: number | null };
+  b: { label: string; impressions: number; clicks: number; conversions: number; rate: number | null };
+  /** 統計的検定の結果 */
+  result: {
+    /** 勝者 (有意差ありの場合のみ a/b、なければ none) */
+    winner: 'a' | 'b' | 'none';
+    /** 相対リフト% (Bの対Aの改善率) */
+    lift: number | null;
+    /** p値 (two-proportion z-test) */
+    pValue: number | null;
+    significant: boolean;
+    /** サンプルが十分か */
+    enoughData: boolean;
+    summary: string;
+  };
+  createdAt: string;
+}
+
+export interface CreateAbTestInput {
+  clientId: string;
+  name: string;
+  hypothesis?: string;
+  metric?: 'cvr' | 'ctr';
+  a: AbArmInput;
+  b: AbArmInput;
+}
+
 /* ---- 承認フロー付き適用 (F-16 / Phase 3) ---- */
 export type ProposalAction = 'adjust_budget' | 'adjust_bid' | 'pause_campaign';
 export type ProposalStatus =
