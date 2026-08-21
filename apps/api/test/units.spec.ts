@@ -1,11 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { isApprover, twoProportionPValue, verdictHigherBetter, verdictLowerBetter, benchmarkFor } from '@adgrid/shared';
+import {
+  isApprover,
+  twoProportionPValue,
+  verdictHigherBetter,
+  verdictLowerBetter,
+  benchmarkFor,
+  editionAllows,
+  industryProfileFor,
+  industryModeFor,
+} from '@adgrid/shared';
 import { limitsFor, widthUnits } from '../src/ai/copy-limits';
 import { scanLawDictionary } from '../src/ai/law-dictionary';
 import { normalizeHeader, parseCsv, parseDate, parseNumber } from '../src/imports/csv.service';
 import { readSettings } from '../src/common/tenant-settings';
 import { runAllSuites } from '../src/eval/runner';
 import { metricValue } from '../src/dashboards/dashboards.service';
+import { efficiencyScore, recommendKeyword } from '../src/keywords/keyword-scoring';
 
 describe('widthUnits (全角=2/半角=1)', () => {
   it('半角英数は1、全角は2で数える', () => {
@@ -159,5 +169,61 @@ describe('CSVパーサ', () => {
   it('ヘッダ正規化は空白・引用符・全角空白を除去し小文字化', () => {
     expect(normalizeHeader(' "クリック数" ')).toBe('クリック数');
     expect(normalizeHeader('Impressions')).toBe('impressions');
+  });
+});
+
+describe('版 (edition) の機能ゲート', () => {
+  it('自社運用版は全機能を許可', () => {
+    for (const f of ['approvals', 'autoApply', 'connections', 'billing', 'members', 'imports', 'knowledge'] as const) {
+      expect(editionAllows('agency', f)).toBe(true);
+    }
+  });
+  it('提供先版は運用/管理系を非許可', () => {
+    expect(editionAllows('client', 'approvals')).toBe(false);
+    expect(editionAllows('client', 'autoApply')).toBe(false);
+    expect(editionAllows('client', 'connections')).toBe(false);
+    expect(editionAllows('client', 'billing')).toBe(false);
+  });
+});
+
+describe('業種モード (industry profile)', () => {
+  it('業種コードでプロファイルを引き、未知はotherにフォールバック', () => {
+    expect(industryProfileFor('beauty').cvLabel).toBe('予約・購入');
+    expect(industryProfileFor('___unknown___').code).toBe('other');
+  });
+  it('美容は薬機法系のNG表現を含む', () => {
+    expect(industryProfileFor('beauty').ngWords).toContain('シミが消える');
+  });
+  it('industryModeFor は相場とプロファイルを揃えて返す', () => {
+    const m = industryModeFor('ec');
+    expect(m.benchmark.cpa).toBe(4000);
+    expect(m.profile.appealAxes[0]).toBe('価格・オファー');
+  });
+});
+
+describe('キーワード最適化スコアリング (F-18)', () => {
+  const ecBm = { ctr: 1.2, cvr: 2.0, cpa: 4000 };
+  it('相場を上回る高効率キーワードは高スコア', () => {
+    const s = efficiencyScore({ ctr: 8, cvr: 6.25, cpa: 2400, roas: 375, bm: ecBm });
+    expect(s).toBeGreaterThanOrEqual(80);
+  });
+  it('CV0・高消化は「停止」', () => {
+    const r = recommendKeyword({ clicks: 450, cost: 67500, conversions: 0, cpa: null, roas: 0, efficiency: 9, bm: ecBm });
+    expect(r.action).toBe('pause');
+    expect(r.bidChangePct).toBe(-100);
+  });
+  it('効率良好・CPAが相場並みは「増額」', () => {
+    const r = recommendKeyword({ clicks: 640, cost: 96000, conversions: 40, cpa: 2400, roas: 375, efficiency: 95, bm: ecBm });
+    expect(r.action).toBe('increase');
+    expect(r.bidChangePct).toBeGreaterThan(0);
+  });
+  it('CPAが相場を大きく超過は「減額」', () => {
+    const r = recommendKeyword({ clicks: 300, cost: 90000, conversions: 9, cpa: 10000, roas: 90, efficiency: 45, bm: ecBm });
+    expect(r.action).toBe('decrease');
+    expect(r.bidChangePct).toBeLessThan(0);
+  });
+  it('低ボリューム・CV0は判断保留の「維持」', () => {
+    const r = recommendKeyword({ clicks: 10, cost: 1500, conversions: 0, cpa: null, roas: 0, efficiency: 5, bm: ecBm });
+    expect(r.action).toBe('keep');
   });
 });
