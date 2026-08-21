@@ -23,6 +23,22 @@ export function resolveTenantId(req: Request): string | null {
   return null;
 }
 
+export interface SessionInfoValue {
+  userId: string | null;
+  role: 'owner' | 'admin' | 'operator' | 'viewer';
+}
+
+/** セッションのユーザーID・ロール。ヘッダフォールバック時 (開発ツール) は owner 扱い */
+export const SessionInfo = createParamDecorator((_: unknown, ctx: ExecutionContext): SessionInfoValue => {
+  const req = ctx.switchToHttp().getRequest<Request>();
+  const token = (req.cookies ?? {})[SESSION_COOKIE] as string | undefined;
+  if (token) {
+    const session = verifySession(token);
+    if (session) return { userId: session.sub, role: session.role };
+  }
+  return { userId: null, role: 'owner' };
+});
+
 export const TenantId = createParamDecorator((_: unknown, ctx: ExecutionContext): string => {
   const req = ctx.switchToHttp().getRequest<Request>();
   const tenantId = resolveTenantId(req);

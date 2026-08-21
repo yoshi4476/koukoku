@@ -163,6 +163,30 @@ export class ClientsController {
     });
   }
 
+  /** アカウント単体取得 (accountIdのみのディープリンク解決用) */
+  @Get('account/:accountId')
+  async account(
+    @TenantId() tenantId: string,
+    @Param('accountId') accountId: string,
+  ): Promise<AdAccountDto> {
+    const a = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.adAccount.findUnique({ where: { id: accountId } }),
+    );
+    if (!a) {
+      throw new AppError(HttpStatus.NOT_FOUND, '広告アカウントが見つかりません。', 'アカウントを選び直してください。');
+    }
+    return {
+      id: a.id,
+      clientId: a.clientId,
+      platform: a.platform as Platform,
+      externalAccountId: a.externalAccountId,
+      name: a.name,
+      currency: a.currency,
+      connectionStatus: 'not_connected',
+      lastSyncedAt: null,
+    };
+  }
+
   @Get(':clientId/accounts')
   async accounts(
     @TenantId() tenantId: string,

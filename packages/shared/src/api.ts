@@ -242,6 +242,51 @@ export interface AlertRunResultDto {
   notified: number;
 }
 
+/* ---- 承認フロー付き適用 (F-16 / Phase 3) ---- */
+export type ProposalAction = 'adjust_budget' | 'adjust_bid' | 'pause_campaign';
+export type ProposalStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'executed'
+  | 'failed'
+  | 'rolled_back';
+
+export interface ProposalDto {
+  id: string;
+  adAccountId: string;
+  accountName: string;
+  clientName: string;
+  platform: Platform;
+  actionType: ProposalAction;
+  actionPayload: Record<string, unknown>;
+  title: string;
+  evidence: string;
+  risk: string;
+  confidence: 'high' | 'mid' | 'low';
+  simulation: string;
+  status: ProposalStatus;
+  executionNote: string;
+  /** ロールバック可能 (実適用され変更前値を保持している場合のみ) */
+  canRollback: boolean;
+  createdAt: string;
+  approvedAt: string | null;
+  executedAt: string | null;
+}
+
+export interface CreateProposalInput {
+  adAccountId: string;
+  actionType: ProposalAction;
+  /** adjust_budget: {newMonthlyBudget} / adjust_bid: {campaignId, percent} / pause_campaign: {campaignId} */
+  actionPayload: Record<string, unknown>;
+  title: string;
+  evidence?: string;
+  risk?: string;
+  confidence?: 'high' | 'mid' | 'low';
+  sourceAuditId?: string;
+  sourceRank?: number;
+}
+
 /* ---- プラン (要件書 §⑦。課金処理はStripe接続後) ---- */
 export type PlanId = 'starter' | 'business' | 'agency' | 'enterprise';
 

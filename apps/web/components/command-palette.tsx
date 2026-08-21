@@ -42,6 +42,7 @@ export function CommandPalette({
       { label: '広告文', href: '/copy', keywords: 'copy koukokubun 生成' },
       { label: '媒体窓口', href: '/portal', keywords: 'portal baitai リンク' },
       { label: 'アラート', href: '/alerts', keywords: 'alerts arato 通知 検知 異常' },
+      { label: '承認キュー', href: '/approvals', keywords: 'approvals shounin 承認 提案 適用 実行' },
       { label: 'データ取込', href: '/import', keywords: 'import csv torikomi' },
       { label: 'API接続', href: '/connections', keywords: 'connections api setsuzoku 接続 同期 oauth' },
       { label: '設定', href: '/settings', keywords: 'settings settei' },

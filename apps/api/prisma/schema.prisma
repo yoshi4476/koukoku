@@ -60,8 +60,40 @@ model Tenant {
   auditTrail  AuditTrail[]
   alertRules  AlertRule[]
   alertEvents AlertEvent[]
+  proposals   Proposal[]
 
   @@map("tenants")
+}
+
+// AI提案の承認・実行 (F-16)。status遷移: pending → approved/rejected → executed/failed → rolled_back
+// 承認なしの実行はサービス層で禁止 (承認済みレコードのみ実行)
+model Proposal {
+  id              String    @id @default(cuid())
+  tenantId        String    @map("tenant_id")
+  adAccountId     String    @map("ad_account_id")
+  actionType      String    @map("action_type") // adjust_budget / adjust_bid / pause_campaign
+  actionPayload   Json      @map("action_payload")
+  title           String
+  evidence        String    @default("")
+  risk            String    @default("")
+  confidence      String    @default("mid")
+  simulation      String    @default("")
+  status          String    @default("pending")
+  sourceAuditId   String?   @map("source_audit_id")
+  sourceRank      Int?      @map("source_rank")
+  createdBy       String?   @map("created_by")
+  approvedBy      String?   @map("approved_by")
+  approvedAt      DateTime? @map("approved_at")
+  executedAt      DateTime? @map("executed_at")
+  executionNote   String    @default("") @map("execution_note")
+  rollbackPayload Json?     @map("rollback_payload")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  adAccount AdAccount @relation(fields: [adAccountId], references: [id])
+
+  @@index([tenantId, status, createdAt])
+  @@map("proposals")
 }
 
 // 異常検知ルール (F-13)。テナント×メトリクスで1件。初回アクセス時にデフォルトを自動作成
@@ -152,6 +184,7 @@ model AdAccount {
   facts      FactAdPerformance[]
   audits     Audit[]
   csvImports CsvImport[]
+  proposals  Proposal[]
 
   @@index([tenantId, clientId])
   @@map("ad_accounts")

@@ -27,6 +27,8 @@ import { BillingService } from './billing/billing.service';
 import { BillingController } from './billing/billing.controller';
 import { MediaSyncService } from './media-connector/sync.service';
 import { ConnectionsController } from './media-connector/connections.controller';
+import { ProposalsService } from './proposals/proposals.service';
+import { ProposalsController } from './proposals/proposals.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -37,6 +39,7 @@ import { ConnectionsController } from './media-connector/connections.controller'
     AlertsController,
     BillingController,
     ConnectionsController,
+    ProposalsController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -54,6 +57,7 @@ import { ConnectionsController } from './media-connector/connections.controller'
     ReportExportService,
     BillingService,
     MediaSyncService,
+    ProposalsService,
     MetricsService,
     LlmService,
     AuditService,

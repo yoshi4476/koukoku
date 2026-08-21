@@ -1,4 +1,11 @@
-import type { Platform, ConnectionStatus, MemberRole, AlertMetric } from '@adgrid/shared';
+import type {
+  Platform,
+  ConnectionStatus,
+  MemberRole,
+  AlertMetric,
+  ProposalAction,
+  ProposalStatus,
+} from '@adgrid/shared';
 
 /* 媒体色はダークモードで反転するため hex ではなく CSS 変数で参照する */
 export const PLATFORM_COLOR_VAR: Record<Platform, string> = {
@@ -88,6 +95,21 @@ export const ALERT_METRIC_META: Record<AlertMetric, { label: string; description
     description: '昨日の消化が7日平均から急減 (配信停止疑い)',
     unit: '%減少',
   },
+};
+
+export const PROPOSAL_ACTION_LABEL: Record<ProposalAction, string> = {
+  adjust_budget: '予算調整',
+  adjust_bid: '入札調整',
+  pause_campaign: '配信停止',
+};
+
+export const PROPOSAL_STATUS_LABEL: Record<ProposalStatus, string> = {
+  pending: '承認待ち',
+  approved: '承認済',
+  rejected: '却下',
+  executed: '実行済',
+  failed: '失敗',
+  rolled_back: 'ロールバック済',
 };
 
 export const INDUSTRY_LABEL: Record<string, string> = {

@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { BillingDto, ConnectionDto, MemberDto, UsageDto } from '@adgrid/shared';
 import { PLANS } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
 import { ErrorCard, Skeleton, SkeletonLines } from '@/components/ui';
-import { apiPost, ApiError, toApiError } from '@/lib/api';
+import { apiPost, apiPut, ApiError, toApiError } from '@/lib/api';
 import { MEMBER_ROLE_LABEL, USAGE_FEATURE_LABEL } from '@/lib/labels';
 import { formatNumber, formatYen } from '@/lib/format';
 
@@ -69,6 +69,77 @@ function AutoReportCard() {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ---- カード5: 自動適用 (kill switch / F-16) ---- */
+function ApplySettingsCard() {
+  const { me } = useAuth();
+  const canEdit = me.role === 'owner' || me.role === 'admin';
+  const settings = useApi<{ applyEnabled: boolean }>('/proposals/settings');
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+
+  useEffect(() => {
+    if (settings.data) setEnabled(settings.data.applyEnabled);
+  }, [settings.data]);
+
+  const toggle = (next: boolean) => {
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    apiPut<{ applyEnabled: boolean }>('/proposals/settings', { applyEnabled: next })
+      .then((r) => {
+        setEnabled(r.applyEnabled);
+        setSaving(false);
+      })
+      .catch((e: unknown) => {
+        setError(toApiError(e));
+        setSaving(false);
+        // サーバ状態と食い違わないよう再取得して同期する
+        settings.retry();
+      });
+  };
+
+  return (
+    <div className="card" style={{ marginBottom: 16, maxWidth: 640 }}>
+      <div className="c-head"><h2>自動適用 (kill switch)</h2></div>
+      {settings.loading ? (
+        <div className="c-body"><SkeletonLines count={2} /></div>
+      ) : settings.error ? (
+        <div className="c-body"><ErrorCard error={settings.error} onRetry={settings.retry} /></div>
+      ) : enabled !== null ? (
+        <div className="c-body form-grid">
+          {error ? <ErrorCard error={error} /> : null}
+          <div className="row-actions">
+            <label className="switch" title={enabled ? '停止する' : '再開する'}>
+              <input
+                type="checkbox"
+                checked={enabled}
+                disabled={saving || !canEdit}
+                aria-label="提案の承認・実行を有効にする"
+                onChange={(e) => toggle(e.target.checked)}
+              />
+              <span className="sw-track" aria-hidden="true" />
+              <span className="sw-knob" aria-hidden="true" />
+            </label>
+            <span style={{ fontSize: 13, fontWeight: 600, color: enabled ? 'var(--good)' : 'var(--bad)' }}>
+              {enabled ? '稼働中' : '停止中'}
+            </span>
+            {saving ? <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>保存中…</span> : null}
+          </div>
+          <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)' }}>
+            停止中は承認・実行がすべてブロックされます (緊急停止用)。
+          </p>
+          {!canEdit ? (
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)' }}>
+              変更はオーナー/管理者のみ行えます。
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -258,7 +329,10 @@ export default function SettingsPage() {
       {/* カード4: 自動レポート */}
       <AutoReportCard />
 
-      {/* カード5: API接続 */}
+      {/* カード5: 自動適用 (kill switch) */}
+      <ApplySettingsCard />
+
+      {/* カード6: API接続 */}
       <div className="card" style={{ marginBottom: 16, maxWidth: 640 }}>
         <div className="c-head"><h2>API接続</h2></div>
         {connections.loading ? (

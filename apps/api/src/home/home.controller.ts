@@ -67,6 +67,26 @@ export class HomeController {
         }
       }
 
+      // 承認待ち: pending の提案 (F-16)
+      const pendings = await tx.proposal.findMany({
+        where: { status: 'pending' },
+        include: { adAccount: { include: { client: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      });
+      for (const p of pendings) {
+        out.push({
+          id: `approval-${p.id}`,
+          kind: 'approval',
+          severity: 'warn',
+          title: `承認待ち: ${p.title}`,
+          subtitle: `${p.adAccount.name} · ${p.simulation}`,
+          clientName: p.adAccount.client.name,
+          platform: p.adAccount.platform as Platform,
+          href: '/approvals',
+        });
+      }
+
       // レポート予定: 直近7日にレポートがないクライアント
       const clients = await tx.client.findMany({ where: { status: 'active' } });
       for (const client of clients) {

@@ -1,25 +1,191 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { AdAccountDto, AuditFinding, AuditRunDto, FindingStatus } from '@adgrid/shared';
+import Link from 'next/link';
+import type {
+  AdAccountDto,
+  AuditFinding,
+  AuditRunDto,
+  CreateProposalInput,
+  FindingStatus,
+  ProposalAction,
+  ProposalDto,
+} from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
 import { ErrorCard, MockBadge, PlatformTag, SkeletonLines } from '@/components/ui';
-import { apiPatch, apiPost, ApiError, toApiError } from '@/lib/api';
-import { AUDIT_CATEGORY_LABEL, CONFIDENCE_LABEL } from '@/lib/labels';
+import { apiGet, apiPatch, apiPost, ApiError, toApiError } from '@/lib/api';
+import { AUDIT_CATEGORY_LABEL, CONFIDENCE_LABEL, PROPOSAL_ACTION_LABEL } from '@/lib/labels';
 import { formatDateTime } from '@/lib/format';
+
+const PROPOSAL_ACTIONS: ProposalAction[] = ['adjust_budget', 'adjust_bid', 'pause_campaign'];
+
+/* ---- 指摘から承認キューへの申請フォーム (S-20 / F-16) ---- */
+function ProposalForm({
+  finding,
+  adAccountId,
+  auditId,
+}: {
+  finding: AuditFinding;
+  adAccountId: string;
+  auditId: string;
+}) {
+  const [actionType, setActionType] = useState<ProposalAction>('adjust_budget');
+  const [budget, setBudget] = useState('');
+  const [percent, setPercent] = useState('');
+  const [campaignId, setCampaignId] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [done, setDone] = useState(false);
+
+  const buildPayload = (): Record<string, unknown> | null => {
+    if (actionType === 'adjust_budget') {
+      const v = Number(budget);
+      return budget !== '' && Number.isFinite(v) && v > 0 ? { newMonthlyBudget: v } : null;
+    }
+    if (actionType === 'adjust_bid') {
+      const v = Number(percent);
+      return percent !== '' && Number.isFinite(v) && v >= -50 && v <= 50 && v !== 0
+        ? { campaignId, percent: v }
+        : null;
+    }
+    return { campaignId };
+  };
+
+  const submit = () => {
+    const actionPayload = buildPayload();
+    if (!actionPayload || sending) return;
+    setSending(true);
+    setError(null);
+    const input: CreateProposalInput = {
+      adAccountId,
+      actionType,
+      actionPayload,
+      title: finding.title,
+      evidence: finding.evidence.reasoning,
+      risk: finding.risk,
+      confidence: finding.confidence,
+      sourceAuditId: auditId,
+      sourceRank: finding.priority_rank,
+    };
+    apiPost<ProposalDto>('/proposals', input)
+      .then(() => {
+        setSending(false);
+        setDone(true);
+      })
+      .catch((e: unknown) => {
+        setError(toApiError(e));
+        setSending(false);
+      });
+  };
+
+  if (done) {
+    return (
+      <div className="alert info" style={{ marginTop: 10, marginBottom: 0 }}>
+        <span className="a-ico" aria-hidden="true">●</span>
+        <div>
+          <span className="a-title">承認キューに追加しました</span>
+          <br />
+          <Link href="/approvals" style={{ fontSize: 12.5 }}>承認キューで確認する</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const fieldId = `propose-${finding.priority_rank}`;
+
+  return (
+    <div className="inline-form" style={{ marginTop: 10 }}>
+      <div className="row-actions">
+        <div className="field">
+          <label htmlFor={`${fieldId}-action`}>アクション種別</label>
+          <select
+            id={`${fieldId}-action`}
+            className="select"
+            value={actionType}
+            onChange={(e) => setActionType(e.target.value as ProposalAction)}
+          >
+            {PROPOSAL_ACTIONS.map((a) => (
+              <option key={a} value={a}>{PROPOSAL_ACTION_LABEL[a]}</option>
+            ))}
+          </select>
+        </div>
+        {actionType === 'adjust_budget' ? (
+          <div className="field">
+            <label htmlFor={`${fieldId}-budget`}>新しい月予算 (円)</label>
+            <input
+              id={`${fieldId}-budget`}
+              className="input num"
+              type="number"
+              min={1}
+              style={{ width: 150 }}
+              value={budget}
+              onChange={(e) => setBudget(e.target.value)}
+              placeholder="300000"
+            />
+          </div>
+        ) : null}
+        {actionType === 'adjust_bid' ? (
+          <div className="field">
+            <label htmlFor={`${fieldId}-percent`}>調整率 (%、-50〜50)</label>
+            <input
+              id={`${fieldId}-percent`}
+              className="input num"
+              type="number"
+              min={-50}
+              max={50}
+              style={{ width: 130 }}
+              value={percent}
+              onChange={(e) => setPercent(e.target.value)}
+              placeholder="-20"
+            />
+          </div>
+        ) : null}
+        {actionType === 'pause_campaign' ? (
+          <div className="field">
+            <label htmlFor={`${fieldId}-campaign`}>キャンペーンID (任意)</label>
+            <input
+              id={`${fieldId}-campaign`}
+              className="input"
+              type="text"
+              style={{ width: 180 }}
+              value={campaignId}
+              onChange={(e) => setCampaignId(e.target.value)}
+            />
+          </div>
+        ) : null}
+        <div style={{ alignSelf: 'flex-end' }}>
+          <button type="button" className="btn sm pri" disabled={sending || buildPayload() === null} onClick={submit}>
+            {sending ? '送信中…' : '承認キューへ送る'}
+          </button>
+        </div>
+      </div>
+      {error ? (
+        <div style={{ marginTop: 10 }}>
+          <ErrorCard error={error} onRetry={submit} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function FindingCard({
   finding,
   status,
   onSetStatus,
   updating,
+  adAccountId,
+  auditId,
 }: {
   finding: AuditFinding;
   status: FindingStatus;
   onSetStatus: (rank: number, status: FindingStatus) => void;
   updating: boolean;
+  adAccountId: string;
+  auditId: string;
 }) {
+  const [proposeOpen, setProposeOpen] = useState(false);
+
   return (
     <div className={`finding st-${status}`}>
       <div className="f-head">
@@ -69,7 +235,12 @@ function FindingCard({
             未対応に戻す
           </button>
         )}
+        <button type="button" className="btn sm sec" onClick={() => setProposeOpen((o) => !o)}>
+          {proposeOpen ? '申請フォームを閉じる' : '適用を申請'}
+        </button>
       </div>
+
+      {proposeOpen ? <ProposalForm finding={finding} adAccountId={adAccountId} auditId={auditId} /> : null}
     </div>
   );
 }
@@ -124,6 +295,8 @@ function RunResult({ run, onUpdated }: { run: AuditRunDto; onUpdated: (r: AuditR
           status={run.findingStatuses[f.priority_rank] ?? 'open'}
           onSetStatus={setStatus}
           updating={updating}
+          adAccountId={run.adAccountId}
+          auditId={run.id}
         />
       ))}
 
@@ -165,6 +338,12 @@ export default function AuditPage() {
     if (qAccountId) {
       setPendingAccountId(qAccountId);
       setAutoOpenLatest(true);
+      // accountId のみのディープリンク (ホーム等) はクライアントをAPIで解決する
+      if (!qClientId) {
+        apiGet<AdAccountDto>(`/clients/account/${encodeURIComponent(qAccountId)}`)
+          .then((a) => setClientId(a.clientId))
+          .catch(() => undefined);
+      }
     }
   }, []);
 

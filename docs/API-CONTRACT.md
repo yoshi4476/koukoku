@@ -42,6 +42,12 @@ Base URL: `http://localhost:4000`。DTO の型定義は `@adgrid/shared` (`packa
 | POST | `/connections/:platform/complete` body `{accounts:[{externalAccountId,name,clientId,monthlyBudget?}]}` | 接続確定+アカウント作成+初回30日同期 | `{connection, sync}` |
 | POST | `/connections/:id/sync` | 今すぐ同期 (30日洗い替え。3時間毎cronもあり) | `SyncResultDto` |
 | DELETE | `/connections/:id` | 切断 (データ・アカウントは保持) | `{ok:true}` |
+| GET | `/proposals` | 提案一覧 (pending先頭) | `ProposalDto[]` |
+| POST | `/proposals` body `CreateProposalInput` | 提案作成 (シミュレーション自動付与) | `ProposalDto` |
+| POST | `/proposals/:id/approve` | 承認→即実行 (owner/adminのみ。kill switch停止中は409)。adjust_budgetは実適用+ロールバック可、他はデモ実行 | `ProposalDto` |
+| POST | `/proposals/:id/reject` | 却下 (owner/adminのみ) | `ProposalDto` |
+| POST | `/proposals/:id/rollback` | 実行済みadjust_budgetを変更前値に戻す | `ProposalDto` |
+| GET/PUT | `/proposals/settings` body `{applyEnabled}` | kill switch (テナント単位の適用停止) | `{applyEnabled}` |
 | GET | `/home` | 今日の司令室 (優先度順タスク) | `HomeDto` |
 | GET | `/clients` | クライアント一覧 | `ClientDto[]` |
 | GET | `/clients/:clientId/accounts` | クライアント配下の広告アカウント | `AdAccountDto[]` |

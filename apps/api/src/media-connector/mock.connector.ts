@@ -1,7 +1,9 @@
 import type { Platform } from '@adgrid/shared';
 import {
+  ApplyResult,
   AuthorizeResult,
   BaseConnector,
+  ChangeRequest,
   DateRange,
   ExternalAccount,
   NormalizedRow,
@@ -39,6 +41,15 @@ export class MockConnector extends BaseConnector {
 
   async authorize(tenantId: string): Promise<AuthorizeResult> {
     return { mode: 'mock', candidates: await this.fetchAccounts(tenantId) };
+  }
+
+  /** デモ接続: 媒体への書込をシミュレートして成功を返す (承認フローの検証用) */
+  protected async doApplyChange(change: ChangeRequest): Promise<ApplyResult> {
+    return {
+      success: true,
+      simulated: true,
+      note: `デモ接続のため媒体への適用をシミュレートしました (${change.operation}: ${change.externalId})。実API接続後は本適用されます。`,
+    };
   }
 
   async fetchAccounts(tenantId: string): Promise<ExternalAccount[]> {

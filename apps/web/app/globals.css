@@ -359,6 +359,16 @@ a.pill { text-decoration: none; }
 .alert-ev .ev-title { flex: 1 1 220px; min-width: 0; font-weight: 600; }
 .alert-ev .ev-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
 
+/* ---------- approvals (S-20 / F-16) ---------- */
+.proposal { border: 1px solid var(--line); border-left: 4px solid var(--primary); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow-1); padding: 14px 16px; }
+.proposal + .proposal { margin-top: 10px; }
+.proposal .p-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.sim-box { margin-top: 10px; background: var(--primary-soft); border: 1px solid var(--primary); border-radius: 8px; padding: 8px 12px; font-size: 12.5px; }
+.sim-box .f-label { color: var(--primary); }
+.prop-row { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 12.5px; flex-wrap: wrap; }
+.prop-row:last-child { border-bottom: none; }
+.prop-row .pr-title { flex: 1 1 200px; min-width: 0; font-weight: 600; }
+
 /* ---------- misc ---------- */
 .section-gap { margin-top: 24px; }
 .row-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
