@@ -2,7 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditResultSchema } from '@adgrid/shared';
 import type { AuditFinding, AuditResult, AuditRunDto } from '@adgrid/shared';
 import { PrismaService, Tx } from '../prisma/prisma.service';
-import { benchmarkFor } from '@adgrid/shared';
+import { benchmarkFor, industryProfileFor } from '@adgrid/shared';
 import { AppError } from '../common/errors';
 import { CalibrationService } from '../calibration/calibration.service';
 import { TrailService } from '../common/trail.service';
@@ -22,6 +22,8 @@ interface AuditInput {
   account: { id: string; name: string; platform: string; monthlyBudget: number | null };
   /** 業種別ベンチマーク (A-3)。診断の判断軸を「時系列」から「業種相場比」に広げる */
   industryBenchmark: { label: string; ctr: number; cvr: number; cpa: number };
+  /** 業種モード: 診断で重点的に見るカテゴリの並び優先に使う */
+  industryCode: string;
   period: { since: string; until: string };
   monthToDateCost: number;
   monthElapsedRatio: number;
@@ -116,6 +118,7 @@ export class AuditService {
         monthlyBudget: account.monthlyBudget ? Number(account.monthlyBudget) : null,
       },
       industryBenchmark: { label: bm.label, ctr: bm.ctr, cvr: bm.cvr, cpa: bm.cpa },
+      industryCode: account.client.industryCode,
       period: { since: isoDate(daysAgo(27)), until: isoDate(daysAgo(0)) },
       monthToDateCost: mtd.cost,
       monthElapsedRatio: +(now.getDate() / daysInMonth).toFixed(2),
@@ -278,12 +281,17 @@ export class AuditService {
       });
     }
 
-    // 優先度順: 計測 → その他 impact*ease*confidence
+    // 優先度順: 計測 → 業種重点カテゴリ → その他 impact*ease*confidence
+    // 業種モード: 業種プロファイルの diagnosisFocus に含まれるカテゴリを一段引き上げる
     const cw = { high: 1.0, mid: 0.7, low: 0.4 } as const;
+    const focus = new Set<string>(industryProfileFor(input.industryCode).diagnosisFocus);
     findings.sort((a, b) => {
       if (a.category === 'measurement' !== (b.category === 'measurement')) {
         return a.category === 'measurement' ? -1 : 1;
       }
+      const af = focus.has(a.category) ? 1 : 0;
+      const bf = focus.has(b.category) ? 1 : 0;
+      if (af !== bf) return bf - af;
       return b.impact_level * b.ease_level * cw[b.confidence] - a.impact_level * a.ease_level * cw[a.confidence];
     });
     findings.forEach((f, i) => (f.priority_rank = i + 1));

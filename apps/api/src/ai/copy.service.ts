@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { CopyResultSchema } from '@adgrid/shared';
-import type { CopyCandidate, CopyResult, CopyRunDto, KnowledgeAssetDto, Platform } from '@adgrid/shared';
+import { CopyResultSchema, industryProfileFor } from '@adgrid/shared';
+import type { AppealAxis, CopyCandidate, CopyResult, CopyRunDto, IndustryProfile, KnowledgeAssetDto, Platform } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 import { TrailService } from '../common/trail.service';
@@ -27,8 +27,13 @@ export class CopyService {
     private readonly knowledge: KnowledgeService,
   ) {}
 
-  /* テンプレート生成 (モックモード)。1案=1訴求を厳守。勝ちパターンの訴求軸を優先 (B-1) */
-  private templateCandidates(input: CopyRunInput, winningPatterns: KnowledgeAssetDto[] = []): CopyCandidate[] {
+  /* テンプレート生成 (モックモード)。1案=1訴求を厳守。
+     優先順: 指定軸 > 勝ちパターン(B-1) > 業種の推奨訴求軸(業種モード) > 全軸 */
+  private templateCandidates(
+    input: CopyRunInput,
+    winningPatterns: KnowledgeAssetDto[] = [],
+    industryAxes: AppealAxis[] = [],
+  ): CopyCandidate[] {
     const productName = input.productInfo.split(/\r?\n/)[0]?.slice(0, 18) || '本サービス';
     const templates: Record<string, { h: string; d: string }> = {
       便益: {
@@ -64,11 +69,12 @@ export class CopyService {
         d: `専門知識は不要です。${productName}は登録後すぐに使いはじめられます。`,
       },
     };
-    // 指定軸 > 勝ちパターンの軸 > 全軸 の優先順で並べる
+    // 指定軸 > 勝ちパターンの軸 > 業種推奨軸 > 全軸 の優先順で並べる
     const winAxes = winningPatterns.map((p) => p.appealAxis).filter((a) => a in templates);
+    const indAxes = industryAxes.filter((a) => a in templates);
     const axes = input.appealAxes.length > 0
       ? input.appealAxes
-      : [...new Set([...winAxes, ...Object.keys(templates)])];
+      : [...new Set([...winAxes, ...indAxes, ...Object.keys(templates)])];
     const out: CopyCandidate[] = [];
     for (let i = 0; i < input.count; i++) {
       const axis = axes[i % axes.length];
@@ -78,14 +84,35 @@ export class CopyService {
     return out;
   }
 
-  /** 2段チェックの1段目: 辞書スキャン (モック/実モード共通で必ず実行) + 入力原文もチェック */
-  private applyDictionary(candidates: CopyCandidate[], productInfo: string): CopyCandidate[] {
+  /** 2段チェックの1段目: 辞書スキャン (モック/実モード共通で必ず実行) + 業種NG表現 */
+  private applyDictionary(
+    candidates: CopyCandidate[],
+    productInfo: string,
+    industryNgWords: string[] = [],
+    industryLabel = '',
+  ): CopyCandidate[] {
     return candidates.map((c) => {
-      const dictIssues = scanLawDictionary(`${c.headline} ${c.description}`);
+      const text = `${c.headline} ${c.description}`;
+      const dictIssues = scanLawDictionary(text);
       const merged = [...c.law_issues];
       for (const issue of dictIssues) {
         const dup = merged.some((m) => m.expression === issue.expression && m.law === issue.law);
         if (!dup) merged.push(issue);
+      }
+      // 業種モードの要注意表現 (辞書に無いものを補足検出)
+      for (const w of industryNgWords) {
+        if (!w || !text.includes(w)) continue;
+        const dup = merged.some((m) => m.expression === w);
+        if (!dup) {
+          merged.push({
+            law: `${industryLabel}の要注意表現`,
+            expression: w,
+            severity: 'warn',
+            reason: `${industryLabel}では断定・誇大等の観点で媒体審査で問題になりやすい表現です。`,
+            suggestion: '根拠の明示や表現の緩和 (「〜の場合があります」等) を検討してください。',
+            confidence: 'mid',
+          });
+        }
       }
       void productInfo;
       return { ...c, law_issues: merged };
@@ -118,6 +145,8 @@ export class CopyService {
     const winningPatterns = client
       ? await this.knowledge.topFor(tenantId, client.industryCode, 3)
       : [];
+    // 業種モード: 業種の推奨訴求軸・NG表現・勘所を反映
+    const profile: IndustryProfile = industryProfileFor(client?.industryCode ?? 'other');
 
     let candidates: CopyCandidate[];
     let mocked = false;
@@ -134,6 +163,7 @@ export class CopyService {
         `<request>媒体: ${input.platform} / 訴求軸: ${input.appealAxes.join('、') || '自動選定'} / 案数: ${count} / 目標長: 見出し${limits.headlineUnits}ユニット・説明文${limits.descriptionUnits}ユニット以内 (全角=2)</request>`,
         `<product_info>\n${input.productInfo}\n</product_info>`,
         `<winning_patterns>\n同業種で成果が実証された勝ちパターン。参考にしつつ商材に合わせること:\n${patternsBlock}\n</winning_patterns>`,
+        `<industry_guidance>\n業種: ${profile.label} / 推奨訴求軸(優先): ${profile.appealAxes.join('、')} / 要注意表現(避ける): ${profile.ngWords.join('、')} / 勘所: ${profile.tip}\n</industry_guidance>`,
         `<law_dictionary_hits>\n${JSON.stringify(dictHits)}\n</law_dictionary_hits>`,
       ].join('\n\n');
       const text = await this.llm.completeText({
@@ -154,11 +184,11 @@ export class CopyService {
       }
       candidates = parsed.data.candidates.slice(0, count);
     } else {
-      candidates = this.templateCandidates({ ...input, count }, winningPatterns);
+      candidates = this.templateCandidates({ ...input, count }, winningPatterns, profile.appealAxes);
       mocked = true;
     }
 
-    candidates = this.applyDictionary(candidates, input.productInfo);
+    candidates = this.applyDictionary(candidates, input.productInfo, profile.ngWords, profile.label);
     const result: CopyResult = { candidates };
     const lengthChecks = this.lengthChecks(candidates, input.platform);
 

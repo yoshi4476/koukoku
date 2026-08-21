@@ -10,12 +10,12 @@ import type {
   Platform,
   SampleDataResultDto,
 } from '@adgrid/shared';
-import { ALL_PLATFORMS, PLATFORM_META } from '@adgrid/shared';
+import { ALL_PLATFORMS, PLATFORM_META, industryModeFor } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
 import { DeltaPill, ErrorCard, HintBar, Skeleton } from '@/components/ui';
 import { apiPost, ApiError, toApiError } from '@/lib/api';
-import { INDUSTRY_LABEL } from '@/lib/labels';
+import { AUDIT_CATEGORY_LABEL, INDUSTRY_LABEL } from '@/lib/labels';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
 
 /* ---- クライアント追加 (ページ上部のインラインフォーム) ---- */
@@ -176,8 +176,55 @@ function AddAccountForm({
   );
 }
 
+/* 業種モード: この業種向けの相場・訴求・診断重点・用語をまとめて可視化 */
+function IndustryModePanel({ industryCode }: { industryCode: string }) {
+  const { profile, benchmark } = industryModeFor(industryCode);
+  return (
+    <div className="ind-mode">
+      <div className="ind-row">
+        <span className="ind-label">相場 (目標値)</span>
+        <span className="ind-val num">
+          CTR {benchmark.ctr}% · CVR {benchmark.cvr}% · CPA ¥{benchmark.cpa.toLocaleString()}
+        </span>
+      </div>
+      <div className="ind-row">
+        <span className="ind-label">推奨する訴求</span>
+        <span className="ind-chips">
+          {profile.appealAxes.map((a) => (
+            <span key={a} className="ind-chip pri">{a}</span>
+          ))}
+        </span>
+      </div>
+      <div className="ind-row">
+        <span className="ind-label">診断の重点</span>
+        <span className="ind-chips">
+          {profile.diagnosisFocus.map((d) => (
+            <span key={d} className="ind-chip">{AUDIT_CATEGORY_LABEL[d] ?? d}</span>
+          ))}
+        </span>
+      </div>
+      <div className="ind-row">
+        <span className="ind-label">CVの呼び方</span>
+        <span className="ind-val">「{profile.cvLabel}」</span>
+      </div>
+      {profile.ngWords.length > 0 ? (
+        <div className="ind-row">
+          <span className="ind-label">要注意表現</span>
+          <span className="ind-chips">
+            {profile.ngWords.slice(0, 6).map((w) => (
+              <span key={w} className="ind-chip ng">{w}</span>
+            ))}
+          </span>
+        </div>
+      ) : null}
+      <p className="ind-tip">💡 {profile.tip}</p>
+    </div>
+  );
+}
+
 function ClientCard({ o, onChanged }: { o: ClientOverviewDto; onChanged: () => void }) {
   const [formOpen, setFormOpen] = useState(false);
+  const [modeOpen, setModeOpen] = useState(false);
   const c = o.client;
   const qs = `clientId=${encodeURIComponent(c.id)}`;
 
@@ -185,9 +232,19 @@ function ClientCard({ o, onChanged }: { o: ClientOverviewDto; onChanged: () => v
     <div className="client-card">
       <div className="cl-head">
         <span className="cl-name">{c.name}</span>
-        <span className="tag">{INDUSTRY_LABEL[c.industryCode] ?? c.industryCode}</span>
+        <button
+          type="button"
+          className={`tag tag-btn${modeOpen ? ' on' : ''}`}
+          title="業種モード: この業種向けの最適化設定を表示"
+          aria-expanded={modeOpen}
+          onClick={() => setModeOpen((v) => !v)}
+        >
+          {INDUSTRY_LABEL[c.industryCode] ?? c.industryCode} 業種モード ▾
+        </button>
         <span className="cl-meta num" style={{ marginLeft: 'auto' }}>アカウント {c.accountCount}件</span>
       </div>
+
+      {modeOpen ? <IndustryModePanel industryCode={c.industryCode} /> : null}
 
       <div className="cl-kpis">
         <div>
