@@ -1,12 +1,23 @@
 'use client';
 
 import { Fragment, useEffect, useState, type FormEvent } from 'react';
-import type { AbArmInput, AbTestDto, CreateAbTestInput } from '@adgrid/shared';
+import Link from 'next/link';
+import type {
+  AbArmInput,
+  AbTestDto,
+  CreateAbTestInput,
+  KnowledgeAssetDto,
+  KnowledgeObjective,
+  PromoteAbTestInput,
+} from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
 import { EmptyState, ErrorCard, SkeletonLines } from '@/components/ui';
 import { apiPost, ApiError, toApiError } from '@/lib/api';
+import { KNOWLEDGE_OBJECTIVE_LABEL } from '@/lib/labels';
 import { formatNumber, formatPercent } from '@/lib/format';
+
+const OBJECTIVES: KnowledgeObjective[] = ['conversion', 'awareness', 'traffic'];
 
 const METRIC_LABEL: Record<AbTestDto['metric'], string> = { cvr: 'CVR', ctr: 'CTR' };
 
@@ -202,15 +213,114 @@ function ArmCompare({ test }: { test: AbTestDto }) {
   );
 }
 
+/* ---- 勝ちパターンに昇格するインラインフォーム (B-3→B-1) ---- */
+function PromoteForm({ test, onDone }: { test: AbTestDto; onDone: () => void }) {
+  const winnerLabel = test.result.winner === 'b' ? test.b.label : test.a.label;
+  const [appealAxis, setAppealAxis] = useState(winnerLabel);
+  const [creativeSummary, setCreativeSummary] = useState('');
+  const [objective, setObjective] = useState<KnowledgeObjective>('conversion');
+  const [shareAnonymized, setShareAnonymized] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+
+  const canSave = appealAxis.trim().length > 0 && !saving;
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (!canSave) return;
+    setSaving(true);
+    setError(null);
+    const body: PromoteAbTestInput = {
+      abTestId: test.id,
+      appealAxis: appealAxis.trim(),
+      creativeSummary: creativeSummary.trim(),
+      objective,
+      shareAnonymized,
+    };
+    apiPost<KnowledgeAssetDto>('/knowledge/promote', body)
+      .then(() => {
+        setSaving(false);
+        onDone();
+      })
+      .catch((err: unknown) => {
+        setError(toApiError(err));
+        setSaving(false);
+      });
+  };
+
+  return (
+    <form className="inline-form form-grid" style={{ marginTop: 10 }} onSubmit={submit}>
+      {error ? <ErrorCard error={error} /> : null}
+      <div className="field">
+        <label htmlFor={`promote-axis-${test.id}`}>訴求軸</label>
+        <input
+          id={`promote-axis-${test.id}`}
+          className="input"
+          type="text"
+          value={appealAxis}
+          onChange={(e) => setAppealAxis(e.target.value)}
+          placeholder="例: 便益訴求の見出し"
+          disabled={saving}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor={`promote-summary-${test.id}`}>クリエイティブ要約</label>
+        <textarea
+          id={`promote-summary-${test.id}`}
+          className="textarea"
+          value={creativeSummary}
+          onChange={(e) => setCreativeSummary(e.target.value)}
+          placeholder="例: 冒頭で価格メリットを提示し、CTAを『無料で試す』に変更"
+          disabled={saving}
+        />
+      </div>
+      <div className="field">
+        <label htmlFor={`promote-objective-${test.id}`}>目的</label>
+        <select
+          id={`promote-objective-${test.id}`}
+          className="select"
+          value={objective}
+          onChange={(e) => setObjective(e.target.value as KnowledgeObjective)}
+          disabled={saving}
+        >
+          {OBJECTIVES.map((o) => (
+            <option key={o} value={o}>{KNOWLEDGE_OBJECTIVE_LABEL[o]}</option>
+          ))}
+        </select>
+      </div>
+      <label className={`check-chip${shareAnonymized ? ' on' : ''}`} style={{ alignSelf: 'flex-start' }}>
+        <input
+          type="checkbox"
+          checked={shareAnonymized}
+          onChange={(e) => setShareAnonymized(e.target.checked)}
+          disabled={saving}
+        />
+        匿名で共有ナレッジにも登録する
+      </label>
+      <p style={{ margin: 0, fontSize: 11.5, color: 'var(--muted)' }}>
+        業種の他社事例として匿名・統計化して共有されます。クライアント名や実額は含まれません。
+      </p>
+      <div>
+        <button type="submit" className="btn sm pri" disabled={!canSave}>
+          {saving ? '登録中…' : '勝ちパターンに登録'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 /* ---- テストカード ---- */
 function TestCard({ test, onChanged }: { test: AbTestDto; onChanged: () => void }) {
   const { result } = test;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+  const [showPromote, setShowPromote] = useState(false);
+  const [promoted, setPromoted] = useState(false);
 
   const summaryVariant = result.significant ? 'sig' : !result.enoughData ? 'amber' : 'flat';
   const lift = liftText(result.lift);
   const canConclude = test.status === 'running' && result.significant;
+  const canPromote = result.winner === 'a' || result.winner === 'b';
 
   const conclude = () => {
     if (busy) return;
@@ -251,11 +361,39 @@ function TestCard({ test, onChanged }: { test: AbTestDto; onChanged: () => void 
       </div>
 
       {error ? <ErrorCard error={error} /> : null}
-      {canConclude ? (
+      {canConclude || (canPromote && !promoted) ? (
         <div className="f-actions">
-          <button type="button" className="btn sm pri" disabled={busy} onClick={conclude}>
-            {busy ? '確定中…' : 'このテストを終了して勝者を確定'}
-          </button>
+          {canConclude ? (
+            <button type="button" className="btn sm pri" disabled={busy} onClick={conclude}>
+              {busy ? '確定中…' : 'このテストを終了して勝者を確定'}
+            </button>
+          ) : null}
+          {canPromote && !promoted ? (
+            <button type="button" className="btn sm sec" onClick={() => setShowPromote((v) => !v)}>
+              {showPromote ? '登録をやめる' : '勝ちパターンに登録'}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {showPromote && !promoted ? (
+        <PromoteForm
+          test={test}
+          onDone={() => {
+            setShowPromote(false);
+            setPromoted(true);
+          }}
+        />
+      ) : null}
+
+      {promoted ? (
+        <div className="alert info" style={{ marginTop: 10, marginBottom: 0 }}>
+          <span className="a-ico" aria-hidden="true">●</span>
+          <div>
+            <span className="a-title">勝ちパターンに登録しました</span>
+            <br />
+            <Link href="/knowledge" style={{ fontSize: 12.5 }}>勝ちパターンで確認する</Link>
+          </div>
         </div>
       ) : null}
     </div>

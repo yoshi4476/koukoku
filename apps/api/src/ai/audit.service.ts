@@ -4,6 +4,7 @@ import type { AuditFinding, AuditResult, AuditRunDto } from '@adgrid/shared';
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { benchmarkFor } from '@adgrid/shared';
 import { AppError } from '../common/errors';
+import { CalibrationService } from '../calibration/calibration.service';
 import { TrailService } from '../common/trail.service';
 import { MetricsService, Totals, daysAgo, isoDate } from '../metrics/metrics.service';
 import { LlmService } from './llm.service';
@@ -44,6 +45,7 @@ export class AuditService {
     private readonly metrics: MetricsService,
     private readonly llm: LlmService,
     private readonly trail: TrailService,
+    private readonly calibration: CalibrationService,
   ) {}
 
   /* ---------------- 入力データ構築 ---------------- */
@@ -431,6 +433,8 @@ export class AuditService {
       result = this.ruleBasedAudit(input);
       mocked = true;
     }
+    // A-4: 過去の採用実績に基づき、カテゴリ別に確信度を較正
+    result = await this.applyCalibration(result);
 
     const row = await this.prisma.withTenant(tenantId, (tx) =>
       tx.audit.create({
@@ -451,6 +455,24 @@ export class AuditService {
       detail: { auditId: row.id, mocked, findings: result.findings.length },
     });
     return this.toDto(row);
+  }
+
+  /** A-4: 採用率の高いカテゴリの確信度を1段上げ、見送られがちなカテゴリを1段下げる */
+  private async applyCalibration(result: AuditResult): Promise<AuditResult> {
+    const factors = await this.calibration.factors();
+    if (factors.size === 0) return result;
+    const bump = (c: AuditFinding['confidence'], dir: 'boost' | 'penalty'): AuditFinding['confidence'] => {
+      const order: AuditFinding['confidence'][] = ['low', 'mid', 'high'];
+      const i = order.indexOf(c);
+      const ni = dir === 'boost' ? Math.min(i + 1, 2) : Math.max(i - 1, 0);
+      return order[ni];
+    };
+    const findings = result.findings.map((f) => {
+      const factor = factors.get(f.category);
+      if (factor === 'boost' || factor === 'penalty') return { ...f, confidence: bump(f.confidence, factor) };
+      return f;
+    });
+    return { ...result, findings };
   }
 
   async list(tenantId: string, adAccountId?: string): Promise<AuditRunDto[]> {
@@ -478,15 +500,21 @@ export class AuditService {
     rank: number,
     status: 'open' | 'adopted' | 'dismissed',
   ): Promise<AuditRunDto> {
-    const row = await this.prisma.withTenant(tenantId, async (tx) => {
+    const { row, category, prev } = await this.prisma.withTenant(tenantId, async (tx) => {
       const audit = await tx.audit.findUnique({ where: { id } });
       if (!audit) {
         throw new AppError(HttpStatus.NOT_FOUND, '診断が見つかりません。', '一覧から選び直してください。');
       }
       const statuses = { ...((audit.findingStatuses ?? {}) as Record<string, string>) };
+      const prevStatus = statuses[String(rank)] ?? 'open';
       statuses[String(rank)] = status;
-      return tx.audit.update({ where: { id }, data: { findingStatuses: statuses } });
+      const result = audit.result as unknown as AuditResult;
+      const finding = result.findings.find((f) => f.priority_rank === rank);
+      const updated = await tx.audit.update({ where: { id }, data: { findingStatuses: statuses } });
+      return { row: updated, category: finding?.category ?? 'other', prev: prevStatus };
     });
+    // 確信度較正 (A-4): 採用/見送りの実績を集計に反映
+    await this.calibration.record(category, prev, status);
     return this.toDto(row);
   }
 }

@@ -62,8 +62,44 @@ model Tenant {
   alertEvents AlertEvent[]
   proposals   Proposal[]
   abTests     AbTest[]
+  knowledge   KnowledgeAsset[]
 
   @@map("tenants")
+}
+
+// 勝ちパターン資産集 (ロードマップ B-1 / 要件書 F-17)。
+// tenantId=NULL は匿名化・統計化された共有ナレッジ (オプトインしたテナントのみ集計対象)。
+// テナント固有のパターンは tenantId 付きで分離保持し、RLSで他テナントから不可視。
+model KnowledgeAsset {
+  id             String   @id @default(cuid())
+  tenantId       String?  @map("tenant_id") // NULL=共有ナレッジ
+  industryCode   String   @map("industry_code")
+  objective      String   @default("conversion") // conversion / awareness / traffic
+  appealAxis     String   @map("appeal_axis")
+  creativeSummary String  @map("creative_summary")
+  platform       String   @default("")
+  winRate        Float    @default(0) @map("win_rate") // 勝率 (0-1)
+  sampleSize     Int      @default(0) @map("sample_size")
+  liftPct        Float?   @map("lift_pct")
+  sourceAnonymized Boolean @default(true) @map("source_anonymized")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id])
+
+  @@index([industryCode, objective])
+  @@map("knowledge_assets")
+}
+
+// 確信度較正 (ロードマップ A-4)。診断カテゴリ別の採用/見送り実績を集計し、
+// 「どのパターンの指摘が実際に採用されたか」から確信度スコアを補正する教師データ。
+// テナント横断で集計 (tenantId を持たず、全体傾向を学習)。
+model CalibrationStat {
+  category  String @id // measurement / budget / structure / bidding / creative / other
+  adopted   Int    @default(0)
+  dismissed Int    @default(0)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("calibration_stats")
 }
 
 // A/Bテスト管理 (ロードマップ B-3)。2アームのCVR差を two-proportion z-test で判定

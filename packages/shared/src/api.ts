@@ -247,6 +247,49 @@ export interface AlertRunResultDto {
   notified: number;
 }
 
+/* ---- 勝ちパターン資産集 (B-1 / F-17) ---- */
+export type KnowledgeObjective = 'conversion' | 'awareness' | 'traffic';
+
+export interface KnowledgeAssetDto {
+  id: string;
+  scope: 'own' | 'shared'; // own=自社ナレッジ / shared=匿名共有
+  industryCode: string;
+  industryLabel: string;
+  objective: KnowledgeObjective;
+  appealAxis: string;
+  creativeSummary: string;
+  platform: string;
+  winRate: number; // 0-1
+  sampleSize: number;
+  liftPct: number | null;
+  createdAt: string;
+}
+
+export interface KnowledgeSearchDto {
+  own: KnowledgeAssetDto[];
+  shared: KnowledgeAssetDto[];
+}
+
+export interface PromoteAbTestInput {
+  abTestId: string;
+  objective?: KnowledgeObjective;
+  appealAxis: string;
+  creativeSummary: string;
+  /** 匿名化して共有ナレッジにも登録する (オプトイン) */
+  shareAnonymized?: boolean;
+}
+
+/* ---- 確信度較正 (A-4) ---- */
+export interface CalibrationDto {
+  category: string;
+  categoryLabel: string;
+  adopted: number;
+  dismissed: number;
+  adoptionRate: number | null; // 採用率 0-1
+  /** この較正がもたらす確信度への影響 (boost/neutral/penalty) */
+  effect: 'boost' | 'neutral' | 'penalty' | 'insufficient';
+}
+
 /* ---- 予算ペーシング予測 (B-4) ---- */
 export interface PacingDto {
   adAccountId: string;

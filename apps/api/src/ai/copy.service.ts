@@ -1,9 +1,10 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { CopyResultSchema } from '@adgrid/shared';
-import type { CopyCandidate, CopyResult, CopyRunDto, Platform } from '@adgrid/shared';
+import type { CopyCandidate, CopyResult, CopyRunDto, KnowledgeAssetDto, Platform } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 import { TrailService } from '../common/trail.service';
+import { KnowledgeService } from '../knowledge/knowledge.service';
 import { LlmService } from './llm.service';
 import { OUTPUT_SCHEMAS, PROMPTS } from './prompt-registry';
 import { scanLawDictionary } from './law-dictionary';
@@ -23,10 +24,11 @@ export class CopyService {
     private readonly prisma: PrismaService,
     private readonly llm: LlmService,
     private readonly trail: TrailService,
+    private readonly knowledge: KnowledgeService,
   ) {}
 
-  /* テンプレート生成 (モックモード)。1案=1訴求を厳守 */
-  private templateCandidates(input: CopyRunInput): CopyCandidate[] {
+  /* テンプレート生成 (モックモード)。1案=1訴求を厳守。勝ちパターンの訴求軸を優先 (B-1) */
+  private templateCandidates(input: CopyRunInput, winningPatterns: KnowledgeAssetDto[] = []): CopyCandidate[] {
     const productName = input.productInfo.split(/\r?\n/)[0]?.slice(0, 18) || '本サービス';
     const templates: Record<string, { h: string; d: string }> = {
       便益: {
@@ -62,7 +64,11 @@ export class CopyService {
         d: `専門知識は不要です。${productName}は登録後すぐに使いはじめられます。`,
       },
     };
-    const axes = input.appealAxes.length > 0 ? input.appealAxes : Object.keys(templates);
+    // 指定軸 > 勝ちパターンの軸 > 全軸 の優先順で並べる
+    const winAxes = winningPatterns.map((p) => p.appealAxis).filter((a) => a in templates);
+    const axes = input.appealAxes.length > 0
+      ? input.appealAxes
+      : [...new Set([...winAxes, ...Object.keys(templates)])];
     const out: CopyCandidate[] = [];
     for (let i = 0; i < input.count; i++) {
       const axis = axes[i % axes.length];
@@ -105,15 +111,29 @@ export class CopyService {
     }
     const count = Math.min(Math.max(input.count || 3, 1), 10);
 
+    // B-1: クライアント業種の勝ちパターンを取得しプロンプトへ反映
+    const client = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.client.findUnique({ where: { id: input.clientId } }),
+    );
+    const winningPatterns = client
+      ? await this.knowledge.topFor(tenantId, client.industryCode, 3)
+      : [];
+
     let candidates: CopyCandidate[];
     let mocked = false;
     if (this.llm.available) {
       const dictHits = scanLawDictionary(input.productInfo);
       const limits = limitsFor(input.platform);
+      const patternsBlock = winningPatterns.length
+        ? winningPatterns
+            .map((p) => `- ${p.appealAxis}: ${p.creativeSummary} (勝率${Math.round(p.winRate * 100)}%${p.liftPct ? `・リフト+${p.liftPct}%` : ''})`)
+            .join('\n')
+        : '(この業種の勝ちパターンはまだ蓄積されていません)';
       const user = [
         `以下のスキーマのJSONのみを出力してください:\n${OUTPUT_SCHEMAS.copy}`,
         `<request>媒体: ${input.platform} / 訴求軸: ${input.appealAxes.join('、') || '自動選定'} / 案数: ${count} / 目標長: 見出し${limits.headlineUnits}ユニット・説明文${limits.descriptionUnits}ユニット以内 (全角=2)</request>`,
         `<product_info>\n${input.productInfo}\n</product_info>`,
+        `<winning_patterns>\n同業種で成果が実証された勝ちパターン。参考にしつつ商材に合わせること:\n${patternsBlock}\n</winning_patterns>`,
         `<law_dictionary_hits>\n${JSON.stringify(dictHits)}\n</law_dictionary_hits>`,
       ].join('\n\n');
       const text = await this.llm.completeText({
@@ -134,7 +154,7 @@ export class CopyService {
       }
       candidates = parsed.data.candidates.slice(0, count);
     } else {
-      candidates = this.templateCandidates({ ...input, count });
+      candidates = this.templateCandidates({ ...input, count }, winningPatterns);
       mocked = true;
     }
 

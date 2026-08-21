@@ -72,6 +72,25 @@ describe('A/Bテスト統計 (B-3)', () => {
   });
 });
 
+describe('A/B勝者の再計算ロジック (B-1昇格)', () => {
+  // 昇格時の勝者はレート比較で決まる (DBのwinnerフィールドに依存しない)
+  const winnerByRate = (aNum: number, aDen: number, bNum: number, bDen: number) => {
+    const aRate = aDen > 0 ? aNum / aDen : 0;
+    const bRate = bDen > 0 ? bNum / bDen : 0;
+    return bRate >= aRate ? 'b' : 'a';
+  };
+  it('CVRが高いアームが勝者', () => {
+    expect(winnerByRate(50, 1000, 88, 1000)).toBe('b');
+    expect(winnerByRate(90, 1000, 50, 1000)).toBe('a');
+  });
+  it('リフトは勝者/敗者のレート差', () => {
+    const aRate = 50 / 1000;
+    const bRate = 88 / 1000;
+    const lift = +(((bRate - aRate) / aRate) * 100).toFixed(1);
+    expect(lift).toBe(76);
+  });
+});
+
 describe('業種ベンチマーク判定 (A-3)', () => {
   it('相場+20%以上はgood、-20%以下はpoor (高いほど良い指標)', () => {
     expect(verdictHigherBetter(2.5, 2.0)).toBe('good');

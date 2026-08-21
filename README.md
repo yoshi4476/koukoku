@@ -27,6 +27,10 @@ pnpm --filter @adgrid/shared build
 pnpm dev                      # api:4000 + web:3000
 ```
 
+> **重要**: APIは必ず非特権ロール (`APP_DATABASE_URL` = adgrid_app) で起動すること。
+> 管理者ロール (`DATABASE_URL` = adgrid_admin) はRLSをバイパスするため、マイグレーション/seed専用。
+> `.env` に `APP_DATABASE_URL` を設定すれば `pnpm dev` は自動でRLS有効の接続を使う (未設定時もローカルデフォルトで adgrid_app)。
+
 http://localhost:3000 を開く。
 
 **ログイン**: デモアカウント `demo@adgrid.jp` / `demo-pass-2026`、または新規登録 → オンボーディング (初回3ステップ: クライアント登録 → データ接続 (CSV/サンプル) → 初回AI診断が自動実行)。

@@ -5,6 +5,8 @@ import type {
   AlertMetric,
   ProposalAction,
   ProposalStatus,
+  KnowledgeObjective,
+  CalibrationDto,
 } from '@adgrid/shared';
 
 /* 媒体色はダークモードで反転するため hex ではなく CSS 変数で参照する */
@@ -110,6 +112,21 @@ export const PROPOSAL_STATUS_LABEL: Record<ProposalStatus, string> = {
   executed: '実行済',
   failed: '失敗',
   rolled_back: 'ロールバック済',
+};
+
+/* 勝ちパターン資産集 (B-1) の目的ラベル */
+export const KNOWLEDGE_OBJECTIVE_LABEL: Record<KnowledgeObjective, string> = {
+  conversion: '獲得',
+  awareness: '認知',
+  traffic: '誘導',
+};
+
+/* 確信度較正 (A-4) の効果バッジ (cls は .pill バリアント) */
+export const CALIBRATION_EFFECT_META: Record<CalibrationDto['effect'], { label: string; cls: string }> = {
+  boost: { label: '確信度を強化', cls: 'up' },
+  penalty: { label: '確信度を抑制', cls: 'down' },
+  neutral: { label: '中立', cls: 'flat' },
+  insufficient: { label: 'データ蓄積中', cls: 'flat' },
 };
 
 export const INDUSTRY_LABEL: Record<string, string> = {

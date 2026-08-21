@@ -33,6 +33,9 @@ import { PacingController } from './insights/pacing.controller';
 import { BenchmarkController } from './insights/benchmark.controller';
 import { AbTestsService } from './abtests/abtests.service';
 import { AbTestsController } from './abtests/abtests.controller';
+import { CalibrationService } from './calibration/calibration.service';
+import { KnowledgeService } from './knowledge/knowledge.service';
+import { KnowledgeController } from './knowledge/knowledge.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -47,6 +50,7 @@ import { AbTestsController } from './abtests/abtests.controller';
     PacingController,
     BenchmarkController,
     AbTestsController,
+    KnowledgeController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -66,6 +70,8 @@ import { AbTestsController } from './abtests/abtests.controller';
     MediaSyncService,
     ProposalsService,
     AbTestsService,
+    CalibrationService,
+    KnowledgeService,
     MetricsService,
     LlmService,
     AuditService,

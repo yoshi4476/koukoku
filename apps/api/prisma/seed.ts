@@ -79,6 +79,8 @@ async function seedFacts(
 async function main() {
   console.log('Seeding ADGRID demo data...');
   // 子テーブルから順に削除 (FK制約対応)
+  await prisma.knowledgeAsset.deleteMany({});
+  await prisma.calibrationStat.deleteMany({});
   await prisma.proposal.deleteMany({});
   await prisma.abTest.deleteMany({});
   await prisma.alertEvent.deleteMany({});
@@ -219,6 +221,28 @@ async function main() {
         aLabel: '青バナー', aImpr: 8000, aClicks: 80, aConv: 4,
         bLabel: '赤バナー', bImpr: 8000, bClicks: 95, bConv: 5,
       },
+    ],
+  });
+
+  // 勝ちパターン資産集のデモ (B-1): 自社2件+匿名共有3件
+  await prisma.knowledgeAsset.createMany({
+    data: [
+      { tenantId: TENANT_ID, industryCode: 'ec', objective: 'conversion', appealAxis: '損失回避', creativeSummary: '「まだ手作業ですか?」形式の問いかけ見出し', platform: 'meta', winRate: 0.088, sampleSize: 88, liftPct: 76, sourceAnonymized: false },
+      { tenantId: TENANT_ID, industryCode: 'beauty', objective: 'conversion', appealAxis: '社会的証明', creativeSummary: '利用者数を前面に出したバナー', platform: 'line_ads', winRate: 0.032, sampleSize: 64, liftPct: 22, sourceAnonymized: false },
+      { tenantId: null, industryCode: 'ec', objective: 'conversion', appealAxis: '緊急性・限定', creativeSummary: '在庫・期限を明示した訴求 (景表法に配慮した実期限のみ)', platform: '', winRate: 0.075, sampleSize: 210, liftPct: 41, sourceAnonymized: true },
+      { tenantId: null, industryCode: 'saas', objective: 'conversion', appealAxis: '簡便性', creativeSummary: '「5分で導入完了」の即時性訴求', platform: '', winRate: 0.028, sampleSize: 180, liftPct: 33, sourceAnonymized: true },
+      { tenantId: null, industryCode: 'beauty', objective: 'awareness', appealAxis: '便益', creativeSummary: 'ビフォーアフターを想起させる便益表現 (薬機法配慮)', platform: '', winRate: 0.021, sampleSize: 150, liftPct: 18, sourceAnonymized: true },
+    ],
+  });
+
+  // 確信度較正のデモ (A-4): 計測は採用されやすい、構造は見送られやすい傾向
+  await prisma.calibrationStat.createMany({
+    data: [
+      { category: 'measurement', adopted: 9, dismissed: 2 },
+      { category: 'budget', adopted: 7, dismissed: 5 },
+      { category: 'bidding', adopted: 6, dismissed: 6 },
+      { category: 'structure', adopted: 2, dismissed: 9 },
+      { category: 'creative', adopted: 5, dismissed: 4 },
     ],
   });
 

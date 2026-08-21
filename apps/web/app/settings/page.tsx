@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { BillingDto, ConnectionDto, MemberDto, UsageDto } from '@adgrid/shared';
+import type { BillingDto, CalibrationDto, ConnectionDto, MemberDto, UsageDto } from '@adgrid/shared';
 import { PLANS, isApprover } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
 import { ErrorCard, Skeleton, SkeletonLines } from '@/components/ui';
 import { apiPost, apiPut, ApiError, toApiError } from '@/lib/api';
-import { MEMBER_ROLE_LABEL, USAGE_FEATURE_LABEL } from '@/lib/labels';
-import { formatNumber, formatYen } from '@/lib/format';
+import { CALIBRATION_EFFECT_META, MEMBER_ROLE_LABEL, USAGE_FEATURE_LABEL } from '@/lib/labels';
+import { formatNumber, formatPercent, formatYen } from '@/lib/format';
 
 interface RunWeeklyAllResult {
   generated: number;
@@ -140,6 +140,66 @@ function ApplySettingsCard() {
           ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/* ---- カード7: 確信度較正 (A-4) ---- */
+function CalibrationCard() {
+  const calibration = useApi<CalibrationDto[]>('/knowledge/calibration');
+  const rows = calibration.data ?? [];
+
+  return (
+    <div className="card" style={{ marginBottom: 16, maxWidth: 640 }}>
+      <div className="c-head"><h2>AIの確信度較正 (学習状況)</h2></div>
+      {calibration.loading ? (
+        <div className="c-body"><SkeletonLines count={3} /></div>
+      ) : calibration.error ? (
+        <div className="c-body"><ErrorCard error={calibration.error} onRetry={calibration.retry} /></div>
+      ) : (
+        <>
+          <div className="c-body tbl-scroll" style={{ padding: 0 }}>
+            {rows.length === 0 ? (
+              <p style={{ padding: '14px 16px', margin: 0, color: 'var(--muted)', fontSize: 12.5 }}>
+                較正データはまだありません。診断の採用・見送りが蓄積されると表示されます。
+              </p>
+            ) : (
+              <table className="data-tbl">
+                <thead>
+                  <tr>
+                    <th>カテゴリ</th>
+                    <th>採用</th>
+                    <th>見送り</th>
+                    <th>採用率</th>
+                    <th style={{ textAlign: 'left' }}>効果</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r) => {
+                    const effect = CALIBRATION_EFFECT_META[r.effect];
+                    return (
+                      <tr key={r.category}>
+                        <td>{r.categoryLabel}</td>
+                        <td>{formatNumber(r.adopted)}</td>
+                        <td>{formatNumber(r.dismissed)}</td>
+                        <td>{r.adoptionRate === null ? '—' : formatPercent(r.adoptionRate * 100, 0)}</td>
+                        <td style={{ textAlign: 'left' }}>
+                          <span className={`pill ${effect.cls}`}>{effect.label}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+          <div className="c-body" style={{ paddingTop: 10, borderTop: '1px solid var(--line)' }}>
+            <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)' }}>
+              診断の採用・見送りの実績から、成果につながりやすい指摘カテゴリの確信度を自動で補正します。使うほど診断の精度が上がります。
+            </p>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -331,6 +391,9 @@ export default function SettingsPage() {
 
       {/* カード5: 自動適用 (kill switch) */}
       <ApplySettingsCard />
+
+      {/* カード7: 確信度較正 (A-4) */}
+      <CalibrationCard />
 
       {/* カード6: API接続 */}
       <div className="card" style={{ marginBottom: 16, maxWidth: 640 }}>

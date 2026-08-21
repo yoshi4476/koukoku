@@ -41,6 +41,7 @@ export function CommandPalette({
       { label: 'レポート', href: '/report', keywords: 'report houkoku' },
       { label: '広告文', href: '/copy', keywords: 'copy koukokubun 生成' },
       { label: 'A/Bテスト', href: '/abtests', keywords: 'abtest ab test kenshou 検定 勝者 有意差' },
+      { label: '勝ちパターン', href: '/knowledge', keywords: 'knowledge kachi pattern 勝ちパターン ナレッジ 資産 訴求 勝率' },
       { label: '予算ペース', href: '/pacing', keywords: 'pacing yosan pace 着地 消化 予測' },
       { label: '媒体窓口', href: '/portal', keywords: 'portal baitai リンク' },
       { label: 'アラート', href: '/alerts', keywords: 'alerts arato 通知 検知 異常' },
