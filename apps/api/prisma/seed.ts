@@ -38,6 +38,7 @@ async function seedFacts(
   adAccountId: string,
   platform: string,
   campaigns: CampaignSpec[],
+  tenantId: string = TENANT_ID,
 ) {
   const rows = [];
   for (let day = 27; day >= 0; day--) {
@@ -56,7 +57,7 @@ async function seedFacts(
       const conversionValue = Math.round(conversions * c.avgOrderValue);
       rows.push({
         date,
-        tenantId: TENANT_ID,
+        tenantId,
         adAccountId,
         platform,
         campaignId: c.campaignId,
@@ -317,7 +318,60 @@ async function main() {
     },
   });
 
-  console.log('Seed done. tenant =', TENANT_ID);
+  // ── 提供先版(client edition)のデモテナント ──────────────────
+  // 他社に下ろした版を実際に確認できるよう、自社データ閲覧中心の別テナントを用意。
+  // デモログイン: client@adgrid.jp / demo-pass-2026
+  const CLIENT_TENANT = 't_demo_client';
+  await prisma.tenant.create({
+    data: { id: CLIENT_TENANT, name: '自社EC事業部 (提供先版デモ)', plan: 'business', edition: 'client' },
+  });
+  const clientUser = await prisma.user.create({
+    data: {
+      email: 'client@adgrid.jp',
+      passwordHash: await bcrypt.hash('demo-pass-2026', 10),
+      name: '提供先 担当者',
+    },
+  });
+  await prisma.tenantMember.create({
+    data: { userId: clientUser.id, tenantId: CLIENT_TENANT, role: 'owner' },
+  });
+  const ecClient = await prisma.client.create({
+    data: { id: 'cc_ec', tenantId: CLIENT_TENANT, name: '自社オンラインストア', industryCode: 'ec' },
+  });
+  const ccGoogle = await prisma.adAccount.create({
+    data: {
+      id: 'cc_acc_google', tenantId: CLIENT_TENANT, clientId: ecClient.id,
+      platform: 'google_ads', externalAccountId: '999-888-7777',
+      name: '自社EC Google広告', monthlyBudget: 600000,
+    },
+  });
+  const ccMeta = await prisma.adAccount.create({
+    data: {
+      id: 'cc_acc_meta', tenantId: CLIENT_TENANT, clientId: ecClient.id,
+      platform: 'meta', externalAccountId: 'act_9999999', name: '自社EC Meta広告', monthlyBudget: 400000,
+    },
+  });
+  await seedFacts(ccGoogle.id, 'google_ads', [
+    { campaignId: 'cc-brand', campaignName: 'ブランド検索', baseCost: 7000, baseCtr: 0.06, baseCvr: 0.045, avgOrderValue: 9000 },
+    { campaignId: 'cc-generic', campaignName: '一般KW検索', baseCost: 12000, baseCtr: 0.02, baseCvr: 0.02, avgOrderValue: 9000 },
+  ], CLIENT_TENANT);
+  await seedFacts(ccMeta.id, 'meta', [
+    { campaignId: 'cc-pros', campaignName: '新規獲得', baseCost: 8000, baseCtr: 0.01, baseCvr: 0.014, avgOrderValue: 8500 },
+  ], CLIENT_TENANT);
+  await prisma.keywordStat.createMany({
+    data: [
+      { tenantId: CLIENT_TENANT, clientId: ecClient.id, adAccountId: ccGoogle.id, platform: 'google_ads', keyword: '自社ストア 公式', matchType: 'exact', currentBid: 180, qualityScore: 9, impressions: 6000, clicks: 480, cost: 72000, conversions: 30, conversionValue: 270000, windowDays: 28 },
+      { tenantId: CLIENT_TENANT, clientId: ecClient.id, adAccountId: ccGoogle.id, platform: 'google_ads', keyword: '通販 送料無料', matchType: 'phrase', currentBid: 250, qualityScore: 6, impressions: 18000, clicks: 270, cost: 81000, conversions: 6, conversionValue: 54000, windowDays: 28 },
+    ],
+  });
+  await prisma.mediaConnection.createMany({
+    data: [
+      { tenantId: CLIENT_TENANT, platform: 'google_ads', status: 'connected', lastSyncedAt: new Date() },
+      { tenantId: CLIENT_TENANT, platform: 'meta', status: 'connected', lastSyncedAt: new Date() },
+    ],
+  });
+
+  console.log('Seed done. tenants =', TENANT_ID, '/', CLIENT_TENANT);
 }
 
 main()

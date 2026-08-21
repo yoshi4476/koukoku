@@ -691,6 +691,9 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .kw-detail-fig { display: flex; flex-direction: column; gap: 2px; }
 .kw-detail-label { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
 .kw-detail-text { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+.kw-propose { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--line); }
+.kw-propose-done { display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 600; color: var(--good); }
+.kw-propose-err { font-size: 12px; color: var(--bad); }
 
 /* ============ 版 (edition) ============ */
 .edition-badge { margin: 4px 10px 12px; padding: 3px 10px; border-radius: 7px; font-size: 11px; font-weight: 700; text-align: center; background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn); }

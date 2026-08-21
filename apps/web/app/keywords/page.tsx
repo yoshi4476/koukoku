@@ -2,10 +2,13 @@
 
 import { Fragment, useMemo, useState } from 'react';
 import Link from 'next/link';
-import type { KeywordAction, KeywordOptimizeDto, KeywordRankItemDto, KeywordRowDto } from '@adgrid/shared';
+import type { KeywordAction, KeywordOptimizeDto, KeywordRankItemDto, KeywordRowDto, ProposalDto } from '@adgrid/shared';
+import { isApprover } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
+import { useAuth } from '@/components/auth-context';
 import { useClients } from '@/components/client-context';
 import { EmptyState, ErrorCard, HintBar, PlatformTag, SkeletonLines } from '@/components/ui';
+import { apiPost, ApiError, toApiError } from '@/lib/api';
 import { KEYWORD_ACTION_META, MATCH_TYPE_LABEL } from '@/lib/labels';
 import { formatNumber, formatPercent, formatYen } from '@/lib/format';
 
@@ -68,6 +71,43 @@ function RankCard({
   );
 }
 
+function ProposeAction({ r }: { r: KeywordRowDto }) {
+  const { me } = useAuth();
+  const [state, setState] = useState<'idle' | 'sending' | 'done'>('idle');
+  const [error, setError] = useState<ApiError | null>(null);
+
+  // 提供先版・維持推奨・承認権限なしでは申請導線を出さない
+  if (me.edition === 'client' || r.action === 'keep' || !isApprover(me.role)) return null;
+
+  const actionLabel = r.action === 'increase' ? '増額' : r.action === 'decrease' ? '減額' : '停止';
+  const submit = () => {
+    setState('sending');
+    setError(null);
+    apiPost<ProposalDto>(`/keywords/${r.id}/propose`, {})
+      .then(() => setState('done'))
+      .catch((e: unknown) => {
+        setError(toApiError(e));
+        setState('idle');
+      });
+  };
+
+  return (
+    <div className="kw-propose">
+      {state === 'done' ? (
+        <span className="kw-propose-done">
+          ✓ 承認キューに{actionLabel}提案を起票しました
+          <Link href="/approvals" className="btn sm sec" style={{ marginLeft: 8 }}>承認キューを開く</Link>
+        </span>
+      ) : (
+        <button type="button" className="btn sm pri" disabled={state === 'sending'} onClick={submit}>
+          {state === 'sending' ? '申請中…' : `この${actionLabel}を承認申請`}
+        </button>
+      )}
+      {error ? <span className="kw-propose-err">{error.message}</span> : null}
+    </div>
+  );
+}
+
 function RowDetail({ r }: { r: KeywordRowDto }) {
   return (
     <div className="kw-detail">
@@ -111,6 +151,7 @@ function RowDetail({ r }: { r: KeywordRowDto }) {
           <div className="num">{formatYen(r.cpc)}</div>
         </div>
       </div>
+      <ProposeAction r={r} />
     </div>
   );
 }

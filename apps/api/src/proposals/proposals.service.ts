@@ -104,6 +104,9 @@ export class ProposalsService {
       }
       return `月予算を ${fmtYen(newBudget)} に設定します。`;
     }
+    // キーワード起点の提案では対象をキーワードとして表現する
+    const kw = typeof input.actionPayload.keyword === 'string' ? input.actionPayload.keyword : '';
+    const target = kw ? `キーワード「${kw}」` : '対象キャンペーン';
     if (input.actionType === 'adjust_bid') {
       const pct = Number(input.actionPayload.percent);
       if (!Number.isFinite(pct) || pct === 0 || Math.abs(pct) > 50) {
@@ -113,10 +116,10 @@ export class ProposalsService {
           '-50〜+50% の範囲で入力してください (例: -15)。',
         );
       }
-      return `対象キャンペーンの入札を${pct > 0 ? '+' : ''}${pct}%調整します。配信量とCPAの両方に影響します。`;
+      return `${target}の入札を${pct > 0 ? '+' : ''}${pct}%調整します。配信量とCPAの両方に影響します。`;
     }
     if (input.actionType === 'pause_campaign') {
-      return `対象キャンペーンの配信を停止します。停止中は費用が発生しません (再開は媒体管理画面から)。`;
+      return `${target}の配信を停止します。停止中は費用が発生しません (再開は媒体管理画面から)。`;
     }
     throw new AppError(HttpStatus.BAD_REQUEST, '不明なアクション種別です。', 'アクションを選び直してください。');
   }

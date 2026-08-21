@@ -73,7 +73,8 @@ export default function LoginPage() {
           アカウントをお持ちでない方は <Link href="/signup">無料で始める</Link>
         </p>
         <p className="auth-demo">
-          デモ環境: <b>demo@adgrid.jp</b> / <b>demo-pass-2026</b> でお試しいただけます。
+          デモ環境 (パスワード共通 <b>demo-pass-2026</b>):<br />
+          自社運用版 <b>demo@adgrid.jp</b> / 提供先版 <b>client@adgrid.jp</b>
         </p>
       </div>
     </div>
