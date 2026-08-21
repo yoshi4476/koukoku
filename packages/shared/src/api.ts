@@ -211,7 +211,15 @@ export interface UsageDto {
 }
 
 /* ---- アラート (F-13) ---- */
-export type AlertMetric = 'budget_pace' | 'cpa_spike' | 'cv_zero' | 'spend_drop';
+export type AlertMetric =
+  | 'budget_pace'
+  | 'cpa_spike'
+  | 'cv_zero'
+  | 'spend_drop'
+  // AIアドバイザー: 「変更したほうがいい」「不備」を先回りで検知
+  | 'benchmark_gap' // 業種相場から大きく乖離 (改善余地)
+  | 'roas_low' // ROASが目標/相場を大きく下回る
+  | 'no_recent_audit'; // 一定期間AI診断が実行されていない (不備)
 export type AlertChannel = 'inapp' | 'slack';
 
 export interface AlertRuleDto {

@@ -210,6 +210,27 @@ const NAV_SETTINGS: NavItem[] = [
   },
 ];
 
+// 広告運用の手順どおりにメニューを並べ替える (準備→作る→見る→直す→報告)。
+// 既存のアイコン定義を href で参照して再構成する。
+const NAV_LOOKUP: Record<string, NavItem> = Object.fromEntries(
+  [...NAV_MAIN, ...NAV_DATA, ...NAV_SETTINGS].map((n) => [n.href, n]),
+);
+
+interface NavPhase {
+  label: string | null;
+  hrefs: string[];
+}
+
+const NAV_PHASES: NavPhase[] = [
+  { label: null, hrefs: ['/'] },
+  { label: '① 準備する', hrefs: ['/clients', '/connections', '/import', '/portal'] },
+  { label: '② 作る', hrefs: ['/copy', '/abtests', '/knowledge'] },
+  { label: '③ 見る（計測）', hrefs: ['/dashboard', '/boards', '/pacing', '/changelog'] },
+  { label: '④ 直す（診断・改善）', hrefs: ['/audit', '/approvals', '/alerts'] },
+  { label: '⑤ 報告する', hrefs: ['/report'] },
+  { label: '設定', hrefs: ['/settings'] },
+];
+
 function NavLinks({ items, pathname }: { items: NavItem[]; pathname: string }) {
   return (
     <>
@@ -282,11 +303,15 @@ export function Shell({ children }: { children: ReactNode }) {
         <Link href="/" className="brand">
           AD<span className="bx">GRID</span>
         </Link>
-        <NavLinks items={NAV_MAIN} pathname={pathname} />
-        <div className="nav-sep">DATA</div>
-        <NavLinks items={NAV_DATA} pathname={pathname} />
-        <div className="nav-sep">SETTINGS</div>
-        <NavLinks items={NAV_SETTINGS} pathname={pathname} />
+        {NAV_PHASES.map((phase, i) => {
+          const items = phase.hrefs.map((h) => NAV_LOOKUP[h]).filter(Boolean);
+          return (
+            <div key={phase.label ?? `p${i}`}>
+              {phase.label ? <div className="nav-sep">{phase.label}</div> : null}
+              <NavLinks items={items} pathname={pathname} />
+            </div>
+          );
+        })}
       </aside>
       <div className="main">
         <div className="topbar">

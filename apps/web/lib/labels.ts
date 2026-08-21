@@ -100,6 +100,21 @@ export const ALERT_METRIC_META: Record<AlertMetric, { label: string; description
     description: '昨日の消化が7日平均から急減 (配信停止疑い)',
     unit: '%減少',
   },
+  benchmark_gap: {
+    label: 'AI提案: 相場より低い',
+    description: 'CVRが業種相場を大きく下回る (改善余地の提案)',
+    unit: '%下回る',
+  },
+  roas_low: {
+    label: 'AI提案: ROAS低下',
+    description: 'ROASが低水準で赤字配信の疑い',
+    unit: '%未満',
+  },
+  no_recent_audit: {
+    label: '不備: 診断未実行',
+    description: '配信中なのに一定期間AI診断していない',
+    unit: '日以上',
+  },
 };
 
 export const PROPOSAL_ACTION_LABEL: Record<ProposalAction, string> = {

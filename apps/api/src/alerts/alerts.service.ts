@@ -7,6 +7,7 @@ import type {
   AlertRunResultDto,
   Platform,
 } from '@adgrid/shared';
+import { benchmarkFor } from '@adgrid/shared';
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { MetricsService, daysAgo } from '../metrics/metrics.service';
 import { TrailService } from '../common/trail.service';
@@ -18,6 +19,10 @@ const DEFAULT_RULES: Array<{ metric: AlertMetric; threshold: number }> = [
   { metric: 'cpa_spike', threshold: 30 }, // CPA前週比 +30% 超
   { metric: 'cv_zero', threshold: 200 }, // クリックN件以上でCV0 (計測欠落疑い)
   { metric: 'spend_drop', threshold: 50 }, // 昨日の消化が直近7日平均比 -50% 超 (配信停止疑い)
+  // AIアドバイザー (先回り提案)
+  { metric: 'benchmark_gap', threshold: 30 }, // CVRが業種相場を30%以上下回る (改善余地)
+  { metric: 'roas_low', threshold: 100 }, // ROASが100%未満 (赤字配信の疑い)
+  { metric: 'no_recent_audit', threshold: 7 }, // N日以上AI診断していない (運用不備)
 ];
 
 /** 同一ルール×アカウントの再通知抑制 (ノイズ対策) */
@@ -187,6 +192,67 @@ export class AlertsService {
             title: `消化急減 — 昨日の消化が7日平均比 -${Math.round(dropPct)}%`,
             body: `${acc.name}: 配信停止・審査落ち・予算切れの可能性があります。媒体の配信状況を確認してください。`,
             payload: { yesterdayCost: Math.round(yesterday.cost), avg7: Math.round(avg7) },
+          });
+        }
+      }
+
+      // --- AIアドバイザー: 「変更したほうがいい」を先回りで提案 ---
+      const last28 = await this.metrics.totals(tx, { adAccountId: acc.id }, daysAgo(27), daysAgo(0));
+
+      // benchmark_gap: 業種相場よりCVRが大きく低い (改善余地の提案)
+      const bmRule = enabled.get('benchmark_gap');
+      const bm = benchmarkFor(acc.client.industryCode);
+      const accCvr = last28.clicks > 0 ? (last28.conversions / last28.clicks) * 100 : null;
+      if (bmRule && accCvr !== null && last28.clicks >= 300) {
+        const gapPct = ((bm.cvr - accCvr) / bm.cvr) * 100;
+        if (gapPct > bmRule.threshold) {
+          fired.push({
+            metric: 'benchmark_gap',
+            ruleId: bmRule.id,
+            adAccountId: acc.id,
+            severity: 'warn',
+            title: `AI提案: CVRが${bm.label}相場を${Math.round(gapPct)}%下回っています`,
+            body: `${acc.name}: 現在CVR ${accCvr.toFixed(2)}% (相場${bm.cvr}%)。LP・訴求の見直しで改善余地が大きい状態です。AI診断で具体策を確認してください。`,
+            payload: { cvr: +accCvr.toFixed(2), benchmark: bm.cvr },
+          });
+        }
+      }
+
+      // roas_low: ROASが低く赤字配信の疑い
+      const roasRule = enabled.get('roas_low');
+      const roas = last7.cost > 0 ? (last7.conversionValue / last7.cost) * 100 : null;
+      if (roasRule && roas !== null && last7.cost > 10000 && roas < roasRule.threshold) {
+        fired.push({
+          metric: 'roas_low',
+          ruleId: roasRule.id,
+          adAccountId: acc.id,
+          severity: 'warn',
+          title: `AI提案: ROASが${Math.round(roas)}%と低水準です`,
+          body: `${acc.name}: 広告費に対する売上が下回っています。予算配分の見直しや入札調整を検討してください。`,
+          payload: { roas: Math.round(roas) },
+        });
+      }
+    }
+
+    // no_recent_audit: 一定期間AI診断が実行されていないアカウント (運用不備)
+    const auditRule = enabled.get('no_recent_audit');
+    if (auditRule) {
+      const cutoff = daysAgo(Math.round(auditRule.threshold));
+      for (const acc of accounts) {
+        const spend = await this.metrics.totals(tx, { adAccountId: acc.id }, daysAgo(6), daysAgo(0));
+        if (spend.cost < 10000) continue; // 配信のあるアカウントのみ対象
+        const recent = await tx.audit.findFirst({
+          where: { adAccountId: acc.id, createdAt: { gte: cutoff } },
+        });
+        if (!recent) {
+          fired.push({
+            metric: 'no_recent_audit',
+            ruleId: auditRule.id,
+            adAccountId: acc.id,
+            severity: 'warn',
+            title: `不備: ${Math.round(auditRule.threshold)}日以上AI診断していません`,
+            body: `${acc.name}: 配信中なのに診断が実行されていません。改善点を見落としている可能性があります。診断を実行しましょう。`,
+            payload: {},
           });
         }
       }
