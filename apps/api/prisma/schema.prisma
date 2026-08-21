@@ -84,6 +84,8 @@ model Project {
   goal      String   @default("conversion") // conversion / awareness / traffic / store
   status    String   @default("active") // active / paused / ended
   note      String   @default("")
+  // 配信設定 (予算・入札・ターゲティング・期間・計測)。ProjectSettings 形状のJSON
+  settings  Json     @default("{}")
   createdAt DateTime @default(now()) @map("created_at")
 
   tenant     Tenant         @relation(fields: [tenantId], references: [id])

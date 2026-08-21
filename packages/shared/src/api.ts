@@ -663,6 +663,7 @@ export interface ProjectDetailDto {
   alerts: AlertEventDto[];
   openFindings: number;
   assets: ProjectAssetDto[];
+  settings: ProjectSettings;
   lastReportAt: string | null;
   createdAt: string;
 }
@@ -675,12 +676,87 @@ export interface CreateProjectInput {
   accountIds?: string[];
 }
 
+/* 配信設定 (予算・入札・ターゲティング・期間・計測) */
+export type BidStrategy =
+  | 'maximize_conversions'
+  | 'target_cpa'
+  | 'target_roas'
+  | 'maximize_clicks'
+  | 'manual';
+
+export const BID_STRATEGY_LABEL: Record<BidStrategy, string> = {
+  maximize_conversions: 'コンバージョン数の最大化',
+  target_cpa: '目標CPA',
+  target_roas: '目標ROAS',
+  maximize_clicks: 'クリック数の最大化',
+  manual: '個別クリック単価 (手動)',
+};
+
+export interface ProjectSettings {
+  /** 月予算の合計 (円) */
+  monthlyBudgetTotal: number | null;
+  /** 日予算の目安 (円) */
+  dailyBudget: number | null;
+  /** 目標CPA (円) */
+  targetCpa: number | null;
+  /** 目標ROAS (%) */
+  targetRoas: number | null;
+  bidStrategy: BidStrategy;
+  /** 配信開始日 YYYY-MM-DD */
+  startDate: string | null;
+  /** 配信終了日 YYYY-MM-DD (無期限は null) */
+  endDate: string | null;
+  /** 対象地域 (例: 全国 / 東京・神奈川) */
+  regions: string;
+  /** 年齢層 (例: 25-44) */
+  ageRange: string;
+  gender: 'all' | 'male' | 'female';
+  devices: 'all' | 'mobile' | 'desktop';
+  /** 計測するCV地点 (例: 購入完了 / 資料請求) */
+  conversionPoint: string;
+  /** 配信時間帯 (例: 終日 / 平日9-18時) */
+  dayparting: string;
+  note: string;
+}
+
+export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
+  monthlyBudgetTotal: null,
+  dailyBudget: null,
+  targetCpa: null,
+  targetRoas: null,
+  bidStrategy: 'maximize_conversions',
+  startDate: null,
+  endDate: null,
+  regions: '全国',
+  ageRange: '指定なし',
+  gender: 'all',
+  devices: 'all',
+  conversionPoint: '',
+  dayparting: '終日',
+  note: '',
+};
+
 export interface UpdateProjectInput {
   name?: string;
   goal?: ProjectGoal;
   status?: ProjectStatus;
   note?: string;
   accountIds?: string[];
+  settings?: Partial<ProjectSettings>;
+}
+
+/* 制作物の改善アドバイス (公開後の改善ポイント) */
+export interface AssetAdviceItem {
+  title: string;
+  detail: string;
+  severity: 'good' | 'tip' | 'warn';
+}
+export interface AssetAdviceDto {
+  assetId: string;
+  type: AssetType;
+  /** 現状の良い点・改善余地の総評 (1行) */
+  summary: string;
+  items: AssetAdviceItem[];
 }
 
 /* ---- プロジェクトの制作物 (広告文/LP/チラシ/動画) ---- */

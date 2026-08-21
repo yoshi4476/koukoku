@@ -775,6 +775,22 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .asset-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 4px; }
 .proj-assets-line { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted); }
 
+/* ---- 配信設定フォーム ---- */
+.set-group { font-size: 12.5px; font-weight: 700; color: var(--primary); margin-top: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+.set-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 560px) { .set-row { grid-template-columns: 1fr; } }
+
+/* ---- 制作物の改善ポイント ---- */
+.asset-advice-wrap { margin-top: 6px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.asset-advice { margin-top: 8px; }
+.aa-summary { margin: 0 0 8px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.aa-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.aa-item { display: flex; gap: 8px; font-size: 12px; line-height: 1.5; padding: 8px 10px; border-radius: 8px; background: var(--bg-sub); border: 1px solid var(--line); }
+.aa-item.warn { background: var(--warn-soft); border-color: var(--warn); }
+.aa-item.good { background: var(--good-soft); border-color: var(--good); }
+.aa-ico { flex: none; }
+.aa-detail { color: var(--ink-2); }
+
 /* ============ ホーム上部の表示モード切替 ============ */
 .mode-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--line); border-radius: 11px; padding: 8px 12px; margin-bottom: 14px; box-shadow: var(--shadow-1); }
 .mode-bar-lab { font-size: 11.5px; font-weight: 700; color: var(--muted); }

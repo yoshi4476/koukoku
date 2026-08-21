@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
 import type {
+  AssetAdviceDto,
   CreateAssetInput,
   CreateProjectInput,
   ProjectAssetDto,
@@ -71,5 +72,10 @@ export class ProjectsController {
     @Param('assetId') assetId: string,
   ): Promise<ProjectAssetDto> {
     return this.projects.publishAsset(tenantId, assetId, user);
+  }
+
+  @Get('assets/:assetId/advice')
+  advice(@TenantId() tenantId: string, @Param('assetId') assetId: string): Promise<AssetAdviceDto> {
+    return this.projects.adviceForAsset(tenantId, assetId);
   }
 }

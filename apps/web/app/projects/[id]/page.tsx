@@ -4,17 +4,21 @@ import { use, useMemo, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type {
+  AssetAdviceDto,
   AssetStatus,
   AssetType,
+  BidStrategy,
   CreateAssetInput,
   DailyPointDto,
   ProjectAssetDto,
   ProjectDetailDto,
+  ProjectSettings,
 } from '@adgrid/shared';
 import {
   ASSET_STATUS_LABEL,
   ASSET_TYPE_ICON,
   ASSET_TYPE_LABEL,
+  BID_STRATEGY_LABEL,
   PROJECT_GOAL_LABEL,
   PROJECT_STATUS_LABEL,
   isApprover,
@@ -23,18 +27,22 @@ import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
 import { useClients } from '@/components/client-context';
 import { DeltaText, ErrorCard, PlatformTag, SkeletonLines } from '@/components/ui';
-import { apiPost, apiPut, toApiError, type ApiError } from '@/lib/api';
+import { apiGet, apiPost, apiPut, toApiError, type ApiError } from '@/lib/api';
 import { CONNECTION_STATUS_META, INDUSTRY_LABEL } from '@/lib/labels';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
 
-type Tab = 'overview' | 'delivery' | 'assets' | 'alerts' | 'improve';
+type Tab = 'overview' | 'delivery' | 'settings' | 'assets' | 'alerts' | 'improve';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: '概要（推移）' },
   { key: 'delivery', label: '掲示' },
+  { key: 'settings', label: '配信設定' },
   { key: 'assets', label: '制作物' },
   { key: 'alerts', label: 'アラート' },
   { key: 'improve', label: '改善' },
 ];
+
+const BID_STRATEGIES: BidStrategy[] = ['maximize_conversions', 'target_cpa', 'target_roas', 'maximize_clicks', 'manual'];
+const ADVICE_ICON: Record<string, string> = { good: '✅', tip: '💡', warn: '⚠️' };
 
 const ASSET_TYPES: AssetType[] = ['copy', 'lp', 'flyer', 'video'];
 const ASSET_STATUS_CLS: Record<AssetStatus, string> = { draft: 'flat', review: 'warn', approved: 'ai', published: 'up' };
@@ -63,6 +71,144 @@ function TrendChart({ points }: { points: DailyPointDto[] }) {
           </circle>
         ))}
       </svg>
+    </div>
+  );
+}
+
+/* 数値入力を number|null に変換 */
+function numOrNull(v: string): number | null {
+  const n = Number(v.replace(/,/g, ''));
+  return v.trim() === '' || Number.isNaN(n) ? null : n;
+}
+
+function SettingsTab({ project, onSaved }: { project: ProjectDetailDto; onSaved: () => void }) {
+  const { me } = useAuth();
+  const canEdit = me.edition === 'agency';
+  const [s, setS] = useState<ProjectSettings>(project.settings);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  const set = <K extends keyof ProjectSettings>(k: K, v: ProjectSettings[K]) => { setS((p) => ({ ...p, [k]: v })); setSaved(false); };
+
+  const save = () => {
+    setBusy(true); setError(null);
+    apiPut(`/projects/${project.id}`, { settings: s })
+      .then(() => { setSaved(true); onSaved(); })
+      .catch((e: unknown) => setError(toApiError(e)))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <div className="card">
+      <div className="c-head"><h2>配信設定（金額・入札・ターゲティング）</h2></div>
+      <div className="c-body form-grid">
+        {error ? <ErrorCard error={error} /> : null}
+
+        <div className="set-group">💴 予算・目標</div>
+        <div className="set-row">
+          <div className="field"><label>月予算 合計 (円)</label>
+            <input className="input" inputMode="numeric" value={s.monthlyBudgetTotal ?? ''} disabled={!canEdit}
+              onChange={(e) => set('monthlyBudgetTotal', numOrNull(e.target.value))} placeholder="例: 1600000" /></div>
+          <div className="field"><label>日予算の目安 (円)</label>
+            <input className="input" inputMode="numeric" value={s.dailyBudget ?? ''} disabled={!canEdit}
+              onChange={(e) => set('dailyBudget', numOrNull(e.target.value))} placeholder="例: 53000" /></div>
+        </div>
+        <div className="set-row">
+          <div className="field"><label>目標CPA (円)</label>
+            <input className="input" inputMode="numeric" value={s.targetCpa ?? ''} disabled={!canEdit}
+              onChange={(e) => set('targetCpa', numOrNull(e.target.value))} placeholder="例: 4000" /></div>
+          <div className="field"><label>目標ROAS (%)</label>
+            <input className="input" inputMode="numeric" value={s.targetRoas ?? ''} disabled={!canEdit}
+              onChange={(e) => set('targetRoas', numOrNull(e.target.value))} placeholder="例: 400" /></div>
+        </div>
+        <div className="field"><label>入札戦略</label>
+          <select className="select" value={s.bidStrategy} disabled={!canEdit} onChange={(e) => set('bidStrategy', e.target.value as BidStrategy)}>
+            {BID_STRATEGIES.map((b) => <option key={b} value={b}>{BID_STRATEGY_LABEL[b]}</option>)}
+          </select></div>
+
+        <div className="set-group">🎯 ターゲティング</div>
+        <div className="set-row">
+          <div className="field"><label>対象地域</label>
+            <input className="input" value={s.regions} disabled={!canEdit} onChange={(e) => set('regions', e.target.value)} placeholder="例: 全国 / 東京・神奈川" /></div>
+          <div className="field"><label>年齢層</label>
+            <input className="input" value={s.ageRange} disabled={!canEdit} onChange={(e) => set('ageRange', e.target.value)} placeholder="例: 25-44" /></div>
+        </div>
+        <div className="set-row">
+          <div className="field"><label>性別</label>
+            <select className="select" value={s.gender} disabled={!canEdit} onChange={(e) => set('gender', e.target.value as ProjectSettings['gender'])}>
+              <option value="all">すべて</option><option value="female">女性</option><option value="male">男性</option>
+            </select></div>
+          <div className="field"><label>デバイス</label>
+            <select className="select" value={s.devices} disabled={!canEdit} onChange={(e) => set('devices', e.target.value as ProjectSettings['devices'])}>
+              <option value="all">すべて</option><option value="mobile">スマホ中心</option><option value="desktop">PC中心</option>
+            </select></div>
+        </div>
+
+        <div className="set-group">📅 期間・計測</div>
+        <div className="set-row">
+          <div className="field"><label>配信開始日</label>
+            <input type="date" className="input" value={s.startDate ?? ''} disabled={!canEdit} onChange={(e) => set('startDate', e.target.value || null)} /></div>
+          <div className="field"><label>配信終了日 (無期限は空欄)</label>
+            <input type="date" className="input" value={s.endDate ?? ''} disabled={!canEdit} onChange={(e) => set('endDate', e.target.value || null)} /></div>
+        </div>
+        <div className="set-row">
+          <div className="field"><label>計測するCV地点</label>
+            <input className="input" value={s.conversionPoint} disabled={!canEdit} onChange={(e) => set('conversionPoint', e.target.value)} placeholder="例: 購入完了 / 資料請求" /></div>
+          <div className="field"><label>配信時間帯</label>
+            <input className="input" value={s.dayparting} disabled={!canEdit} onChange={(e) => set('dayparting', e.target.value)} placeholder="例: 終日 / 平日9-18時" /></div>
+        </div>
+        <div className="field"><label>メモ</label>
+          <textarea className="textarea" rows={2} value={s.note} disabled={!canEdit} onChange={(e) => set('note', e.target.value)} placeholder="運用上の申し送りなど" /></div>
+
+        {canEdit ? (
+          <div className="f-actions">
+            <button className="btn pri" disabled={busy} onClick={save}>{busy ? '保存中…' : '設定を保存'}</button>
+            {saved ? <span style={{ color: 'var(--good)', fontWeight: 600, fontSize: 13 }}>✓ 保存しました</span> : null}
+          </div>
+        ) : (
+          <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)' }}>※ 提供先版では閲覧のみです。</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AssetAdvice({ assetId }: { assetId: string }) {
+  const [open, setOpen] = useState(false);
+  const [advice, setAdvice] = useState<AssetAdviceDto | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = () => {
+    if (open) { setOpen(false); return; }
+    setOpen(true);
+    if (advice) return;
+    setBusy(true);
+    apiGet<AssetAdviceDto>(`/projects/assets/${assetId}/advice`)
+      .then(setAdvice)
+      .catch(() => setAdvice(null))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <div className="asset-advice-wrap">
+      <button className="btn sm sec" onClick={load}>{open ? '改善ポイントを閉じる' : '💡 改善ポイントを見る'}</button>
+      {open ? (
+        <div className="asset-advice">
+          {busy ? <SkeletonLines count={2} /> : advice ? (
+            <>
+              <p className="aa-summary">{advice.summary}</p>
+              <ul className="aa-list">
+                {advice.items.map((it, i) => (
+                  <li key={i} className={`aa-item ${it.severity}`}>
+                    <span className="aa-ico">{ADVICE_ICON[it.severity]}</span>
+                    <span><b>{it.title}</b><br /><span className="aa-detail">{it.detail}</span></span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : <p style={{ color: 'var(--muted)', fontSize: 12.5 }}>改善ポイントを取得できませんでした。</p>}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -178,6 +324,7 @@ function AssetCard({ asset, canPublish, onChanged }: { asset: ProjectAssetDto; c
           <button className="btn sm sec" disabled={busy} onClick={() => advance('approved')}>公開を停止</button>
         ) : null}
       </div>
+      <AssetAdvice assetId={asset.id} />
     </div>
   );
 }
@@ -324,6 +471,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               </div>
             </div>
           ) : null}
+
+          {/* --- 配信設定 --- */}
+          {tab === 'settings' ? <SettingsTab project={d} onSaved={detail.retry} /> : null}
 
           {/* --- 制作物 --- */}
           {tab === 'assets' ? <AssetsTab project={d} onChanged={detail.retry} /> : null}

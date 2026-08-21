@@ -248,13 +248,26 @@ async function main() {
   // プロジェクト (目的・施策単位)。複数媒体をまとめ、掲示/推移/アラート/改善のハブに
   const mkProject = async (
     id: string, clientId: string, name: string, goal: string, accountIds: string[], note = '',
+    settings: Record<string, unknown> = {},
   ) => {
-    await prisma.project.create({ data: { id, tenantId: TENANT_ID, clientId, name, goal, note } });
+    await prisma.project.create({ data: { id, tenantId: TENANT_ID, clientId, name, goal, note, settings } });
     await prisma.adAccount.updateMany({ where: { id: { in: accountIds } }, data: { projectId: id } });
   };
-  await mkProject('p_a_spring', clientA.id, '春の新規獲得キャンペーン', 'conversion', [accAGoogle.id, accAMeta.id], 'Google検索とMetaで新規顧客を獲得する主力施策');
-  await mkProject('p_b_repeat', clientB.id, 'リピート促進 (LINE/Meta)', 'store', [accBMeta.id, accBLine.id], '既存顧客の再来店・再購入を狙う');
-  await mkProject('p_c_lead', clientC.id, 'BtoBリード獲得', 'conversion', [accCGoogle.id, accCYahoo.id], '検索広告で問い合わせ・資料請求を獲得');
+  await mkProject('p_a_spring', clientA.id, '春の新規獲得キャンペーン', 'conversion', [accAGoogle.id, accAMeta.id], 'Google検索とMetaで新規顧客を獲得する主力施策', {
+    monthlyBudgetTotal: 1600000, dailyBudget: 53000, targetCpa: 4000, targetRoas: 400, bidStrategy: 'target_cpa',
+    startDate: '2026-03-01', endDate: '2026-05-31', regions: '全国', ageRange: '25-44', gender: 'female',
+    devices: 'all', conversionPoint: '購入完了', dayparting: '終日', note: '母の日商戦に向けて5月は予算増額予定',
+  });
+  await mkProject('p_b_repeat', clientB.id, 'リピート促進 (LINE/Meta)', 'store', [accBMeta.id, accBLine.id], '既存顧客の再来店・再購入を狙う', {
+    monthlyBudgetTotal: 700000, dailyBudget: 23000, targetCpa: 6000, targetRoas: null, bidStrategy: 'maximize_conversions',
+    startDate: '2026-01-01', endDate: null, regions: '東京・神奈川・千葉・埼玉', ageRange: '20-49', gender: 'female',
+    devices: 'mobile', conversionPoint: '来店予約', dayparting: '平日10-20時', note: '',
+  });
+  await mkProject('p_c_lead', clientC.id, 'BtoBリード獲得', 'conversion', [accCGoogle.id, accCYahoo.id], '検索広告で問い合わせ・資料請求を獲得', {
+    monthlyBudgetTotal: 1700000, dailyBudget: 56000, targetCpa: 15000, targetRoas: null, bidStrategy: 'maximize_conversions',
+    startDate: '2026-01-01', endDate: null, regions: '全国', ageRange: '指定なし', gender: 'all',
+    devices: 'desktop', conversionPoint: '資料請求・問い合わせ', dayparting: '平日9-18時', note: 'PC・法人向けにデスクトップ重視',
+  });
 
   // 制作物 (広告文/LP/チラシ/動画) のデモ。下書き〜公開の各段階を含む
   await prisma.projectAsset.createMany({
