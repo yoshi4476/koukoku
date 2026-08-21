@@ -79,6 +79,7 @@ async function seedFacts(
 async function main() {
   console.log('Seeding ADGRID demo data...');
   // 子テーブルから順に削除 (FK制約対応)
+  await prisma.keywordStat.deleteMany({});
   await prisma.dashboard.deleteMany({});
   await prisma.changeLog.deleteMany({});
   await prisma.knowledgeAsset.deleteMany({});
@@ -197,6 +198,48 @@ async function main() {
   // C社 Yahoo!: 安定
   await seedFacts(accCYahoo.id, 'yahoo_search', [
     { campaignId: 'y-c-main', campaignName: '指名+一般検索', baseCost: 15000, baseCtr: 0.04, baseCvr: 0.03, avgOrderValue: 150000 },
+  ]);
+
+  // 検索キーワード実績 (キーワード最適化 F-18)。増額/維持/減額/停止・各ランキングを網羅する配分
+  type KwSeed = {
+    keyword: string; matchType: string; bid: number; qs: number;
+    impr: number; clicks: number; cost: number; conv: number; convValue: number;
+  };
+  const seedKeywords = async (
+    clientId: string, adAccountId: string, platform: string, kws: KwSeed[],
+  ) => {
+    await prisma.keywordStat.createMany({
+      data: kws.map((k) => ({
+        tenantId: TENANT_ID, clientId, adAccountId, platform,
+        keyword: k.keyword, matchType: k.matchType, currentBid: k.bid, qualityScore: k.qs,
+        impressions: k.impr, clicks: k.clicks, cost: k.cost, conversions: k.conv,
+        conversionValue: k.convValue, windowDays: 28,
+      })),
+    });
+  };
+  // A社 Google (EC・物販): 相場 CPA4000 / CVR2.0 / CTR1.2
+  await seedKeywords(clientA.id, accAGoogle.id, 'google_ads', [
+    { keyword: 'アドグリッド 公式', matchType: 'exact', bid: 180, qs: 9, impr: 8000, clicks: 640, cost: 96000, conv: 40, convValue: 360000 },
+    { keyword: 'スキンケア セット 送料無料', matchType: 'phrase', bid: 220, qs: 8, impr: 12000, clicks: 300, cost: 60000, conv: 15, convValue: 135000 },
+    { keyword: '化粧品 通販 カテゴリ', matchType: 'phrase', bid: 320, qs: 6, impr: 20000, clicks: 300, cost: 90000, conv: 9, convValue: 81000 },
+    { keyword: '美容液 口コミ ランキング', matchType: 'phrase', bid: 210, qs: 5, impr: 9000, clicks: 180, cost: 36000, conv: 4, convValue: 36000 },
+    { keyword: '格安 化粧水', matchType: 'broad', bid: 150, qs: 4, impr: 30000, clicks: 450, cost: 67500, conv: 0, convValue: 0 },
+    { keyword: '競合ブランド 比較', matchType: 'broad', bid: 200, qs: 6, impr: 6000, clicks: 90, cost: 18000, conv: 3, convValue: 27000 },
+  ]);
+  // C社 Google (BtoB SaaS): 相場 CPA15000 / CVR1.0 / CTR1.5・高単価
+  await seedKeywords(clientC.id, accCGoogle.id, 'google_ads', [
+    { keyword: 'クラウド勤怠 サービス名', matchType: 'exact', bid: 500, qs: 10, impr: 5000, clicks: 400, cost: 200000, conv: 30, convValue: 4500000 },
+    { keyword: '勤怠管理 料金', matchType: 'phrase', bid: 1000, qs: 8, impr: 8000, clicks: 240, cost: 240000, conv: 12, convValue: 1800000 },
+    { keyword: '業務効率化 ツール', matchType: 'phrase', bid: 800, qs: 5, impr: 25000, clicks: 375, cost: 300000, conv: 5, convValue: 750000 },
+    { keyword: '競合SaaS 代替', matchType: 'phrase', bid: 800, qs: 7, impr: 6000, clicks: 120, cost: 96000, conv: 6, convValue: 900000 },
+    { keyword: 'カテゴリ 比較 おすすめ', matchType: 'phrase', bid: 470, qs: 6, impr: 15000, clicks: 225, cost: 105000, conv: 5, convValue: 750000 },
+    { keyword: '無料 勤怠 ツール', matchType: 'broad', bid: 400, qs: 4, impr: 40000, clicks: 600, cost: 240000, conv: 0, convValue: 0 },
+  ]);
+  // C社 Yahoo! (BtoB SaaS)
+  await seedKeywords(clientC.id, accCYahoo.id, 'yahoo_search', [
+    { keyword: 'サービス名 ヤフー', matchType: 'exact', bid: 400, qs: 9, impr: 3000, clicks: 210, cost: 84000, conv: 15, convValue: 2250000 },
+    { keyword: '勤怠システム 導入', matchType: 'phrase', bid: 700, qs: 7, impr: 12000, clicks: 180, cost: 126000, conv: 6, convValue: 900000 },
+    { keyword: '勤怠 安い', matchType: 'broad', bid: 300, qs: 4, impr: 18000, clicks: 270, cost: 81000, conv: 1, convValue: 150000 },
   ]);
 
   await prisma.mediaConnection.createMany({

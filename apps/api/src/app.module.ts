@@ -42,6 +42,8 @@ import { ChangeLogController } from './changelog/changelog.controller';
 import { SlackController } from './slack/slack.controller';
 import { DashboardsService } from './dashboards/dashboards.service';
 import { DashboardsController } from './dashboards/dashboards.controller';
+import { KeywordsService } from './keywords/keywords.service';
+import { KeywordsController } from './keywords/keywords.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -61,6 +63,7 @@ import { DashboardsController } from './dashboards/dashboards.controller';
     ChangeLogController,
     SlackController,
     DashboardsController,
+    KeywordsController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -84,6 +87,7 @@ import { DashboardsController } from './dashboards/dashboards.controller';
     KnowledgeService,
     ChangeLogService,
     DashboardsService,
+    KeywordsService,
     MetricsService,
     LlmService,
     AuditService,

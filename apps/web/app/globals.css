@@ -642,6 +642,56 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 }
 .help-tip:hover .help-pop, .help-tip:focus .help-pop { display: block; }
 
+/* ============ キーワード最適化 (F-18) ============ */
+.kw-ranks { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.kw-rank { background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--rank-accent, var(--primary)); border-radius: 12px; padding: 12px 14px; box-shadow: var(--shadow-1); }
+.kw-rank-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.kw-rank-title { font-size: 13px; font-weight: 700; color: var(--ink); }
+.kw-rank-hint { font-size: 11px; color: var(--muted); }
+.kw-rank-empty { font-size: 12px; color: var(--muted); margin: 6px 0; }
+.kw-rank-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.kw-rank-list li { display: flex; align-items: center; gap: 8px; }
+.kw-rank-no { flex: none; width: 18px; height: 18px; border-radius: 5px; background: var(--bg-sub); color: var(--muted); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.kw-rank-list li:first-child .kw-rank-no { background: var(--rank-accent, var(--primary)); color: #fff; }
+.kw-rank-body { min-width: 0; flex: 1; display: flex; flex-direction: column; }
+.kw-rank-kw { font-size: 12.5px; font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kw-rank-note { font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kw-rank-val { flex: none; font-size: 13px; font-weight: 700; color: var(--rank-accent, var(--primary)); }
+
+.kw-summary { display: flex; flex-wrap: wrap; gap: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; box-shadow: var(--shadow-1); }
+.kw-sum-item { display: flex; flex-direction: column; gap: 2px; padding-right: 14px; border-right: 1px solid var(--line); }
+.kw-sum-item:last-child { border-right: none; }
+.kw-sum-item.wide { flex: 1; min-width: 180px; }
+.kw-sum-label { font-size: 11px; color: var(--muted); }
+.kw-sum-val { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+.kw-sum-val.up { color: var(--good); }
+.kw-sum-val.warn { color: var(--warn); }
+.kw-sum-val.down { color: var(--bad); }
+
+.kw-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+.kw-search { flex: 1; min-width: 200px; max-width: 340px; }
+.kw-industry { margin-left: auto; font-size: 11.5px; color: var(--muted); }
+
+.kw-tbl td { vertical-align: middle; }
+.kw-cell { display: flex; flex-direction: column; gap: 2px; min-width: 190px; }
+.kw-name { font-weight: 600; color: var(--ink); }
+.kw-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.kw-match { font-size: 10.5px; color: var(--muted); background: var(--bg-sub); border: 1px solid var(--line); border-radius: 5px; padding: 0 5px; }
+.kw-client { font-size: 10.5px; color: var(--muted); }
+.kw-eff { display: inline-flex; align-items: center; gap: 6px; }
+.kw-eff-bar { display: block; height: 6px; width: 40px; border-radius: 3px; background: linear-gradient(90deg, var(--bad), var(--warn), var(--good)); background-size: 250% 100%; }
+.kw-eff-num { font-size: 12px; color: var(--ink-2); min-width: 20px; }
+.kw-delta.up { color: var(--good); font-weight: 700; }
+.kw-delta.down { color: var(--bad); font-weight: 700; }
+
+.kw-detail { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px; }
+.kw-detail-texts { display: flex; flex-wrap: wrap; gap: 24px; }
+.kw-detail-block { flex: 1; min-width: 220px; }
+.kw-detail-figs { display: flex; gap: 24px; flex-wrap: wrap; padding-top: 10px; border-top: 1px solid var(--line); }
+.kw-detail-fig { display: flex; flex-direction: column; gap: 2px; }
+.kw-detail-label { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+.kw-detail-text { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+
 @media (prefers-reduced-motion: reduce) {
   .skel::after { animation: none; }
   * { transition-duration: 0s !important; }

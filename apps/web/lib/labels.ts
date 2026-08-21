@@ -3,6 +3,7 @@ import type {
   ConnectionStatus,
   MemberRole,
   AlertMetric,
+  KeywordAction,
   ProposalAction,
   ProposalStatus,
   KnowledgeObjective,
@@ -167,6 +168,23 @@ export const WIDGET_TYPE_LABEL: Record<WidgetType, string> = {
   bar: '横棒',
   line: '折れ線',
   table: '表',
+};
+
+/* キーワード最適化 (F-18) の推奨アクション。cls は .pill バリアント */
+export const KEYWORD_ACTION_META: Record<
+  KeywordAction,
+  { label: string; cls: string; icon: string }
+> = {
+  increase: { label: '増額', cls: 'up', icon: '▲' },
+  keep: { label: '維持', cls: 'flat', icon: '＝' },
+  decrease: { label: '減額', cls: 'warn', icon: '▼' },
+  pause: { label: '停止', cls: 'down', icon: '■' },
+};
+
+export const MATCH_TYPE_LABEL: Record<string, string> = {
+  exact: '完全一致',
+  phrase: 'フレーズ',
+  broad: '部分一致',
 };
 
 export const INDUSTRY_LABEL: Record<string, string> = {

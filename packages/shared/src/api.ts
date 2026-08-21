@@ -557,3 +557,80 @@ export interface PortalCardDto {
   lastSyncedAt: string | null;
   accountCount: number;
 }
+
+/* ---- キーワード最適化 (F-18) ---- */
+/** 各キーワードへの推奨アクション。増額/維持/減額/停止 */
+export type KeywordAction = 'increase' | 'keep' | 'decrease' | 'pause';
+
+export interface KeywordRowDto {
+  id: string;
+  keyword: string;
+  matchType: 'exact' | 'phrase' | 'broad';
+  platform: Platform;
+  clientId: string;
+  clientName: string;
+  adAccountId: string;
+  accountName: string;
+  impressions: number;
+  clicks: number;
+  cost: number;
+  conversions: number;
+  conversionValue: number;
+  currentBid: number | null;
+  qualityScore: number | null;
+  /* 算出指標 */
+  ctr: number | null;
+  cpc: number | null;
+  cpa: number | null;
+  cvr: number | null;
+  roas: number | null;
+  /** 投資対効果 (回収額-費用)/費用 = ROI%。conversionValue 未計測時 null */
+  roi: number | null;
+  /** 総合効率スコア 0-100 (CTR/CVR/CPA/ROAS を業種相場で正規化した合成値) */
+  efficiency: number;
+  /* 推奨 */
+  action: KeywordAction;
+  /** 推奨後の入札額 (currentBid が既知の場合)。未知なら null */
+  recommendedBid: number | null;
+  /** 推奨する予算/入札の増減率 (例 +30, -50)。維持は 0 */
+  bidChangePct: number;
+  /** なぜこの推奨か (1行) */
+  reason: string;
+  /** 期待効果 (1行) */
+  expectedImpact: string;
+}
+
+/** ランキング枠 (最高CTR / バランス最良 / 最高ROI) の1エントリ */
+export interface KeywordRankItemDto {
+  keyword: string;
+  clientName: string;
+  platform: Platform;
+  /** そのランキングの主要指標の表示値 (例 "CTR 8.2%") */
+  metricLabel: string;
+  metricValue: number;
+  note: string;
+}
+
+export interface KeywordOptimizeDto {
+  /** 分析対象キーワード総数 */
+  totalKeywords: number;
+  /** 集計期間の日数 */
+  windowDays: number;
+  /** 業種モードのラベル (相場基準に使用) */
+  industryLabel: string;
+  /* 3つの算出ランキング */
+  topCtr: KeywordRankItemDto[];
+  bestBalance: KeywordRankItemDto[];
+  topRoi: KeywordRankItemDto[];
+  /* 予算配分の提案サマリ */
+  summary: {
+    increaseCount: number;
+    decreaseCount: number;
+    pauseCount: number;
+    /** 減額/停止で浮く推定月額 (円) */
+    reclaimableBudget: number;
+    /** 増額推奨に再配分した場合の期待CV増分 (件/月) */
+    projectedCvGain: number;
+  };
+  rows: KeywordRowDto[];
+}

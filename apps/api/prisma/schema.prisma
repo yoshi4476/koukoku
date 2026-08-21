@@ -65,6 +65,7 @@ model Tenant {
   knowledge   KnowledgeAsset[]
   changeLogs  ChangeLog[]
   dashboards  Dashboard[]
+  keywordStats KeywordStat[]
 
   @@map("tenants")
 }
@@ -265,14 +266,45 @@ model Client {
   industryCode String @default("other") @map("industry_code")
   status       String @default("active")
 
-  tenant     Tenant      @relation(fields: [tenantId], references: [id])
-  adAccounts AdAccount[]
-  reports    Report[]
-  copyJobs   CopyJob[]
-  abTests    AbTest[]
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  adAccounts   AdAccount[]
+  reports      Report[]
+  copyJobs     CopyJob[]
+  abTests      AbTest[]
+  keywordStats KeywordStat[]
 
   @@index([tenantId])
   @@map("clients")
+}
+
+// キーワード実績スナップショット (キーワード最適化 F-18)。
+// 検索広告のキーワード単位で直近28日集計を保持し、増額/減額の推奨と
+// CTR/コスト/ROIランキングを算出する。マッチタイプ・入札は媒体同期で更新。
+model KeywordStat {
+  id              String   @id @default(cuid())
+  tenantId        String   @map("tenant_id")
+  clientId        String   @map("client_id")
+  adAccountId     String   @map("ad_account_id")
+  platform        String
+  keyword         String
+  matchType       String   @default("phrase") @map("match_type") // exact / phrase / broad
+  currentBid      Decimal? @map("current_bid") @db.Decimal(10, 2)
+  impressions     BigInt   @default(0)
+  clicks          BigInt   @default(0)
+  cost            Decimal  @default(0) @db.Decimal(14, 2)
+  conversions     Decimal  @default(0) @db.Decimal(12, 2)
+  conversionValue Decimal  @default(0) @map("conversion_value") @db.Decimal(14, 2)
+  qualityScore    Int?     @map("quality_score") // 1-10 (Google品質スコア等)
+  windowDays      Int      @default(28) @map("window_days")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  client    Client    @relation(fields: [clientId], references: [id])
+  adAccount AdAccount @relation(fields: [adAccountId], references: [id])
+
+  @@index([tenantId, adAccountId])
+  @@index([tenantId, clientId])
+  @@map("keyword_stats")
 }
 
 model AdAccount {
@@ -289,10 +321,11 @@ model AdAccount {
   tenant     Tenant             @relation(fields: [tenantId], references: [id])
   client     Client             @relation(fields: [clientId], references: [id])
   facts      FactAdPerformance[]
-  audits     Audit[]
-  csvImports CsvImport[]
-  proposals  Proposal[]
-  changeLogs ChangeLog[]
+  audits       Audit[]
+  csvImports   CsvImport[]
+  proposals    Proposal[]
+  changeLogs   ChangeLog[]
+  keywordStats KeywordStat[]
 
   @@index([tenantId, clientId])
   @@map("ad_accounts")
