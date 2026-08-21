@@ -6,7 +6,7 @@ import type { ProposalDto, ProposalStatus } from '@adgrid/shared';
 import { isApprover } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
-import { EmptyState, ErrorCard, PlatformTag, Skeleton, SkeletonLines } from '@/components/ui';
+import { EmptyState, ErrorCard, HintBar, PlatformTag, Skeleton, SkeletonLines } from '@/components/ui';
 import { apiPost, ApiError, toApiError } from '@/lib/api';
 import { CONFIDENCE_LABEL, PROPOSAL_ACTION_LABEL, PROPOSAL_STATUS_LABEL } from '@/lib/labels';
 import { formatDateTime } from '@/lib/format';
@@ -169,6 +169,10 @@ export default function ApprovalsPage() {
         <h1>承認キュー</h1>
         <span className="sub">AIの提案を確認し、承認してから広告アカウントへ適用します</span>
       </div>
+
+      <HintBar id="approvals" title="承認キューの使い方">
+        AI提案の適用は<mark>必ず人間の承認</mark>を経てから実行されます。影響シミュレーションを確認して「承認して実行」。予算変更は<mark>「元に戻す」でロールバック</mark>可能。緊急時は設定画面のkill switchで全適用を停止できます。承認はオーナー/管理者のみ。
+      </HintBar>
 
       {settings.loading ? <Skeleton h={20} w={260} style={{ marginBottom: 10 }} /> : null}
       {settings.error ? <ErrorCard error={settings.error} onRetry={settings.retry} /> : null}

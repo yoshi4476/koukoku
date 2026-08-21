@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { PacingDto } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
-import { EmptyState, ErrorCard, PlatformTag, SkeletonLines } from '@/components/ui';
+import { EmptyState, ErrorCard, HintBar, PlatformTag, SkeletonLines } from '@/components/ui';
 import { formatDate, formatPercent, formatYen } from '@/lib/format';
 
 const STATUS_META: Record<PacingDto['status'], { pill: string; label: string; seg: string }> = {
@@ -117,6 +117,10 @@ export default function PacingPage() {
         <h1>予算ペース</h1>
         <span className="sub">月予算に対する消化ペースと着地予測を確認します</span>
       </div>
+
+      <HintBar id="pacing" title="予算ペースの使い方">
+        月予算に対する<mark>着地予測</mark>を表示します。青=当月消化・オレンジ=着地予測のバーで、100%ラインを超えると予算オーバー。<mark>推奨日予算</mark>に調整すれば予算内に収まります。超過ペースのアカウントは早めに対応を。
+      </HintBar>
 
       {pacing.error ? <ErrorCard error={pacing.error} onRetry={pacing.retry} /> : null}
 

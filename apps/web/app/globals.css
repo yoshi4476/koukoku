@@ -613,6 +613,35 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 
 .wadd-btn { margin-top: 16px; }
 
+/* ---------- ワンポイントアドバイス (HintBar / HelpTip) ---------- */
+.hint-bar {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--primary-soft); border: 1px solid var(--primary);
+  border-radius: 10px; padding: 11px 14px; margin-bottom: 16px;
+  font-size: 13px; color: var(--ink); line-height: 1.7;
+}
+.hint-bar .hint-ico { flex: none; font-size: 15px; line-height: 1.5; }
+.hint-bar .hint-body { flex: 1; min-width: 0; }
+.hint-bar .hint-body b { color: var(--primary-strong); font-weight: 700; }
+.hint-bar .hint-body :is(mark) { background: var(--warn-soft); color: var(--warn); padding: 0 3px; border-radius: 3px; font-weight: 600; }
+.hint-bar .hint-body kbd { font-family: ui-monospace, Consolas, monospace; font-size: 11px; border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; background: var(--surface); }
+.hint-close { flex: none; border: none; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
+.hint-close:hover { background: var(--surface); color: var(--ink); }
+
+.help-tip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; margin-left: 5px; border-radius: 50%;
+  background: var(--line-strong); color: var(--surface);
+  font-size: 10px; font-weight: 700; cursor: help; position: relative; vertical-align: middle;
+}
+.help-tip .help-pop {
+  display: none; position: absolute; bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  width: max-content; max-width: 240px; z-index: 30;
+  background: var(--ink); color: var(--bg); font-size: 11.5px; font-weight: 400;
+  line-height: 1.6; border-radius: 7px; padding: 7px 10px; text-align: left; white-space: normal;
+}
+.help-tip:hover .help-pop, .help-tip:focus .help-pop { display: block; }
+
 @media (prefers-reduced-motion: reduce) {
   .skel::after { animation: none; }
   * { transition-duration: 0s !important; }

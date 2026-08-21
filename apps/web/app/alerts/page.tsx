@@ -9,7 +9,7 @@ import type {
   AlertSettingsDto,
 } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
-import { ErrorCard, PlatformTag, SkeletonLines } from '@/components/ui';
+import { ErrorCard, HintBar, PlatformTag, SkeletonLines } from '@/components/ui';
 import { apiPatch, apiPost, apiPut, ApiError, toApiError } from '@/lib/api';
 import { ALERT_METRIC_META } from '@/lib/labels';
 import { formatDateTime } from '@/lib/format';
@@ -447,6 +447,10 @@ export default function AlertsPage() {
         <h1>アラート</h1>
         <span className="sub">予算・CPA・計測の異常を毎時検知して通知します</span>
       </div>
+
+      <HintBar id="alerts" title="アラートの使い方">
+        予算超過・CPA急変・計測ゼロ・消化急減を<mark>毎時自動で検知</mark>します。しきい値は自由に調整可能。<mark>Slack通知</mark>も設定できます。同じアラートは6時間抑制されるので通知が煩くなりません。
+      </HintBar>
       <RulesCard running={running} runResult={runResult} runError={runError} onRun={runNow} />
       <SlackCard />
       <EventsCard events={events} running={running} onRun={runNow} />

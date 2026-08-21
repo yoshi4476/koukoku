@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import type { PortalCardDto } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
-import { ErrorCard, Skeleton } from '@/components/ui';
+import { ErrorCard, HintBar, Skeleton } from '@/components/ui';
 import { CONNECTION_STATUS_META, PLATFORM_COLOR_VAR } from '@/lib/labels';
 import { formatDateTime } from '@/lib/format';
 
@@ -47,6 +47,10 @@ export default function PortalPage() {
         <h1>媒体窓口</h1>
         <span className="sub">各媒体の管理画面・ヘルプ・API情報と接続状態</span>
       </div>
+
+      <HintBar id="portal" title="媒体窓口の使い方">
+        各媒体の<mark>管理画面・ヘルプ・API情報</mark>にワンクリックでアクセスできます。接続状態は信号色で表示。「この媒体についてAIに聞く」で不明点を解決。LINEはAPI未提供のためCSV連携をご利用ください。
+      </HintBar>
 
       {error ? <ErrorCard error={error} onRetry={retry} /> : null}
 

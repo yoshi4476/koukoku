@@ -13,7 +13,7 @@ import type {
 import { WIDGET_METRIC_LABEL } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
-import { DeltaPill, EmptyState, ErrorCard, Skeleton, SkeletonLines } from '@/components/ui';
+import { DeltaPill, EmptyState, ErrorCard, HintBar, Skeleton, SkeletonLines } from '@/components/ui';
 import { apiDelete, apiPost, apiPut, ApiError, toApiError } from '@/lib/api';
 import { WIDGET_DIMENSION_LABEL, WIDGET_TYPE_LABEL } from '@/lib/labels';
 import { formatNumber, formatPercent, formatYen } from '@/lib/format';
@@ -473,6 +473,10 @@ export default function BoardsPage() {
         <span className="sub">指標・グラフを自由に並べた自分だけのダッシュボード</span>
         {saving ? <span className="sub">保存中…</span> : null}
       </div>
+
+      <HintBar id="boards" title="カスタムボードの使い方">
+        指標・グラフを自由に並べた<mark>自分だけのダッシュボード</mark>を作れます。「編集」を押すとウィジェットの追加・並べ替え・削除ができます。数値・横棒・折れ線・表の4種類。クライアント報告用のビューを保存しておくと便利です。
+      </HintBar>
 
       {list.error ? <ErrorCard error={list.error} onRetry={list.retry} /> : null}
       {list.loading ? (

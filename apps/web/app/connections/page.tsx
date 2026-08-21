@@ -12,7 +12,7 @@ import type {
 import { ALL_PLATFORMS, PLATFORM_META } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
-import { ErrorCard, SkeletonLines } from '@/components/ui';
+import { ErrorCard, HintBar, SkeletonLines } from '@/components/ui';
 import { apiDelete, apiPost, ApiError, toApiError } from '@/lib/api';
 import { CONNECTION_STATUS_META, PLATFORM_COLOR_VAR } from '@/lib/labels';
 import { formatDateTime, formatNumber, formatPeriod } from '@/lib/format';
@@ -282,6 +282,10 @@ export default function ConnectionsPage() {
         <h1>API接続</h1>
         <span className="sub">媒体APIとの接続・自動同期・切断の管理</span>
       </div>
+
+      <HintBar id="connections" title="API接続の使い方">
+        媒体を接続すると実績が<mark>3時間ごとに自動同期</mark>されます。3ステップのウィザードで接続。実APIの認証情報が未設定の間は<mark>デモ接続</mark>で動作を体験できます。LINEはAPI未提供のためCSV連携を。
+      </HintBar>
 
       {/* ---- 上段: 接続済み ---- */}
       <div className="card" style={{ marginBottom: 16 }}>

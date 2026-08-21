@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import type { ReportRunDto } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
-import { ErrorCard, MockBadge, SkeletonLines } from '@/components/ui';
+import { ErrorCard, HintBar, MockBadge, SkeletonLines } from '@/components/ui';
 import { apiPost, ApiError, toApiError } from '@/lib/api';
 import { REPORT_SECTION_LABEL } from '@/lib/labels';
 import { formatDate, formatDateTime } from '@/lib/format';
@@ -108,6 +108,10 @@ export default function ReportPage() {
         <h1>レポート</h1>
         <span className="sub">「結果 → 要因 → 次のアクション」の構成で自動生成します</span>
       </div>
+
+      <HintBar id="report" title="レポートの使い方">
+        クライアントを選んで生成すると「結果→要因→次のアクション」構成の週次レポートが自動作成されます。<mark>PDF・スライドでダウンロード</mark>してクライアント報告にそのまま使えます。毎週月曜7:00に自動生成もされます (設定画面で手動実行可)。
+      </HintBar>
 
       {clientsError ? <ErrorCard error={clientsError} onRetry={reload} /> : null}
 

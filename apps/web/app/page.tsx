@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import type { HomeDto, HomeTaskDto, OnboardingStatusDto, TaskKind } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
-import { ErrorCard, PlatformTag, Skeleton } from '@/components/ui';
+import { ErrorCard, HintBar, PlatformTag, Skeleton } from '@/components/ui';
 import { apiPost, ApiError, toApiError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 
@@ -113,6 +113,10 @@ export default function HomePage() {
           </span>
         ) : null}
       </div>
+
+      <HintBar id="home" title="今日の司令室の使い方">
+        この画面は<mark>今日やるべきこと</mark>だけを優先度順 (アラート→AI提案→レポート予定) に表示します。運用者の1日はここから始めましょう。各行のボタンから該当画面に直行できます。
+      </HintBar>
 
       {error ? <ErrorCard error={error} onRetry={retry} /> : null}
       {ackError ? <ErrorCard error={ackError} /> : null}

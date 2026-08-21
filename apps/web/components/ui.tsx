@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { Platform } from '@adgrid/shared';
 import { PLATFORM_META } from '@adgrid/shared';
@@ -82,4 +83,45 @@ export function PlatformTag({ platform, full = false }: { platform: Platform; fu
 
 export function MockBadge() {
   return <span className="pill warn" title="ANTHROPIC_API_KEY 未設定のためモック結果です">モック結果</span>;
+}
+
+/* ---- ワンポイントアドバイス: 各画面上部の使い方ヒント (閉じる状態を記憶) ---- */
+export function HintBar({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+  const key = `adgrid_hint_${id}`;
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(key) === 'closed') setOpen(false);
+    } catch {
+      /* localStorage不可でも表示は続行 */
+    }
+  }, [key]);
+  if (!open) return null;
+  const close = () => {
+    setOpen(false);
+    try {
+      localStorage.setItem(key, 'closed');
+    } catch {
+      /* 記憶できなくても閉じる */
+    }
+  };
+  return (
+    <div className="hint-bar" role="note">
+      <span className="hint-ico" aria-hidden="true">💡</span>
+      <div className="hint-body">
+        <b>{title}</b>
+        <div>{children}</div>
+      </div>
+      <button type="button" className="hint-close" aria-label="ヒントを閉じる" onClick={close}>×</button>
+    </div>
+  );
+}
+
+/* ---- インラインのワンポイント: ラベル横などに置く小さな ? ---- */
+export function HelpTip({ text }: { text: string }) {
+  return (
+    <span className="help-tip" tabIndex={0} role="note" aria-label={`ヒント: ${text}`}>
+      ?<span className="help-pop">{text}</span>
+    </span>
+  );
 }

@@ -3,7 +3,7 @@
 import type { ChangeLogDto } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
-import { EmptyState, ErrorCard, PlatformTag, SkeletonLines } from '@/components/ui';
+import { EmptyState, ErrorCard, HintBar, PlatformTag, SkeletonLines } from '@/components/ui';
 import { CHANGELOG_ACTOR_META } from '@/lib/labels';
 import { formatDateTime, formatYen } from '@/lib/format';
 
@@ -82,6 +82,10 @@ export default function ChangelogPage() {
         <h1>変更履歴</h1>
         <span className="sub">ADGRID経由の変更と媒体側の変更を統合して記録します。実績の変動要因の特定に使えます</span>
       </div>
+
+      <HintBar id="changelog" title="変更履歴の使い方">
+        <mark>ADGRID経由の変更</mark>(承認実行・ロールバック)と<mark>媒体側の変更</mark>を統合して記録します。「いつ・誰が・何を変えたか」が分かるので、実績が動いた要因の特定に使えます。
+      </HintBar>
 
       {changelog.error ? <ErrorCard error={changelog.error} onRetry={changelog.retry} /> : null}
 

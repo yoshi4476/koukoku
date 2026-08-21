@@ -5,7 +5,7 @@ import Link from 'next/link';
 import type { KnowledgeAssetDto, KnowledgeObjective, KnowledgeSearchDto } from '@adgrid/shared';
 import { INDUSTRY_BENCHMARKS } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
-import { EmptyState, ErrorCard, SkeletonLines } from '@/components/ui';
+import { EmptyState, ErrorCard, HintBar, SkeletonLines } from '@/components/ui';
 import { KNOWLEDGE_OBJECTIVE_LABEL, PLATFORM_SHORT_LABEL } from '@/lib/labels';
 import { formatNumber, formatPercent } from '@/lib/format';
 
@@ -109,6 +109,10 @@ export default function KnowledgePage() {
         <h1>勝ちパターン</h1>
         <span className="sub">A/Bで実証された訴求・クリエイティブの勝ち筋を資産化します</span>
       </div>
+
+      <HintBar id="knowledge" title="勝ちパターンの使い方">
+        A/Bで実証された<mark>勝ち筋を資産化</mark>します。自社のパターンと、他社を含む匿名共有ナレッジの2種類。業種×目的で検索でき、広告文生成に自動反映されます。<mark>使うテナントが増えるほど賢くなります</mark>。
+      </HintBar>
 
       <div className="kn-filters">
         <div className="field">

@@ -13,7 +13,7 @@ import type {
 import { ALL_PLATFORMS, PLATFORM_META } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
-import { DeltaPill, ErrorCard, Skeleton } from '@/components/ui';
+import { DeltaPill, ErrorCard, HintBar, Skeleton } from '@/components/ui';
 import { apiPost, ApiError, toApiError } from '@/lib/api';
 import { INDUSTRY_LABEL } from '@/lib/labels';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
@@ -301,6 +301,10 @@ export default function ClientsPage() {
           </button>
         </span>
       </div>
+
+      <HintBar id="clients" title="クライアント管理の使い方">
+        担当クライアントの状況を一覧で確認できます。<mark>未対応の提案数</mark>や最終レポート日が見えるので、対応漏れを防げます。カードから診断・レポート・取込に直行。「アカウントを追加」で媒体アカウントを登録します。
+      </HintBar>
 
       {addOpen ? (
         <AddClientForm

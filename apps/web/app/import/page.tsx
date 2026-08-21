@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { AdAccountDto, CsvImportResultDto } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
-import { ErrorCard, SkeletonLines } from '@/components/ui';
+import { ErrorCard, HintBar, SkeletonLines } from '@/components/ui';
 import { apiUpload, ApiError, toApiError } from '@/lib/api';
 import { formatNumber } from '@/lib/format';
 
@@ -74,6 +74,10 @@ export default function ImportPage() {
         <h1>データ取込 (CSV)</h1>
         <span className="sub">各媒体の管理画面からダウンロードしたCSVを取り込みます (Shift_JIS / UTF-8 自動判別)</span>
       </div>
+
+      <HintBar id="import" title="データ取込の使い方">
+        媒体管理画面の<mark>日別レポートCSV</mark>をそのままアップロードできます。Shift_JIS・UTF-8を自動判別し、列も自動でマッピング。API接続していない媒体の実績はこちらで反映します。
+      </HintBar>
 
       {clientsError ? <ErrorCard error={clientsError} onRetry={reload} /> : null}
 

@@ -7,7 +7,7 @@ import { ALL_PLATFORMS } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
 import { TrendChart } from '@/components/trend-chart';
-import { DeltaPill, DeltaText, ErrorCard, PlatformTag, Skeleton, SkeletonLines } from '@/components/ui';
+import { DeltaPill, DeltaText, ErrorCard, HintBar, PlatformTag, Skeleton, SkeletonLines } from '@/components/ui';
 import { PLATFORM_SHORT_LABEL } from '@/lib/labels';
 import { formatNumber, formatPercent, formatPeriod, formatYen } from '@/lib/format';
 
@@ -194,6 +194,10 @@ export default function DashboardPage() {
         <h1>統合ダッシュボード</h1>
         {data ? <span className="sub">期間: {formatPeriod(data.period.since, data.period.until)} · 比較: 前週</span> : null}
       </div>
+
+      <HintBar id="dashboard" title="統合ダッシュボードの見方">
+        全媒体の実績を1画面で確認できます。上部のKPIカードは<mark>前週比</mark>を色と矢印で表示 (CPAは下がると緑=良化)。<mark>媒体別の行をクリック</mark>するとキャンペーン別に展開します。トップバーでクライアントを絞ると業種ベンチマーク比較も表示されます。
+      </HintBar>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
         <div className="tabs" role="tablist" aria-label="媒体で絞り込む">

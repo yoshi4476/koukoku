@@ -12,7 +12,7 @@ import type {
 } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
-import { EmptyState, ErrorCard, SkeletonLines } from '@/components/ui';
+import { EmptyState, ErrorCard, HintBar, SkeletonLines } from '@/components/ui';
 import { apiPost, ApiError, toApiError } from '@/lib/api';
 import { KNOWLEDGE_OBJECTIVE_LABEL } from '@/lib/labels';
 import { formatNumber, formatPercent } from '@/lib/format';
@@ -410,6 +410,10 @@ export default function AbTestsPage() {
         <h1>A/Bテスト</h1>
         <span className="sub">訴求・クリエイティブの勝敗を統計的に判定します</span>
       </div>
+
+      <HintBar id="abtests" title="A/Bテストの使い方">
+        2案の実績数値を入れると<mark>統計的に勝敗を判定</mark>します (有意差の有無・p値・リフト)。サンプルが十分でないうちは「継続を」と表示。勝者が出たら<mark>「勝ちパターンに登録」</mark>で資産化できます。
+      </HintBar>
 
       <CreateForm onDone={tests.retry} />
 

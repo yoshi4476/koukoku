@@ -13,7 +13,7 @@ import type {
 } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
-import { ErrorCard, MockBadge, PlatformTag, SkeletonLines } from '@/components/ui';
+import { ErrorCard, HintBar, MockBadge, PlatformTag, SkeletonLines } from '@/components/ui';
 import { apiGet, apiPatch, apiPost, ApiError, toApiError } from '@/lib/api';
 import { AUDIT_CATEGORY_LABEL, CONFIDENCE_LABEL, PROPOSAL_ACTION_LABEL } from '@/lib/labels';
 import { formatDateTime } from '@/lib/format';
@@ -403,6 +403,10 @@ export default function AuditPage() {
         <h1>AI診断</h1>
         <span className="sub">実績データから改善点を優先度順に提案します</span>
       </div>
+
+      <HintBar id="audit" title="AI診断の使い方">
+        アカウントを選んで<mark>「診断を実行」</mark>すると、AIが改善点を優先度順に提案します。各指摘には根拠・期待効果・リスク・確信度が付きます。良い指摘は<mark>「対応済にする」</mark>、不要なら「見送る」。承認フローに載せたい提案は「適用を申請」から。
+      </HintBar>
 
       {clientsError ? <ErrorCard error={clientsError} onRetry={reload} /> : null}
 

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import type { CopyCandidate, CopyRunDto, LawIssue, Platform } from '@adgrid/shared';
 import { ALL_PLATFORMS, APPEAL_AXES, PLATFORM_META } from '@adgrid/shared';
 import { useClients } from '@/components/client-context';
-import { ErrorCard, MockBadge, PlatformTag, SkeletonLines } from '@/components/ui';
+import { ErrorCard, HintBar, MockBadge, PlatformTag, SkeletonLines } from '@/components/ui';
 import { apiPost, ApiError, toApiError } from '@/lib/api';
 import { CONFIDENCE_LABEL } from '@/lib/labels';
 
@@ -106,6 +106,10 @@ export default function CopyPage() {
         <h1>広告文スタジオ</h1>
         <span className="sub">訴求軸ごとに広告文を生成し、文字数と法規制を自動チェックします</span>
       </div>
+
+      <HintBar id="copy" title="広告文スタジオの使い方">
+        商材情報と訴求軸を入れると媒体別の広告文を生成します。<mark>薬機法・景表法・金商法のチェック</mark>が自動で走り、NG表現は修正案付きで警告します。文字数も媒体別に自動検証。同業種の勝ちパターンも反映されます。
+      </HintBar>
 
       {clientsError ? <ErrorCard error={clientsError} onRetry={reload} /> : null}
 

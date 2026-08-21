@@ -6,7 +6,7 @@ import type { BillingDto, CalibrationDto, ConnectionDto, MemberDto, UsageDto } f
 import { PLANS, isApprover } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
-import { ErrorCard, Skeleton, SkeletonLines } from '@/components/ui';
+import { ErrorCard, HintBar, Skeleton, SkeletonLines } from '@/components/ui';
 import { apiPost, apiPut, ApiError, toApiError } from '@/lib/api';
 import { CALIBRATION_EFFECT_META, MEMBER_ROLE_LABEL, USAGE_FEATURE_LABEL } from '@/lib/labels';
 import { formatNumber, formatPercent, formatYen } from '@/lib/format';
@@ -221,6 +221,10 @@ export default function SettingsPage() {
         <h1>設定</h1>
         <span className="sub">ワークスペース・AI利用量・メンバーの管理</span>
       </div>
+
+      <HintBar id="settings" title="設定画面でできること">
+        プラン・<mark>AI利用量</mark>・メンバーの確認、<mark>自動レポートの手動実行</mark>、承認フローのkill switch、AIの確信度較正の学習状況、API接続の管理ができます。
+      </HintBar>
 
       {/* カード1: ワークスペース */}
       <div className="card" style={{ marginBottom: 16, maxWidth: 640 }}>
