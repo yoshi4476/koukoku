@@ -1,0 +1,206 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// マルチテナント基盤 (要件書 §④)。全業務テーブルに tenant_id。
+// RLSポリシーは migrations/xxxx_rls/migration.sql で付与する。
+// ============================================================
+
+model Tenant {
+  id        String   @id
+  name      String
+  plan      String   @default("starter")
+  status    String   @default("active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  clients     Client[]
+  adAccounts  AdAccount[]
+  audits      Audit[]
+  reports     Report[]
+  copyJobs    CopyJob[]
+  csvImports  CsvImport[]
+  llmCalls    LlmCall[]
+  connections MediaConnection[]
+
+  @@map("tenants")
+}
+
+model Client {
+  id           String @id @default(cuid())
+  tenantId     String @map("tenant_id")
+  name         String
+  industryCode String @default("other") @map("industry_code")
+  status       String @default("active")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  adAccounts AdAccount[]
+  reports    Report[]
+  copyJobs   CopyJob[]
+
+  @@index([tenantId])
+  @@map("clients")
+}
+
+model AdAccount {
+  id                String  @id @default(cuid())
+  tenantId          String  @map("tenant_id")
+  clientId          String  @map("client_id")
+  platform          String
+  externalAccountId String  @map("external_account_id")
+  name              String
+  currency          String  @default("JPY")
+  isBillable        Boolean @default(true) @map("is_billable")
+  monthlyBudget     Decimal? @map("monthly_budget") @db.Decimal(14, 2)
+
+  tenant     Tenant             @relation(fields: [tenantId], references: [id])
+  client     Client             @relation(fields: [clientId], references: [id])
+  facts      FactAdPerformance[]
+  audits     Audit[]
+  csvImports CsvImport[]
+
+  @@index([tenantId, clientId])
+  @@map("ad_accounts")
+}
+
+model MediaConnection {
+  id           String    @id @default(cuid())
+  tenantId     String    @map("tenant_id")
+  platform     String
+  status       String    @default("not_connected") // connected / needs_reauth / error / not_connected
+  lastSyncedAt DateTime? @map("last_synced_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, platform])
+  @@map("media_connections")
+}
+
+// 統一実績スキーマ (プロンプトD準拠)。MVPは通常テーブル+複合Index。
+// スケール時の月次パーティション化 DDL は docs/partitioning.sql 参照。
+model FactAdPerformance {
+  date            DateTime @db.Date
+  tenantId        String   @map("tenant_id")
+  adAccountId     String   @map("ad_account_id")
+  platform        String
+  campaignId      String   @default("") @map("campaign_id")
+  campaignName    String   @default("") @map("campaign_name")
+  adgroupId       String   @default("") @map("adgroup_id")
+  adId            String   @default("") @map("ad_id")
+  impressions     BigInt   @default(0)
+  clicks          BigInt   @default(0)
+  cost            Decimal  @default(0) @db.Decimal(14, 2)
+  conversions     Decimal  @default(0) @db.Decimal(12, 2)
+  conversionValue Decimal  @default(0) @map("conversion_value") @db.Decimal(14, 2)
+  currency        String   @default("JPY")
+  extra           Json     @default("{}")
+
+  adAccount AdAccount @relation(fields: [adAccountId], references: [id])
+
+  @@id([tenantId, adAccountId, date, campaignId, adgroupId, adId])
+  @@index([tenantId, date])
+  @@map("fact_ad_performance")
+}
+
+model CsvImport {
+  id             String   @id @default(cuid())
+  tenantId       String   @map("tenant_id")
+  adAccountId    String   @map("ad_account_id")
+  fileName       String   @map("file_name")
+  detectedFormat String   @map("detected_format")
+  encoding       String
+  mapping        Json     @default("{}")
+  rowCount       Int      @default(0) @map("row_count")
+  insertedRows   Int      @default(0) @map("inserted_rows")
+  errorRows      Int      @default(0) @map("error_rows")
+  status         String   @default("done")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  adAccount AdAccount @relation(fields: [adAccountId], references: [id])
+
+  @@index([tenantId])
+  @@map("csv_imports")
+}
+
+// AI実行結果。result は構造化JSON (packages/shared の zod スキーマ検証済み)
+model Audit {
+  id              String   @id @default(cuid())
+  tenantId        String   @map("tenant_id")
+  adAccountId     String   @map("ad_account_id")
+  promptVersion   String   @map("prompt_version")
+  model           String
+  mocked          Boolean  @default(false)
+  result          Json
+  findingStatuses Json     @default("{}") @map("finding_statuses")
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  adAccount AdAccount @relation(fields: [adAccountId], references: [id])
+
+  @@index([tenantId, adAccountId, createdAt])
+  @@map("audits")
+}
+
+model Report {
+  id            String   @id @default(cuid())
+  tenantId      String   @map("tenant_id")
+  clientId      String   @map("client_id")
+  periodType    String   @map("period_type")
+  periodStart   DateTime @map("period_start") @db.Date
+  promptVersion String   @map("prompt_version")
+  model         String
+  mocked        Boolean  @default(false)
+  result        Json
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@index([tenantId, clientId, createdAt])
+  @@map("reports")
+}
+
+model CopyJob {
+  id            String   @id @default(cuid())
+  tenantId      String   @map("tenant_id")
+  clientId      String   @map("client_id")
+  platform      String
+  promptVersion String   @map("prompt_version")
+  model         String
+  mocked        Boolean  @default(false)
+  input         Json
+  result        Json
+  lengthChecks  Json     @default("[]") @map("length_checks")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  client Client @relation(fields: [clientId], references: [id])
+
+  @@index([tenantId, clientId, createdAt])
+  @@map("copy_jobs")
+}
+
+// LLM原価計測 (要件書 F-09)。原価ダッシュボードの元データ
+model LlmCall {
+  id            String   @id @default(cuid())
+  tenantId      String   @map("tenant_id")
+  feature       String // audit / report / copy / format_detect
+  model         String
+  inputTokens   Int      @map("input_tokens")
+  outputTokens  Int      @map("output_tokens")
+  costJpy       Decimal  @map("cost_jpy") @db.Decimal(10, 2)
+  latencyMs     Int      @map("latency_ms")
+  promptVersion String   @map("prompt_version")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@map("llm_calls")
+}

@@ -1,0 +1,16 @@
+{
+  "name": "adgrid",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @adgrid/api --filter @adgrid/web dev",
+    "build": "pnpm -r build",
+    "db:up": "docker compose up -d",
+    "db:migrate": "pnpm --filter @adgrid/api db:migrate",
+    "db:seed": "pnpm --filter @adgrid/api db:seed",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

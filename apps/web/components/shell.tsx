@@ -1,0 +1,160 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import type { ReactNode } from 'react';
+import { useClients } from '@/components/client-context';
+
+interface NavItem {
+  href: string;
+  label: string;
+  icon: ReactNode;
+}
+
+const NAV_MAIN: NavItem[] = [
+  {
+    href: '/',
+    label: 'ホーム',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <path d="M2 7 7 2l5 5v5H8V9H6v3H2z" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    href: '/dashboard',
+    label: 'ダッシュボード',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <path d="M2 12V6h2v6zm4 0V2h2v10zm4 0V8h2v4z" fill="currentColor" />
+      </svg>
+    ),
+  },
+  {
+    href: '/audit',
+    label: 'AI診断',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        <path d="M7 4v3l2 2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      </svg>
+    ),
+  },
+  {
+    href: '/report',
+    label: 'レポート',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <path d="M3 2h8v10H3z M5 5h4M5 7h4M5 9h2" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      </svg>
+    ),
+  },
+  {
+    href: '/copy',
+    label: '広告文',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <path d="M2 3h10M2 7h7M2 11h9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    href: '/portal',
+    label: '媒体窓口',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <rect x="2" y="2" width="4" height="4" rx="1" fill="currentColor" />
+        <rect x="8" y="2" width="4" height="4" rx="1" fill="currentColor" />
+        <rect x="2" y="8" width="4" height="4" rx="1" fill="currentColor" />
+        <rect x="8" y="8" width="4" height="4" rx="1" fill="currentColor" />
+      </svg>
+    ),
+  },
+];
+
+const NAV_DATA: NavItem[] = [
+  {
+    href: '/import',
+    label: 'データ取込',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <path d="M7 2v6M4.5 5.5 7 8l2.5-2.5M3 11h8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+];
+
+const NAV_SETTINGS: NavItem[] = [
+  {
+    href: '/settings',
+    label: '設定',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <circle cx="7" cy="7" r="2" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <path
+          d="M7 1v2M7 11v2M1 7h2M11 7h2M3 3l1.4 1.4M9.6 9.6 11 11M11 3 9.6 4.4M4.4 9.6 3 11"
+          stroke="currentColor"
+          strokeWidth="1.3"
+        />
+      </svg>
+    ),
+  },
+];
+
+function NavLinks({ items, pathname }: { items: NavItem[]; pathname: string }) {
+  return (
+    <>
+      {items.map((item) => {
+        const on = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+        return (
+          <Link key={item.href} href={item.href} className={`nav-item${on ? ' on' : ''}`} aria-current={on ? 'page' : undefined}>
+            {item.icon}
+            {item.label}
+          </Link>
+        );
+      })}
+    </>
+  );
+}
+
+export function Shell({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const { clients, selectedClientId, setSelectedClientId } = useClients();
+
+  return (
+    <div className="app">
+      <aside className="sidebar">
+        <Link href="/" className="brand">
+          AD<span className="bx">GRID</span>
+        </Link>
+        <NavLinks items={NAV_MAIN} pathname={pathname} />
+        <div className="nav-sep">DATA</div>
+        <NavLinks items={NAV_DATA} pathname={pathname} />
+        <div className="nav-sep">SETTINGS</div>
+        <NavLinks items={NAV_SETTINGS} pathname={pathname} />
+      </aside>
+      <div className="main">
+        <div className="topbar">
+          <select
+            className="client-sw"
+            value={selectedClientId}
+            onChange={(e) => setSelectedClientId(e.target.value)}
+            aria-label="クライアントで絞り込む"
+          >
+            <option value="">クライアント: すべて</option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <button type="button" className="cmdk" title="コマンドパレット (今後実装予定)">
+            クライアント・機能を検索… <span className="kbd">⌘K</span>
+          </button>
+          <span className="avatar" aria-hidden="true">和</span>
+        </div>
+        <main className="content">{children}</main>
+      </div>
+    </div>
+  );
+}
