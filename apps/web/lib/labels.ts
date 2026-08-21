@@ -8,6 +8,8 @@ import type {
   KnowledgeObjective,
   CalibrationDto,
   ChangeLogDto,
+  WidgetDimension,
+  WidgetType,
 } from '@adgrid/shared';
 
 /* 媒体色はダークモードで反転するため hex ではなく CSS 変数で参照する */
@@ -135,6 +137,21 @@ export const CHANGELOG_ACTOR_META: Record<ChangeLogDto['actor'], { label: string
   adgrid: { label: 'ADGRID', cls: 'ai' },
   media_console: { label: '媒体管理画面', cls: 'flat' },
   api: { label: 'API同期', cls: 'flat' },
+};
+
+/* カスタムダッシュボード (B-5) の集計軸・種別ラベル */
+export const WIDGET_DIMENSION_LABEL: Record<WidgetDimension, string> = {
+  none: '集計なし',
+  platform: '媒体別',
+  client: 'クライアント別',
+  date: '日別',
+};
+
+export const WIDGET_TYPE_LABEL: Record<WidgetType, string> = {
+  stat: '数値',
+  bar: '横棒',
+  line: '折れ線',
+  table: '表',
 };
 
 export const INDUSTRY_LABEL: Record<string, string> = {

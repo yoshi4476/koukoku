@@ -79,6 +79,7 @@ async function seedFacts(
 async function main() {
   console.log('Seeding ADGRID demo data...');
   // 子テーブルから順に削除 (FK制約対応)
+  await prisma.dashboard.deleteMany({});
   await prisma.changeLog.deleteMany({});
   await prisma.knowledgeAsset.deleteMany({});
   await prisma.calibrationStat.deleteMany({});
@@ -254,6 +255,23 @@ async function main() {
       { tenantId: TENANT_ID, adAccountId: accBMeta.id, actor: 'media_console', actorName: '媒体管理画面', entity: 'campaign', field: 'bid', oldValue: '150', newValue: '180', note: '媒体側で入札を手動変更', changedAt: daysAgo(2) },
       { tenantId: TENANT_ID, adAccountId: accBMeta.id, actor: 'media_console', actorName: '媒体管理画面', entity: 'campaign', field: 'status', oldValue: 'active', newValue: 'paused', note: '審査落ちにより一時停止', changedAt: daysAgo(1) },
     ],
+  });
+
+  // カスタムダッシュボードのデモ (B-5)
+  await prisma.dashboard.create({
+    data: {
+      tenantId: TENANT_ID,
+      name: '経営サマリ',
+      isDefault: true,
+      layout: [
+        { id: 'w1', type: 'stat', title: '消化額 (7日)', metric: 'cost', dimension: 'none', width: 1, days: 7 },
+        { id: 'w2', type: 'stat', title: 'CV (7日)', metric: 'conversions', dimension: 'none', width: 1, days: 7 },
+        { id: 'w3', type: 'stat', title: 'CPA (7日)', metric: 'cpa', dimension: 'none', width: 1, days: 7 },
+        { id: 'w4', type: 'bar', title: '媒体別 消化額', metric: 'cost', dimension: 'platform', width: 2, days: 7 },
+        { id: 'w5', type: 'bar', title: 'クライアント別 CV', metric: 'conversions', dimension: 'client', width: 1, days: 7 },
+        { id: 'w6', type: 'line', title: '日次 消化額の推移', metric: 'cost', dimension: 'date', width: 3, days: 14 },
+      ],
+    },
   });
 
   console.log('Seed done. tenant =', TENANT_ID);

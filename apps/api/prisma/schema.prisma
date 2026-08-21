@@ -64,8 +64,27 @@ model Tenant {
   abTests     AbTest[]
   knowledge   KnowledgeAsset[]
   changeLogs  ChangeLog[]
+  dashboards  Dashboard[]
 
   @@map("tenants")
+}
+
+// カスタムダッシュボード (ロードマップ B-5)。テナントが自作・保存・共有する。
+// layout はウィジェット配列 (種別・指標・ディメンジョン・グラフ種・幅) のJSON。
+model Dashboard {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  layout    Json     @default("[]")
+  isDefault Boolean  @default(false) @map("is_default")
+  createdBy String?  @map("created_by")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@map("dashboards")
 }
 
 // 変更履歴 (ロードマップ B-2 / 要件書 F-15)。

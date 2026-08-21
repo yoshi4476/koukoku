@@ -37,6 +37,7 @@ export function CommandPalette({
       { label: 'ホーム', href: '/', keywords: 'home kanri 司令室' },
       { label: 'クライアント', href: '/clients', keywords: 'clients kuraianto 管理 一覧' },
       { label: 'ダッシュボード', href: '/dashboard', keywords: 'dashboard kpi' },
+      { label: 'カスタムボード', href: '/boards', keywords: 'boards custom dashboard looker widget uijetto カスタム ボード ウィジェット' },
       { label: 'AI診断', href: '/audit', keywords: 'audit shindan 診断' },
       { label: 'レポート', href: '/report', keywords: 'report houkoku' },
       { label: '広告文', href: '/copy', keywords: 'copy koukokubun 生成' },

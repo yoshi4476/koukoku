@@ -247,6 +247,63 @@ export interface AlertRunResultDto {
   notified: number;
 }
 
+/* ---- カスタムダッシュボード (B-5) ---- */
+export type WidgetMetric = 'cost' | 'conversions' | 'cpa' | 'roas' | 'clicks' | 'impressions' | 'ctr' | 'cvr';
+export type WidgetDimension = 'none' | 'platform' | 'client' | 'date';
+export type WidgetType = 'stat' | 'bar' | 'line' | 'table';
+
+export interface WidgetDef {
+  id: string;
+  type: WidgetType;
+  title: string;
+  metric: WidgetMetric;
+  /** stat以外で使う集計軸 */
+  dimension: WidgetDimension;
+  /** グリッド幅 (1=1/3, 2=2/3, 3=全幅) */
+  width: 1 | 2 | 3;
+  /** 期間 (日数) */
+  days: number;
+  clientId?: string;
+}
+
+export interface DashboardDef {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  layout: WidgetDef[];
+  updatedAt: string;
+}
+
+export interface DashboardListDto {
+  dashboards: Array<{ id: string; name: string; isDefault: boolean; widgetCount: number }>;
+}
+
+/** ウィジェット1個のデータ (集約結果) */
+export interface WidgetDataDto {
+  widgetId: string;
+  metric: WidgetMetric;
+  /** stat: 単一値+前期比 / bar・line・table: ラベル付き系列 */
+  stat?: { value: number; delta: number | null };
+  series?: Array<{ label: string; value: number }>;
+  unit: 'yen' | 'count' | 'percent' | 'ratio';
+}
+
+export const WIDGET_METRIC_LABEL: Record<WidgetMetric, string> = {
+  cost: '消化額',
+  conversions: 'CV',
+  cpa: 'CPA',
+  roas: 'ROAS',
+  clicks: 'クリック',
+  impressions: '表示回数',
+  ctr: 'CTR',
+  cvr: 'CVR',
+};
+
+export const WIDGET_METRIC_UNIT: Record<WidgetMetric, WidgetDataDto['unit']> = {
+  cost: 'yen', conversions: 'count', cpa: 'yen', roas: 'percent',
+  clicks: 'count', impressions: 'count', ctr: 'percent', cvr: 'percent',
+};
+
 /* ---- 変更履歴 (B-2 / F-15) ---- */
 export interface ChangeLogDto {
   id: string;

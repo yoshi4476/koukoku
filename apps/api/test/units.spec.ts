@@ -5,6 +5,7 @@ import { scanLawDictionary } from '../src/ai/law-dictionary';
 import { normalizeHeader, parseCsv, parseDate, parseNumber } from '../src/imports/csv.service';
 import { readSettings } from '../src/common/tenant-settings';
 import { runAllSuites } from '../src/eval/runner';
+import { metricValue } from '../src/dashboards/dashboards.service';
 
 describe('widthUnits (全角=2/半角=1)', () => {
   it('半角英数は1、全角は2で数える', () => {
@@ -106,6 +107,21 @@ describe('業種ベンチマーク判定 (A-3)', () => {
   it('未知業種はotherにフォールバック', () => {
     expect(benchmarkFor('unknown').code).toBe('other');
     expect(benchmarkFor('ec').label).toBe('EC・物販');
+  });
+});
+
+describe('カスタムダッシュボードの指標計算 (B-5)', () => {
+  const t = { cost: 100000, impressions: 500000, clicks: 5000, conversions: 50, conversionValue: 400000 };
+  it('派生指標を正しく計算', () => {
+    expect(metricValue('cost', t)).toBe(100000);
+    expect(metricValue('cpa', t)).toBe(2000); // 100000/50
+    expect(metricValue('ctr', t)).toBe(1); // 5000/500000*100
+    expect(metricValue('cvr', t)).toBe(1); // 50/5000*100
+    expect(metricValue('roas', t)).toBe(400); // 400000/100000*100
+  });
+  it('ゼロ除算はnull', () => {
+    expect(metricValue('cpa', { ...t, conversions: 0 })).toBeNull();
+    expect(metricValue('ctr', { ...t, impressions: 0 })).toBeNull();
   });
 });
 

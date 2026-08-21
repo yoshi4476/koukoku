@@ -40,6 +40,8 @@ import { EvalController } from './eval/eval.controller';
 import { ChangeLogService } from './changelog/changelog.service';
 import { ChangeLogController } from './changelog/changelog.controller';
 import { SlackController } from './slack/slack.controller';
+import { DashboardsService } from './dashboards/dashboards.service';
+import { DashboardsController } from './dashboards/dashboards.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -58,6 +60,7 @@ import { SlackController } from './slack/slack.controller';
     EvalController,
     ChangeLogController,
     SlackController,
+    DashboardsController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -80,6 +83,7 @@ import { SlackController } from './slack/slack.controller';
     CalibrationService,
     KnowledgeService,
     ChangeLogService,
+    DashboardsService,
     MetricsService,
     LlmService,
     AuditService,

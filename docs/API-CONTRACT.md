@@ -59,6 +59,16 @@ Base URL: `http://localhost:4000`。DTO の型定義は `@adgrid/shared` (`packa
 | GET | `/changelog?adAccountId=&clientId=` | 変更履歴タイムライン (B-2。ADGRID経由+媒体側の統合) | `ChangeLogDto[]` |
 | GET | `/eval` | eval回帰スコア (A-2。プロンプト/辞書の品質可視化) | `{suites, allOk}` |
 | POST | `/slack/command` | Slackスラッシュコマンド (B-6。署名検証・summary/alerts/help) | Slack応答JSON |
+| GET | `/dashboards` | カスタムダッシュボード一覧 (B-5) | `DashboardListDto` |
+| POST | `/dashboards` body `{name}` | 新規作成 | `DashboardDef` |
+| GET | `/dashboards/:id` | 定義取得 (layout=WidgetDef[]) | `DashboardDef` |
+| PUT | `/dashboards/:id` body `{name?, layout}` | 名前・レイアウト保存 | `DashboardDef` |
+| DELETE | `/dashboards/:id` | 削除 (既定は不可・400) | `{ok:true}` |
+| GET | `/dashboards/:id/data` | 全ウィジェットの集約データ | `WidgetDataDto[]` |
+
+WidgetDef: `{id, type: stat/bar/line/table, title, metric, dimension: none/platform/client/date, width: 1-3, days, clientId?}`。
+WidgetDataDto: `stat`(単一値+delta) または `series`([{label,value}])、`unit`(yen/count/percent/ratio)。
+WIDGET_METRIC_LABEL / WIDGET_METRIC_UNIT は `@adgrid/shared` からimport。
 | GET/PUT | `/proposals/settings` body `{applyEnabled}` | kill switch (テナント単位の適用停止) | `{applyEnabled}` |
 | GET | `/home` | 今日の司令室 (優先度順タスク) | `HomeDto` |
 | GET | `/clients` | クライアント一覧 | `ClientDto[]` |
