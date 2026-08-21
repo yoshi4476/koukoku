@@ -10,6 +10,8 @@ interface AuthContextValue {
   me: MeDto;
   loggingOut: boolean;
   logout: () => void;
+  /** 版切替など /me を更新する操作の後に呼ぶ */
+  setMe: (me: MeDto) => void;
 }
 
 const Ctx = createContext<AuthContextValue | null>(null);
@@ -82,7 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
   }
 
-  return <Ctx.Provider value={{ me, loggingOut, logout }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ me, loggingOut, logout, setMe }}>{children}</Ctx.Provider>;
 }
 
 export function useAuth(): AuthContextValue {

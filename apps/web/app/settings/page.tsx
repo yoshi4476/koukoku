@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { BillingDto, CalibrationDto, ConnectionDto, MemberDto, UsageDto } from '@adgrid/shared';
-import { PLANS, isApprover } from '@adgrid/shared';
+import type { BillingDto, CalibrationDto, ConnectionDto, Edition, MeDto, MemberDto, UsageDto } from '@adgrid/shared';
+import { PLANS, isApprover, editionAllows, EDITION_LABEL } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
 import { ErrorCard, HintBar, Skeleton, SkeletonLines } from '@/components/ui';
@@ -204,6 +204,70 @@ function CalibrationCard() {
   );
 }
 
+/* ---- カード0: 版 (edition) 切替 ---- */
+const EDITIONS: { id: Edition; desc: string }[] = [
+  { id: 'agency', desc: '全機能。複数クライアントの運用・承認・自動適用・媒体接続・課金までを社内で扱う運用者向け。' },
+  { id: 'client', desc: '提供先(クライアント企業)に下ろす版。自社の実績・診断・レポート閲覧が中心で、承認・自動適用や媒体接続・課金などの運用/管理画面は非表示。' },
+];
+
+function EditionCard() {
+  const { me, setMe } = useAuth();
+  const [saving, setSaving] = useState<Edition | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const canEdit = me.role === 'owner';
+
+  const switchTo = (edition: Edition) => {
+    if (edition === me.edition || saving) return;
+    setSaving(edition);
+    setError(null);
+    apiPut<MeDto>('/auth/edition', { edition })
+      .then((updated) => setMe(updated))
+      .catch((e: unknown) => setError(toApiError(e)))
+      .finally(() => setSaving(null));
+  };
+
+  return (
+    <div className="card" style={{ marginBottom: 16, maxWidth: 640 }}>
+      <div className="c-head">
+        <h2>提供版 (エディション)</h2>
+        <span className={`pill ${me.edition === 'agency' ? 'ai' : 'flat'}`} style={{ marginLeft: 'auto' }}>
+          現在: {EDITION_LABEL[me.edition]}
+        </span>
+      </div>
+      <div className="c-body form-grid">
+        <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)' }}>
+          1つのシステムで<mark>自社運用版</mark>と<mark>提供先版</mark>を切り替えられます。提供先版に切り替えると、運用/管理系のメニューと操作が自動的に隠れます。
+        </p>
+        {error ? <ErrorCard error={error} /> : null}
+        <div className="edition-choices">
+          {EDITIONS.map((e) => {
+            const active = me.edition === e.id;
+            return (
+              <button
+                key={e.id}
+                type="button"
+                className={`edition-choice${active ? ' on' : ''}`}
+                disabled={!canEdit || saving !== null}
+                aria-pressed={active}
+                onClick={() => switchTo(e.id)}
+              >
+                <span className="ec-head">
+                  <span className="ec-name">{EDITION_LABEL[e.id]}</span>
+                  {active ? <span className="pill ai">選択中</span> : saving === e.id ? <span className="pill flat">切替中…</span> : null}
+                </span>
+                <span className="ec-desc">{e.desc}</span>
+              </button>
+            );
+          })}
+        </div>
+        {!canEdit ? (
+          <p style={{ margin: 0, fontSize: 11.5, color: 'var(--muted)' }}>版の切替はオーナーのみ可能です。</p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { me } = useAuth();
   const usage = useApi<UsageDto>('/usage');
@@ -223,8 +287,11 @@ export default function SettingsPage() {
       </div>
 
       <HintBar id="settings" title="設定画面でできること">
-        プラン・<mark>AI利用量</mark>・メンバーの確認、<mark>自動レポートの手動実行</mark>、承認フローのkill switch、AIの確信度較正の学習状況、API接続の管理ができます。
+        <mark>提供版の切替</mark>、プラン・<mark>AI利用量</mark>・メンバーの確認、<mark>自動レポートの手動実行</mark>、承認フローのkill switch、AIの確信度較正の学習状況、API接続の管理ができます。
       </HintBar>
+
+      {/* カード0: 版切替 */}
+      <EditionCard />
 
       {/* カード1: ワークスペース */}
       <div className="card" style={{ marginBottom: 16, maxWidth: 640 }}>
@@ -348,7 +415,8 @@ export default function SettingsPage() {
         ) : null}
       </div>
 
-      {/* カード3: メンバー */}
+      {/* カード3: メンバー (提供先版では非表示) */}
+      {editionAllows(me.edition, 'members') ? (
       <div className="card" style={{ marginBottom: 16, maxWidth: 640 }}>
         <div className="c-head"><h2>メンバー</h2></div>
         {members.loading ? (
@@ -389,17 +457,19 @@ export default function SettingsPage() {
           </>
         )}
       </div>
+      ) : null}
 
       {/* カード4: 自動レポート */}
       <AutoReportCard />
 
-      {/* カード5: 自動適用 (kill switch) */}
-      <ApplySettingsCard />
+      {/* カード5: 自動適用 (kill switch) — 提供先版では非表示 */}
+      {editionAllows(me.edition, 'autoApply') ? <ApplySettingsCard /> : null}
 
       {/* カード7: 確信度較正 (A-4) */}
       <CalibrationCard />
 
-      {/* カード6: API接続 */}
+      {/* カード6: API接続 — 提供先版では非表示 */}
+      {editionAllows(me.edition, 'connections') ? (
       <div className="card" style={{ marginBottom: 16, maxWidth: 640 }}>
         <div className="c-head"><h2>API接続</h2></div>
         {connections.loading ? (
@@ -419,6 +489,7 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+      ) : null}
     </>
   );
 }

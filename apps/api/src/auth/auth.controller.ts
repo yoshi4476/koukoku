@@ -1,6 +1,6 @@
-import { Body, Controller, Get, HttpStatus, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Post, Put, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import type { MeDto } from '@adgrid/shared';
+import type { Edition, MeDto } from '@adgrid/shared';
 import { AppError } from '../common/errors';
 import { TrailService } from '../common/trail.service';
 import { AuthService, SESSION_COOKIE, verifySession } from './auth.service';
@@ -57,6 +57,22 @@ export class AuthController {
 
   @Get('me')
   me(@Req() req: Request): Promise<MeDto> {
+    return this.auth.me(this.requireSession(req));
+  }
+
+  @Put('edition')
+  async setEdition(@Req() req: Request, @Body() body: { edition?: string }): Promise<MeDto> {
+    if (body?.edition !== 'agency' && body?.edition !== 'client') {
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        '版の指定が不正です。',
+        'agency または client を指定してください。',
+      );
+    }
+    return this.auth.setEdition(this.requireSession(req), body.edition as Edition);
+  }
+
+  private requireSession(req: Request) {
     const token = (req.cookies ?? {})[SESSION_COOKIE] as string | undefined;
     const session = token ? verifySession(token) : null;
     if (!session) {
@@ -66,6 +82,6 @@ export class AuthController {
         'ログイン画面からサインインしてください。',
       );
     }
-    return this.auth.me(session);
+    return session;
   }
 }

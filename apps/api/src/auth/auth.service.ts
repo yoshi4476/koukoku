@@ -2,7 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
-import type { MeDto, MemberRole } from '@adgrid/shared';
+import type { Edition, MeDto, MemberRole } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 
@@ -100,6 +100,7 @@ export class AuthService {
         tenantId,
         tenantName: input.tenantName.trim(),
         role: 'owner',
+        edition: 'agency',
       },
       token: signSession(payload),
     };
@@ -145,6 +146,7 @@ export class AuthService {
         tenantId: membership.tenantId,
         tenantName: tenant?.name ?? '',
         role: membership.role as MemberRole,
+        edition: (tenant?.edition as Edition) ?? 'agency',
       },
       token: signSession(payload),
     };
@@ -173,6 +175,22 @@ export class AuthService {
       tenantId: membership.tenantId,
       tenantName: tenant?.name ?? '',
       role: membership.role as MemberRole,
+      edition: (tenant?.edition as Edition) ?? 'agency',
     };
+  }
+
+  /** 版の切替 (owner専用)。1システムで自社運用版⇄提供先版をデモ/運用切替する */
+  async setEdition(session: SessionPayload, edition: Edition): Promise<MeDto> {
+    if (session.role !== 'owner') {
+      throw new AppError(
+        HttpStatus.FORBIDDEN,
+        '版の切替はオーナーのみ可能です。',
+        'オーナー権限のアカウントで操作してください。',
+      );
+    }
+    await this.prisma.withTenant(session.tenantId, (tx) =>
+      tx.tenant.update({ where: { id: session.tenantId }, data: { edition } }),
+    );
+    return this.me(session);
   }
 }

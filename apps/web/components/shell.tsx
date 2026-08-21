@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { editionAllows, EDITION_LABEL, type EditionFeature } from '@adgrid/shared';
 import { useAuth } from '@/components/auth-context';
 import { useClients } from '@/components/client-context';
 import { CommandPalette } from '@/components/command-palette';
@@ -12,6 +13,14 @@ interface NavItem {
   label: string;
   icon: ReactNode;
 }
+
+/** 版で出し分けするナビ (提供先版で隠す運用/管理系画面) */
+const HREF_FEATURE: Record<string, EditionFeature> = {
+  '/approvals': 'approvals',
+  '/connections': 'connections',
+  '/import': 'imports',
+  '/knowledge': 'knowledge',
+};
 
 const NAV_MAIN: NavItem[] = [
   {
@@ -305,6 +314,7 @@ function AvatarMenu() {
 
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { me } = useAuth();
   const { clients, selectedClientId, setSelectedClientId } = useClients();
   const [paletteOpen, setPaletteOpen] = useState(false);
 
@@ -314,8 +324,20 @@ export function Shell({ children }: { children: ReactNode }) {
         <Link href="/" className="brand">
           AD<span className="bx">GRID</span>
         </Link>
+        {me.edition === 'client' ? (
+          <div className="edition-badge" title="提供先版: 自社データの閲覧が中心の画面構成です">
+            {EDITION_LABEL[me.edition]}
+          </div>
+        ) : null}
         {NAV_PHASES.map((phase, i) => {
-          const items = phase.hrefs.map((h) => NAV_LOOKUP[h]).filter(Boolean);
+          const items = phase.hrefs
+            .filter((h) => {
+              const f = HREF_FEATURE[h];
+              return !f || editionAllows(me.edition, f);
+            })
+            .map((h) => NAV_LOOKUP[h])
+            .filter(Boolean);
+          if (items.length === 0) return null;
           return (
             <div key={phase.label ?? `p${i}`}>
               {phase.label ? <div className="nav-sep">{phase.label}</div> : null}

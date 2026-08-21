@@ -109,7 +109,13 @@ export class HomeController {
       return { out, adoptedCount };
     });
 
-    const all = [...tasks, ...extra.out];
+    // 提供先版(client)では承認タスクを司令室に出さない (運用操作は自社運用版側で扱う)
+    const tenant = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.tenant.findUnique({ where: { id: tenantId }, select: { edition: true } }),
+    );
+    const isClient = tenant?.edition === 'client';
+
+    const all = [...tasks, ...extra.out].filter((t) => !(isClient && t.kind === 'approval'));
     const order: Record<string, number> = { alert: 0, ai_proposal: 1, approval: 2, report: 3 };
     all.sort((a, b) => order[a.kind] - order[b.kind]);
 

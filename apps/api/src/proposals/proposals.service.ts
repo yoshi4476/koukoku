@@ -51,6 +51,7 @@ export class ProposalsService {
 
   async setApplyEnabled(tenantId: string, enabled: boolean, user: SessionInfoValue): Promise<boolean> {
     this.assertApprover(user);
+    await this.assertAgencyEdition(tenantId);
     await this.prisma.withTenant(tenantId, (tx) => patchSettings(tx, tenantId, { applyEnabled: enabled }));
     await this.trail.record({
       tenantId,
@@ -66,6 +67,20 @@ export class ProposalsService {
         HttpStatus.FORBIDDEN,
         '承認・実行の権限がありません。',
         '承認はオーナーまたは管理者ロールのみ実行できます。承認者に依頼してください。',
+      );
+    }
+  }
+
+  /** 提供先版(client)では承認・自動適用など運用操作を禁止 (UI非表示に加えたサーバ側二重防御) */
+  private async assertAgencyEdition(tenantId: string): Promise<void> {
+    const tenant = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.tenant.findUnique({ where: { id: tenantId }, select: { edition: true } }),
+    );
+    if (tenant?.edition === 'client') {
+      throw new AppError(
+        HttpStatus.FORBIDDEN,
+        'この版では承認・自動適用の操作はできません。',
+        '広告の変更・適用は運用担当(自社運用版)側で行われます。',
       );
     }
   }
@@ -109,6 +124,7 @@ export class ProposalsService {
   async create(tenantId: string, user: SessionInfoValue, input: CreateProposalInput): Promise<ProposalDto> {
     // 提案は承認キューに直接載りワンクリック実行の起点になるため、作成も承認者権限に限定する
     this.assertApprover(user);
+    await this.assertAgencyEdition(tenantId);
     if (!input?.adAccountId || !input?.title?.trim()) {
       throw new AppError(
         HttpStatus.BAD_REQUEST,
@@ -154,6 +170,7 @@ export class ProposalsService {
 
   async approveAndExecute(tenantId: string, user: SessionInfoValue, id: string): Promise<ProposalDto> {
     this.assertApprover(user);
+    await this.assertAgencyEdition(tenantId);
 
     // 承認をアトミックに確定: kill switch確認・pending→approved を1トランザクションで。
     // updateMany(where status=pending) にすることで、同時承認の二重通過を防ぐ (count=0で敗者を検出)。

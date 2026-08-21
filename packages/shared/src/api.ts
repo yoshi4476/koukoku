@@ -14,6 +14,42 @@ export function isApprover(role: MemberRole): boolean {
   return role === 'owner' || role === 'admin';
 }
 
+/* ---- 版 (edition) ---- */
+// agency=自社運用版(全機能) / client=提供先版(自社データ閲覧中心・運用操作は非表示)
+export type Edition = 'agency' | 'client';
+
+export const EDITION_LABEL: Record<Edition, string> = {
+  agency: '自社運用版',
+  client: '提供先版',
+};
+
+/** 版ごとに使える機能。client版は「自分のデータ閲覧」中心で、承認・自動適用・
+ *  媒体接続や課金などの運用/管理機能を隠す。ナビ絞り込みとサーバ側ガードで二重に効かせる */
+export type EditionFeature =
+  | 'approvals' // 承認キュー
+  | 'autoApply' // 自動適用/キルスイッチ
+  | 'connections' // 媒体API接続の管理
+  | 'billing' // プラン・課金
+  | 'members' // メンバー管理
+  | 'imports' // CSV取込
+  | 'knowledge'; // 勝ちパターン資産集 (テナント横断ナレッジ)
+
+const CLIENT_HIDDEN: ReadonlySet<EditionFeature> = new Set<EditionFeature>([
+  'approvals',
+  'autoApply',
+  'connections',
+  'billing',
+  'members',
+  'imports',
+  'knowledge',
+]);
+
+/** 版 edition が feature を使えるか。agencyは全許可、clientは運用/管理系を不可 */
+export function editionAllows(edition: Edition, feature: EditionFeature): boolean {
+  if (edition === 'agency') return true;
+  return !CLIENT_HIDDEN.has(feature);
+}
+
 export interface MeDto {
   userId: string;
   email: string;
@@ -21,6 +57,7 @@ export interface MeDto {
   tenantId: string;
   tenantName: string;
   role: MemberRole;
+  edition: Edition;
 }
 
 /* ---- オンボーディング ---- */
