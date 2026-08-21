@@ -1,5 +1,6 @@
 /* eslint-disable no-console */
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcryptjs';
 
 // 管理者ロールで実行 (RLSは所有者にはかからないため seed 可能)
 const prisma = new PrismaClient();
@@ -86,10 +87,24 @@ async function main() {
   await prisma.mediaConnection.deleteMany({});
   await prisma.adAccount.deleteMany({});
   await prisma.client.deleteMany({});
+  await prisma.tenantMember.deleteMany({});
+  await prisma.user.deleteMany({});
   await prisma.tenant.deleteMany({});
 
   await prisma.tenant.create({
     data: { id: TENANT_ID, name: 'デモ広告代理店', plan: 'business' },
+  });
+
+  // デモログイン: demo@adgrid.jp / demo-pass-2026
+  const demoUser = await prisma.user.create({
+    data: {
+      email: 'demo@adgrid.jp',
+      passwordHash: await bcrypt.hash('demo-pass-2026', 10),
+      name: 'デモ 運用者',
+    },
+  });
+  await prisma.tenantMember.create({
+    data: { userId: demoUser.id, tenantId: TENANT_ID, role: 'owner' },
   });
 
   const clientA = await prisma.client.create({

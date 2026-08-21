@@ -3,6 +3,7 @@ import { AuditResultSchema } from '@adgrid/shared';
 import type { AuditFinding, AuditResult, AuditRunDto } from '@adgrid/shared';
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
+import { TrailService } from '../common/trail.service';
 import { MetricsService, Totals, daysAgo, isoDate } from '../metrics/metrics.service';
 import { LlmService } from './llm.service';
 import { OUTPUT_SCHEMAS, PROMPTS } from './prompt-registry';
@@ -39,6 +40,7 @@ export class AuditService {
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
     private readonly llm: LlmService,
+    private readonly trail: TrailService,
   ) {}
 
   /* ---------------- 入力データ構築 ---------------- */
@@ -370,6 +372,12 @@ export class AuditService {
         },
       }),
     );
+    await this.trail.record({
+      tenantId,
+      action: 'audit_run',
+      resource: adAccountId,
+      detail: { auditId: row.id, mocked, findings: result.findings.length },
+    });
     return this.toDto(row);
   }
 

@@ -6,6 +6,32 @@ import type { AuditResult, FindingStatus, ReportResult, CopyResult } from './ai'
  * すべてのリクエストは開発中 `x-tenant-id` ヘッダでテナントを指定する
  * ============================================================ */
 
+/* ---- 認証 ---- */
+export type MemberRole = 'owner' | 'admin' | 'operator' | 'viewer';
+
+export interface MeDto {
+  userId: string;
+  email: string;
+  name: string;
+  tenantId: string;
+  tenantName: string;
+  role: MemberRole;
+}
+
+/* ---- オンボーディング ---- */
+export interface OnboardingStatusDto {
+  needsOnboarding: boolean;
+  clientCount: number;
+  hasData: boolean;
+  hasAudit: boolean;
+}
+
+export interface SampleDataResultDto {
+  clientId: string;
+  adAccountId: string;
+  auditId: string;
+}
+
 export interface ClientDto {
   id: string;
   name: string;

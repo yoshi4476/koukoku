@@ -5,6 +5,7 @@ import { PLATFORM_META } from '@adgrid/shared';
 import type { Platform } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
+import { TrailService } from '../common/trail.service';
 import { MetricsService, Totals, daysAgo, isoDate } from '../metrics/metrics.service';
 import { LlmService } from './llm.service';
 import { OUTPUT_SCHEMAS, PROMPTS } from './prompt-registry';
@@ -40,6 +41,7 @@ export class ReportService {
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
     private readonly llm: LlmService,
+    private readonly trail: TrailService,
   ) {}
 
   private async buildInput(tenantId: string, clientId: string): Promise<ReportInput> {
@@ -180,6 +182,12 @@ export class ReportService {
         },
       }),
     );
+    await this.trail.record({
+      tenantId,
+      action: 'report_run',
+      resource: clientId,
+      detail: { reportId: row.id, mocked, periodType },
+    });
     return {
       id: row.id,
       clientId: row.clientId,

@@ -1,7 +1,26 @@
 # ADGRID API 契約 (MVP)
 
-Base URL: `http://localhost:4000` / 全リクエストに `x-tenant-id: t_demo_agency` ヘッダ (認証実装までの開発用)。
-DTO の型定義は `@adgrid/shared` (`packages/shared/src/api.ts`) が正。
+Base URL: `http://localhost:4000`。DTO の型定義は `@adgrid/shared` (`packages/shared/src/api.ts`) が正。
+
+## 認証
+
+セッションは httpOnly クッキー `adgrid_session` (JWT, 7日)。web からの fetch は必ず `credentials: 'include'` を付ける。
+クッキーが無い場合のみ `x-tenant-id` ヘッダ / `DEV_TENANT_ID` にフォールバック (開発用。本番は `ALLOW_TENANT_HEADER=false`)。
+
+| Method | Path | 説明 | レスポンス型 |
+|---|---|---|---|
+| POST | `/auth/signup` body `{email,password,name,tenantName}` | 登録+テナント作成+ログイン (クッキー設定) | `MeDto` |
+| POST | `/auth/login` body `{email,password}` | ログイン (クッキー設定) | `MeDto` |
+| POST | `/auth/logout` | ログアウト (クッキー削除) | `{ok:true}` |
+| GET | `/auth/me` | セッション確認。未ログインは401 | `MeDto` |
+| GET | `/onboarding/status` | オンボーディング要否 | `OnboardingStatusDto` |
+| POST | `/onboarding/sample` | サンプルデータ作成+初回診断まで自動実行 | `SampleDataResultDto` |
+| POST | `/clients` body `{name, industryCode?}` | クライアント作成 | `ClientDto` |
+| POST | `/clients/:clientId/accounts` body `{platform, name?, monthlyBudget?}` | 広告アカウント作成 | `AdAccountDto` |
+
+デモログイン: `demo@adgrid.jp` / `demo-pass-2026` (seed)。
+
+## 業務API
 
 | Method | Path | 説明 | レスポンス型 |
 |---|---|---|---|

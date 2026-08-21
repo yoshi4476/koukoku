@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { HomeDto, HomeTaskDto, TaskKind } from '@adgrid/shared';
+import type { HomeDto, HomeTaskDto, OnboardingStatusDto, TaskKind } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { ErrorCard, PlatformTag, Skeleton } from '@/components/ui';
 import { formatDate } from '@/lib/format';
@@ -57,6 +57,8 @@ function HomeSkeleton() {
 
 export default function HomePage() {
   const { data, loading, error, retry } = useApi<HomeDto>('/home');
+  const onboarding = useApi<OnboardingStatusDto>('/onboarding/status');
+  const needsSetup = onboarding.data?.needsOnboarding === true;
 
   return (
     <>
@@ -73,11 +75,19 @@ export default function HomePage() {
       {loading ? <HomeSkeleton /> : null}
 
       {data && data.tasks.length === 0 ? (
-        <div className="empty">
-          <div className="e-title">今日は対応事項がありません</div>
-          <div className="e-sub">アラート・AI提案・レポート予定はすべて対応済みです。</div>
-          <Link href="/dashboard" className="btn pri">ダッシュボードを見る</Link>
-        </div>
+        needsSetup ? (
+          <div className="empty">
+            <div className="e-title">初期セットアップを完了させましょう</div>
+            <div className="e-sub">クライアント登録とデータ接続が済むと、ここに毎日のタスクが並びます。</div>
+            <Link href="/onboarding" className="btn pri">セットアップを続ける</Link>
+          </div>
+        ) : (
+          <div className="empty">
+            <div className="e-title">今日は対応事項がありません</div>
+            <div className="e-sub">アラート・AI提案・レポート予定はすべて対応済みです。</div>
+            <Link href="/dashboard" className="btn pri">ダッシュボードを見る</Link>
+          </div>
+        )
       ) : null}
 
       {data

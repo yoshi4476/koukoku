@@ -12,6 +12,33 @@ datasource db {
 // RLSポリシーは migrations/xxxx_rls/migration.sql で付与する。
 // ============================================================
 
+// 認証テーブル (users / tenant_members) はログイン時にテナント文脈なしで
+// 参照する必要があるためRLS対象外。アプリ層 (AuthService) のみが触る。
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  memberships TenantMember[]
+
+  @@map("users")
+}
+
+model TenantMember {
+  id       String @id @default(cuid())
+  userId   String @map("user_id")
+  tenantId String @map("tenant_id")
+  role     String @default("owner") // owner / admin / operator / viewer
+
+  user   User   @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([userId, tenantId])
+  @@map("tenant_members")
+}
+
 model Tenant {
   id        String   @id
   name      String
@@ -19,6 +46,7 @@ model Tenant {
   status    String   @default("active")
   createdAt DateTime @default(now()) @map("created_at")
 
+  members     TenantMember[]
   clients     Client[]
   adAccounts  AdAccount[]
   audits      Audit[]
@@ -27,8 +55,26 @@ model Tenant {
   csvImports  CsvImport[]
   llmCalls    LlmCall[]
   connections MediaConnection[]
+  auditTrail  AuditTrail[]
 
   @@map("tenants")
+}
+
+// 操作証跡 (F-10)。追記専用 — adgrid_app のUPDATE/DELETE権限をマイグレーションで剥奪
+model AuditTrail {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  userId    String?  @map("user_id")
+  action    String // login / login_failed / signup / audit_run / report_run / copy_run / csv_import
+  resource  String   @default("")
+  detail    Json     @default("{}")
+  ip        String   @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@map("audit_trail")
 }
 
 model Client {

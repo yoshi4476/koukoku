@@ -13,6 +13,17 @@ export class ApiError extends Error {
   }
 }
 
+/** 未ログイン (HTTP 401)。認証ゲートはこれを検知して /login へ誘導する */
+export class ApiAuthError extends ApiError {
+  constructor(
+    message = 'ログインが必要です。',
+    resolution = 'ログイン画面からもう一度ログインしてください。',
+  ) {
+    super(message, resolution, 401);
+    this.name = 'ApiAuthError';
+  }
+}
+
 export function toApiError(e: unknown): ApiError {
   if (e instanceof ApiError) return e;
   return new ApiError(
@@ -26,6 +37,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   try {
     res = await fetch(`${API_BASE}${path}`, {
       ...init,
+      // セッションは httpOnly クッキー。x-tenant-id はクッキーが無い開発環境向けフォールバック
+      credentials: 'include',
       headers: { 'x-tenant-id': TENANT_ID, ...(init.headers ?? {}) },
       cache: 'no-store',
     });
@@ -36,8 +49,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     );
   }
   if (!res.ok) {
-    let message = `リクエストに失敗しました (HTTP ${res.status})。`;
-    let resolution = '時間をおいて再試行してください。';
+    let message: string | undefined;
+    let resolution: string | undefined;
     try {
       const body = (await res.json()) as { message?: unknown; resolution?: unknown };
       if (typeof body.message === 'string' && body.message) message = body.message;
@@ -45,7 +58,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     } catch {
       // JSONでないエラー応答はデフォルト文言のまま表示する
     }
-    throw new ApiError(message, resolution, res.status);
+    if (res.status === 401) throw new ApiAuthError(message, resolution);
+    throw new ApiError(
+      message ?? `リクエストに失敗しました (HTTP ${res.status})。`,
+      resolution ?? '時間をおいて再試行してください。',
+      res.status,
+    );
   }
   return (await res.json()) as T;
 }

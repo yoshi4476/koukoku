@@ -3,6 +3,7 @@ import { CopyResultSchema } from '@adgrid/shared';
 import type { CopyCandidate, CopyResult, CopyRunDto, Platform } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
+import { TrailService } from '../common/trail.service';
 import { LlmService } from './llm.service';
 import { OUTPUT_SCHEMAS, PROMPTS } from './prompt-registry';
 import { scanLawDictionary } from './law-dictionary';
@@ -21,6 +22,7 @@ export class CopyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly llm: LlmService,
+    private readonly trail: TrailService,
   ) {}
 
   /* テンプレート生成 (モックモード)。1案=1訴求を厳守 */
@@ -159,6 +161,12 @@ export class CopyService {
         },
       }),
     );
+    await this.trail.record({
+      tenantId,
+      action: 'copy_run',
+      resource: input.clientId,
+      detail: { copyJobId: row.id, mocked, platform: input.platform, count },
+    });
     return this.toDto(row);
   }
 

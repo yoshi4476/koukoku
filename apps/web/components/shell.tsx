@@ -2,8 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useAuth } from '@/components/auth-context';
 import { useClients } from '@/components/client-context';
+import { CommandPalette } from '@/components/command-palette';
 
 interface NavItem {
   href: string;
@@ -117,9 +119,55 @@ function NavLinks({ items, pathname }: { items: NavItem[]; pathname: string }) {
   );
 }
 
+function AvatarMenu() {
+  const { me, loggingOut, logout } = useAuth();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  /* メニュー外クリックで閉じる */
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  const initial = me.name.trim().charAt(0) || me.email.charAt(0).toUpperCase();
+
+  return (
+    <div className="avatar-wrap" ref={wrapRef}>
+      <button
+        type="button"
+        className="avatar"
+        title={me.name}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {initial}
+      </button>
+      {open ? (
+        <div className="avatar-menu" role="menu">
+          <div className="am-head">
+            <div className="am-name">{me.name}</div>
+            <div className="am-sub">{me.tenantName}</div>
+            <div className="am-sub">{me.email}</div>
+          </div>
+          <button type="button" className="am-item" role="menuitem" disabled={loggingOut} onClick={logout}>
+            {loggingOut ? 'ログアウト中…' : 'ログアウト'}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { clients, selectedClientId, setSelectedClientId } = useClients();
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   return (
     <div className="app">
@@ -148,13 +196,18 @@ export function Shell({ children }: { children: ReactNode }) {
               </option>
             ))}
           </select>
-          <button type="button" className="cmdk" title="コマンドパレット (今後実装予定)">
+          <button type="button" className="cmdk" title="コマンドパレットを開く" onClick={() => setPaletteOpen(true)}>
             クライアント・機能を検索… <span className="kbd">⌘K</span>
           </button>
-          <span className="avatar" aria-hidden="true">和</span>
+          <AvatarMenu />
         </div>
         <main className="content">{children}</main>
       </div>
+      <CommandPalette
+        open={paletteOpen}
+        onOpen={() => setPaletteOpen(true)}
+        onClose={() => setPaletteOpen(false)}
+      />
     </div>
   );
 }

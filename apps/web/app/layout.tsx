@@ -2,8 +2,7 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { Inter, Noto_Sans_JP } from 'next/font/google';
 import './globals.css';
-import { ClientProvider } from '@/components/client-context';
-import { Shell } from '@/components/shell';
+import { AppFrame } from '@/components/app-frame';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -27,9 +26,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ja" className={`${inter.variable} ${notoSansJp.variable}`}>
       <body>
-        <ClientProvider>
-          <Shell>{children}</Shell>
-        </ClientProvider>
+        <AppFrame>{children}</AppFrame>
       </body>
     </html>
   );

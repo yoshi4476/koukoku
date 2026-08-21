@@ -14,10 +14,18 @@ import { CopyService } from './ai/copy.service';
 import { CopyController } from './ai/copy.controller';
 import { CsvService } from './imports/csv.service';
 import { ImportsController } from './imports/imports.controller';
+import { AuthService } from './auth/auth.service';
+import { TrailService } from './common/trail.service';
+import { AuthController } from './auth/auth.controller';
+import { OnboardingController } from './onboarding/onboarding.controller';
+import { UsageController } from './usage/usage.controller';
 
 @Module({
   imports: [PrismaModule],
   controllers: [
+    AuthController,
+    OnboardingController,
+    UsageController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -28,6 +36,8 @@ import { ImportsController } from './imports/imports.controller';
     ImportsController,
   ],
   providers: [
+    AuthService,
+    TrailService,
     MetricsService,
     LlmService,
     AuditService,

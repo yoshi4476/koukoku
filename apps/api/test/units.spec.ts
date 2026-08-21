@@ -1,0 +1,67 @@
+import { describe, expect, it } from 'vitest';
+import { limitsFor, widthUnits } from '../src/ai/copy-limits';
+import { scanLawDictionary } from '../src/ai/law-dictionary';
+import { normalizeHeader, parseCsv, parseDate, parseNumber } from '../src/imports/csv.service';
+
+describe('widthUnits (全角=2/半角=1)', () => {
+  it('半角英数は1、全角は2で数える', () => {
+    expect(widthUnits('abc123')).toBe(6);
+    expect(widthUnits('広告')).toBe(4);
+    expect(widthUnits('AB広告')).toBe(6);
+  });
+  it('半角カナは1で数える', () => {
+    expect(widthUnits('ｱｲｳ')).toBe(3);
+  });
+  it('Google RSA 見出し上限 (30ユニット=全角15字)', () => {
+    const limits = limitsFor('google_ads');
+    expect(widthUnits('あ'.repeat(15))).toBe(limits.headlineUnits);
+    expect(widthUnits('あ'.repeat(16))).toBeGreaterThan(limits.headlineUnits);
+  });
+});
+
+describe('scanLawDictionary (薬機法/景表法/金商法)', () => {
+  it('薬機法blockを検出し修正案を返す', () => {
+    const issues = scanLawDictionary('飲むだけで痩せるサプリ');
+    expect(issues.some((i) => i.law === '薬機法' && i.severity === 'block')).toBe(true);
+    expect(issues[0].suggestion.length).toBeGreaterThan(0);
+  });
+  it('景表法の最上級表現はwarn', () => {
+    const issues = scanLawDictionary('顧客満足度No.1の実績');
+    expect(issues.some((i) => i.law === '景表法' && i.severity === 'warn')).toBe(true);
+  });
+  it('金融の断定的利益保証はblock', () => {
+    const issues = scanLawDictionary('元本保証で安心の投資');
+    expect(issues.some((i) => i.severity === 'block')).toBe(true);
+  });
+  it('適法な表現は誤検出しない', () => {
+    expect(scanLawDictionary('うるおいを与える薬用クリーム。資料請求はこちら。')).toHaveLength(0);
+  });
+});
+
+describe('CSVパーサ', () => {
+  it('引用符内のカンマ・改行・二重引用符を扱える', () => {
+    const rows = parseCsv('a,"1,234","x""y"\nb,2,z\n');
+    expect(rows).toEqual([
+      ['a', '1,234', 'x"y'],
+      ['b', '2', 'z'],
+    ]);
+  });
+  it('空行を無視する', () => {
+    expect(parseCsv('a,b\n\n\nc,d\n')).toHaveLength(2);
+  });
+  it('金額のカンマ・¥・空白を除去して数値化', () => {
+    expect(parseNumber('"¥13,500"')).toBe(13500);
+    expect(parseNumber(undefined)).toBe(0);
+    expect(parseNumber('abc')).toBe(0);
+  });
+  it('日付はUTC深夜に固定 (YYYY/MM/DD・YYYY-MM-DD)', () => {
+    const d = parseDate('2026/08/21');
+    expect(d?.toISOString()).toBe('2026-08-21T00:00:00.000Z');
+    expect(parseDate('2026-08-05')?.toISOString()).toBe('2026-08-05T00:00:00.000Z');
+    expect(parseDate('8月21日')).toBeNull();
+  });
+  it('ヘッダ正規化は空白・引用符・全角空白を除去し小文字化', () => {
+    expect(normalizeHeader(' "クリック数" ')).toBe('クリック数');
+    expect(normalizeHeader('Impressions')).toBe('impressions');
+  });
+});

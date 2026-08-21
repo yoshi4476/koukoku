@@ -3,6 +3,7 @@ import * as iconv from 'iconv-lite';
 import type { CsvImportResultDto } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
+import { TrailService } from '../common/trail.service';
 
 /** 列名エイリアス辞書 (Google/Yahoo!/Meta の標準レポートの日英表記を吸収) */
 const COLUMN_ALIASES: Record<string, string[]> = {
@@ -15,17 +16,17 @@ const COLUMN_ALIASES: Record<string, string[]> = {
   conversionValue: ['コンバージョン値', '総コンバージョン価値', 'コンバージョン価値', 'conversion value', 'cv値', '売上', '購入コンバージョン値'],
 };
 
-function normalizeHeader(h: string): string {
+export function normalizeHeader(h: string): string {
   return h.trim().toLowerCase().replace(/["'\s　]/g, '');
 }
 
-function parseNumber(v: string | undefined): number {
+export function parseNumber(v: string | undefined): number {
   if (!v) return 0;
   const n = Number(String(v).replace(/[,¥\\"\s%]/g, ''));
   return Number.isFinite(n) ? n : 0;
 }
 
-function parseDate(v: string | undefined): Date | null {
+export function parseDate(v: string | undefined): Date | null {
   if (!v) return null;
   const m = String(v)
     .trim()
@@ -37,7 +38,7 @@ function parseDate(v: string | undefined): Date | null {
 }
 
 /** 素朴だが引用符対応のCSV行パーサ */
-function parseCsv(text: string): string[][] {
+export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let field = '';
   let row: string[] = [];
@@ -77,7 +78,10 @@ function parseCsv(text: string): string[][] {
 
 @Injectable()
 export class CsvService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly trail: TrailService,
+  ) {}
 
   /** 文字コード判定: UTF-8で復号し、置換文字が多ければ Shift_JIS とみなす */
   private decode(buffer: Buffer): { text: string; encoding: 'utf8' | 'sjis' } {
@@ -233,6 +237,12 @@ export class CsvService {
       }),
     );
 
+    await this.trail.record({
+      tenantId,
+      action: 'csv_import',
+      resource: adAccountId,
+      detail: { importId: importRow.id, fileName, insertedRows: inserted, errorRows },
+    });
     return {
       importId: importRow.id,
       detectedFormat,

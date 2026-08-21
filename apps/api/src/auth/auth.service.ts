@@ -1,0 +1,178 @@
+import { HttpStatus, Injectable } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
+import * as jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
+import type { MeDto, MemberRole } from '@adgrid/shared';
+import { PrismaService } from '../prisma/prisma.service';
+import { AppError } from '../common/errors';
+
+export interface SessionPayload {
+  sub: string; // userId
+  tenantId: string;
+  role: MemberRole;
+}
+
+export const SESSION_COOKIE = 'adgrid_session';
+
+function authSecret(): string {
+  // 本番では必ず AUTH_SECRET を設定する。ローカル開発のみのデフォルト
+  return process.env.AUTH_SECRET ?? 'adgrid-local-dev-secret-change-me';
+}
+
+export function signSession(payload: SessionPayload): string {
+  return jwt.sign(payload, authSecret(), { expiresIn: '7d' });
+}
+
+export function verifySession(token: string): SessionPayload | null {
+  try {
+    const decoded = jwt.verify(token, authSecret());
+    if (typeof decoded !== 'object' || decoded === null) return null;
+    const d = decoded as Record<string, unknown>;
+    if (typeof d.sub !== 'string' || typeof d.tenantId !== 'string') return null;
+    return { sub: d.sub, tenantId: d.tenantId, role: (d.role as MemberRole) ?? 'operator' };
+  } catch {
+    return null;
+  }
+}
+
+@Injectable()
+export class AuthService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async signup(input: {
+    email: string;
+    password: string;
+    name: string;
+    tenantName: string;
+  }): Promise<{ me: MeDto; token: string }> {
+    const email = input.email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        'メールアドレスの形式が正しくありません。',
+        'example@company.co.jp の形式で入力してください。',
+      );
+    }
+    if ((input.password ?? '').length < 8) {
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        'パスワードが短すぎます。',
+        '8文字以上のパスワードを設定してください。',
+      );
+    }
+    if (!input.name?.trim() || !input.tenantName?.trim()) {
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        'お名前または会社名が未入力です。',
+        'すべての項目を入力してください。',
+      );
+    }
+
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      throw new AppError(
+        HttpStatus.CONFLICT,
+        'このメールアドレスは登録済みです。',
+        'ログイン画面からサインインするか、別のメールアドレスをお使いください。',
+      );
+    }
+
+    const passwordHash = await bcrypt.hash(input.password, 10);
+    const tenantId = `t_${randomUUID().replace(/-/g, '').slice(0, 20)}`;
+
+    const user = await this.prisma.user.create({
+      data: { email, passwordHash, name: input.name.trim() },
+    });
+    // テナント作成はRLS対象のため、新テナントIDをコンテキストに設定して作成
+    await this.prisma.withTenant(tenantId, async (tx) => {
+      await tx.tenant.create({ data: { id: tenantId, name: input.tenantName.trim() } });
+    });
+    await this.prisma.tenantMember.create({
+      data: { userId: user.id, tenantId, role: 'owner' },
+    });
+
+    const payload: SessionPayload = { sub: user.id, tenantId, role: 'owner' };
+    return {
+      me: {
+        userId: user.id,
+        email,
+        name: user.name,
+        tenantId,
+        tenantName: input.tenantName.trim(),
+        role: 'owner',
+      },
+      token: signSession(payload),
+    };
+  }
+
+  async login(email: string, password: string): Promise<{ me: MeDto; token: string }> {
+    const invalid = () =>
+      new AppError(
+        HttpStatus.UNAUTHORIZED,
+        'メールアドレスまたはパスワードが一致しません。',
+        '入力内容を確認して再試行してください。パスワードを忘れた場合は管理者に連絡してください。',
+      );
+    // 注意: tenants はRLS対象のため、ここでは join せず
+    // テナントID確定後に withTenant 内で名前を取得する
+    const user = await this.prisma.user.findUnique({
+      where: { email: (email ?? '').trim().toLowerCase() },
+      include: { memberships: true },
+    });
+    if (!user) throw invalid();
+    const ok = await bcrypt.compare(password ?? '', user.passwordHash);
+    if (!ok) throw invalid();
+    const membership = user.memberships[0];
+    if (!membership) {
+      throw new AppError(
+        HttpStatus.FORBIDDEN,
+        '所属するワークスペースがありません。',
+        '招待メールを確認するか、新規登録からワークスペースを作成してください。',
+      );
+    }
+    const tenant = await this.prisma.withTenant(membership.tenantId, (tx) =>
+      tx.tenant.findUnique({ where: { id: membership.tenantId } }),
+    );
+    const payload: SessionPayload = {
+      sub: user.id,
+      tenantId: membership.tenantId,
+      role: membership.role as MemberRole,
+    };
+    return {
+      me: {
+        userId: user.id,
+        email: user.email,
+        name: user.name,
+        tenantId: membership.tenantId,
+        tenantName: tenant?.name ?? '',
+        role: membership.role as MemberRole,
+      },
+      token: signSession(payload),
+    };
+  }
+
+  async me(session: SessionPayload): Promise<MeDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: session.sub },
+      include: { memberships: { where: { tenantId: session.tenantId } } },
+    });
+    const membership = user?.memberships[0];
+    if (!user || !membership) {
+      throw new AppError(
+        HttpStatus.UNAUTHORIZED,
+        'セッションが無効です。',
+        'もう一度ログインしてください。',
+      );
+    }
+    const tenant = await this.prisma.withTenant(session.tenantId, (tx) =>
+      tx.tenant.findUnique({ where: { id: session.tenantId } }),
+    );
+    return {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      tenantId: membership.tenantId,
+      tenantName: tenant?.name ?? '',
+      role: membership.role as MemberRole,
+    };
+  }
+}

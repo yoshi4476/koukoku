@@ -24,6 +24,14 @@ function ReportView({ report, clientName }: { report: ReportRunDto; clientName: 
           <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--muted)' }} className="num">
             {clientName} · 週次 · 開始 {formatDate(report.periodStart)} · 生成 {formatDateTime(report.createdAt)}
           </span>
+          <a
+            className="btn sm sec"
+            href={`/report/print?id=${encodeURIComponent(report.id)}`}
+            target="_blank"
+            rel="noopener"
+          >
+            印刷 / PDF保存
+          </a>
         </div>
         <div className="c-body">
           <p style={{ margin: 0 }}>{report.result.executive_summary}</p>

@@ -1,11 +1,80 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Post } from '@nestjs/common';
 import type { AdAccountDto, ClientDto, ConnectionStatus, Platform } from '@adgrid/shared';
+import { ALL_PLATFORMS } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantId } from '../common/tenant';
+import { AppError } from '../common/errors';
 
 @Controller('clients')
 export class ClientsController {
   constructor(private readonly prisma: PrismaService) {}
+
+  @Post()
+  async create(
+    @TenantId() tenantId: string,
+    @Body() body: { name?: string; industryCode?: string },
+  ): Promise<ClientDto> {
+    if (!body?.name?.trim()) {
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        'クライアント名が未入力です。',
+        'クライアント名 (例: 株式会社サンプル) を入力してください。',
+      );
+    }
+    const client = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.client.create({
+        data: { tenantId, name: body.name!.trim(), industryCode: body.industryCode ?? 'other' },
+      }),
+    );
+    return {
+      id: client.id,
+      name: client.name,
+      industryCode: client.industryCode,
+      status: 'active',
+      accountCount: 0,
+    };
+  }
+
+  @Post(':clientId/accounts')
+  async createAccount(
+    @TenantId() tenantId: string,
+    @Param('clientId') clientId: string,
+    @Body() body: { platform?: Platform; name?: string; monthlyBudget?: number },
+  ): Promise<AdAccountDto> {
+    if (!body?.platform || !ALL_PLATFORMS.includes(body.platform)) {
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        '媒体が選択されていません。',
+        '媒体 (Google広告など) を選択してください。',
+      );
+    }
+    const account = await this.prisma.withTenant(tenantId, async (tx) => {
+      const client = await tx.client.findUnique({ where: { id: clientId } });
+      if (!client) {
+        throw new AppError(HttpStatus.NOT_FOUND, 'クライアントが見つかりません。', 'クライアントを選び直してください。');
+      }
+      return tx.adAccount.create({
+        data: {
+          tenantId,
+          clientId,
+          platform: body.platform!,
+          externalAccountId: 'manual',
+          name: body.name?.trim() || `${client.name} ${body.platform}`,
+          monthlyBudget: body.monthlyBudget ?? null,
+        },
+      });
+    });
+    return {
+      id: account.id,
+      clientId: account.clientId,
+      platform: account.platform as Platform,
+      externalAccountId: account.externalAccountId,
+      name: account.name,
+      currency: account.currency,
+      connectionStatus: 'not_connected',
+      lastSyncedAt: null,
+    };
+  }
 
   @Get()
   async list(@TenantId() tenantId: string): Promise<ClientDto[]> {

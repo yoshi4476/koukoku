@@ -152,6 +152,21 @@ export default function AuditPage() {
   const [run, setRun] = useState<AuditRunDto | null>(null);
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<ApiError | null>(null);
+  // オンボーディング完了画面などからの遷移 (?clientId=&accountId=) を反映する
+  const [pendingAccountId, setPendingAccountId] = useState<string | null>(null);
+  // 遷移直後は最新の診断結果を自動表示する (アハ体験を空状態で受けない)
+  const [autoOpenLatest, setAutoOpenLatest] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const qClientId = params.get('clientId');
+    const qAccountId = params.get('accountId');
+    if (qClientId) setClientId(qClientId);
+    if (qAccountId) {
+      setPendingAccountId(qAccountId);
+      setAutoOpenLatest(true);
+    }
+  }, []);
 
   // トップバーでクライアントを切り替えたら診断対象にも反映する
   useEffect(() => {
@@ -164,7 +179,21 @@ export default function AuditPage() {
     setAdAccountId('');
   }, [clientId]);
 
+  // アカウント一覧の取得後に、URLで指定されたアカウントを選択状態にする
+  useEffect(() => {
+    if (!pendingAccountId || !accounts.data) return;
+    if (accounts.data.some((a) => a.id === pendingAccountId)) setAdAccountId(pendingAccountId);
+    setPendingAccountId(null);
+  }, [pendingAccountId, accounts.data]);
+
   const history = useApi<AuditRunDto[]>(adAccountId ? `/audits?adAccountId=${encodeURIComponent(adAccountId)}` : '/audits');
+
+  useEffect(() => {
+    if (!autoOpenLatest || run || !adAccountId || !history.data) return;
+    const latest = history.data.find((h) => h.adAccountId === adAccountId);
+    if (latest) setRun(latest);
+    setAutoOpenLatest(false);
+  }, [autoOpenLatest, run, adAccountId, history.data]);
 
   const runAudit = () => {
     if (!adAccountId) return;

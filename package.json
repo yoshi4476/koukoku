@@ -8,7 +8,8 @@
     "db:up": "docker compose up -d",
     "db:migrate": "pnpm --filter @adgrid/api db:migrate",
     "db:seed": "pnpm --filter @adgrid/api db:seed",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r --if-present test"
   },
   "engines": {
     "node": ">=20"
