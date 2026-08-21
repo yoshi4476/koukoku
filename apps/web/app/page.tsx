@@ -2,11 +2,61 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import type { HomeDto, HomeTaskDto, OnboardingStatusDto, TaskKind } from '@adgrid/shared';
+import type { Edition, HomeDto, HomeTaskDto, MeDto, OnboardingStatusDto, TaskKind } from '@adgrid/shared';
+import { EDITION_LABEL } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
+import { useAuth } from '@/components/auth-context';
 import { ErrorCard, HintBar, PlatformTag, Skeleton } from '@/components/ui';
-import { apiPost, ApiError, toApiError } from '@/lib/api';
+import { apiPost, apiPut, ApiError, toApiError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
+
+/** ホーム上部の表示モード切替 (自社運用版 / 提供先版)。オーナーのみ切替可 */
+const EDITION_DESC: Record<Edition, string> = {
+  agency: '全機能で運用',
+  client: '自社データ閲覧中心',
+};
+
+function EditionModeBar({ onSwitched }: { onSwitched: () => void }) {
+  const { me, setMe } = useAuth();
+  const [saving, setSaving] = useState<Edition | null>(null);
+  const canEdit = me.role === 'owner';
+  const editions: Edition[] = ['agency', 'client'];
+
+  const switchTo = (edition: Edition) => {
+    if (edition === me.edition || saving || !canEdit) return;
+    setSaving(edition);
+    apiPut<MeDto>('/auth/edition', { edition })
+      .then((updated) => {
+        setMe(updated);
+        onSwitched();
+      })
+      .catch(() => {})
+      .finally(() => setSaving(null));
+  };
+
+  return (
+    <div className="mode-bar">
+      <span className="mode-bar-lab">表示モード</span>
+      <div className="mode-seg" role="group" aria-label="表示モードの切替">
+        {editions.map((e) => (
+          <button
+            key={e}
+            type="button"
+            className={`mode-opt${me.edition === e ? ' on' : ''}`}
+            disabled={!canEdit || saving !== null}
+            aria-pressed={me.edition === e}
+            onClick={() => switchTo(e)}
+          >
+            {e === 'agency' ? '🏢' : '🤝'} {EDITION_LABEL[e]}
+            {saving === e ? '…' : ''}
+          </button>
+        ))}
+      </div>
+      <span className="mode-bar-desc">{EDITION_DESC[me.edition]}</span>
+      {!canEdit ? <span className="mode-bar-note">切替はオーナーのみ</span> : null}
+    </div>
+  );
+}
 
 const GROUPS: Array<{ kind: TaskKind; title: string }> = [
   { kind: 'alert', title: 'アラート' },
@@ -105,6 +155,7 @@ export default function HomePage() {
 
   return (
     <>
+      <EditionModeBar onSwitched={retry} />
       <div className="page-h">
         <h1>{data ? `${formatDate(data.date)} の司令室` : '今日の司令室'}</h1>
         {data ? (

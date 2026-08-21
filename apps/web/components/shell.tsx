@@ -228,6 +228,16 @@ const NAV_SETTINGS: NavItem[] = [
       </svg>
     ),
   },
+  {
+    href: '/guide',
+    label: '使い方ガイド',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <path d="M2 2.5h3.2c.9 0 1.8.4 1.8 1.3v8c0-.7-.9-1-1.8-1H2z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+        <path d="M12 2.5H8.8C7.9 2.5 7 2.9 7 3.8v8c0-.7.9-1 1.8-1H12z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
 ];
 
 // 広告運用の手順どおりにメニューを並べ替える (準備→作る→見る→直す→報告)。
@@ -248,7 +258,7 @@ const NAV_PHASES: NavPhase[] = [
   { label: '③ 見る（計測）', hrefs: ['/dashboard', '/boards', '/pacing', '/changelog'] },
   { label: '④ 直す（診断・改善）', hrefs: ['/audit', '/keywords', '/approvals', '/alerts'] },
   { label: '⑤ 報告する', hrefs: ['/report'] },
-  { label: '設定', hrefs: ['/settings'] },
+  { label: '設定', hrefs: ['/settings', '/guide'] },
 ];
 
 function NavLinks({ items, pathname }: { items: NavItem[]; pathname: string }) {

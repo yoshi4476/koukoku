@@ -13,11 +13,19 @@ export interface IndustryBenchmark {
 
 export const INDUSTRY_BENCHMARKS: Record<string, IndustryBenchmark> = {
   ec: { code: 'ec', label: 'EC・物販', ctr: 1.2, cvr: 2.0, cpa: 4000 },
+  apparel: { code: 'apparel', label: 'アパレル・ファッション', ctr: 1.4, cvr: 1.8, cpa: 3500 },
   beauty: { code: 'beauty', label: '美容・サロン', ctr: 1.0, cvr: 1.5, cpa: 6000 },
+  food: { code: 'food', label: '飲食・グルメ', ctr: 1.3, cvr: 2.5, cpa: 3000 },
   saas: { code: 'saas', label: 'SaaS・IT', ctr: 1.5, cvr: 1.0, cpa: 15000 },
+  app: { code: 'app', label: 'アプリ・ゲーム', ctr: 1.6, cvr: 3.0, cpa: 500 },
+  btob: { code: 'btob', label: 'BtoB・製造/法人', ctr: 1.3, cvr: 0.9, cpa: 18000 },
   finance: { code: 'finance', label: '金融・保険', ctr: 0.8, cvr: 0.8, cpa: 20000 },
   hr: { code: 'hr', label: '人材・採用', ctr: 1.0, cvr: 1.2, cpa: 10000 },
   realestate: { code: 'realestate', label: '不動産', ctr: 0.9, cvr: 0.6, cpa: 25000 },
+  bridal: { code: 'bridal', label: 'ブライダル', ctr: 1.0, cvr: 1.2, cpa: 15000 },
+  automotive: { code: 'automotive', label: '自動車', ctr: 0.9, cvr: 1.0, cpa: 12000 },
+  medical: { code: 'medical', label: '医療・クリニック', ctr: 1.0, cvr: 2.0, cpa: 8000 },
+  travel: { code: 'travel', label: '旅行・観光', ctr: 1.1, cvr: 1.5, cpa: 5000 },
   education: { code: 'education', label: '教育・スクール', ctr: 1.1, cvr: 1.3, cpa: 8000 },
   other: { code: 'other', label: 'その他', ctr: 1.0, cvr: 1.2, cpa: 8000 },
 };

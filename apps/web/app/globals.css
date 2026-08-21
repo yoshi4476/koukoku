@@ -721,6 +721,46 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .ind-chip.ng { background: var(--bad-soft); border-color: var(--bad-soft); color: var(--bad); }
 .ind-tip { margin: 2px 0 0; font-size: 12px; color: var(--ink-2); line-height: 1.5; }
 
+/* ============ ホーム上部の表示モード切替 ============ */
+.mode-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--line); border-radius: 11px; padding: 8px 12px; margin-bottom: 14px; box-shadow: var(--shadow-1); }
+.mode-bar-lab { font-size: 11.5px; font-weight: 700; color: var(--muted); }
+.mode-seg { display: inline-flex; gap: 3px; background: var(--bg-sub); border: 1px solid var(--line); border-radius: 9px; padding: 3px; }
+.mode-opt { border: none; background: transparent; font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--muted); padding: 5px 14px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+.mode-opt:hover:not(:disabled):not(.on) { color: var(--ink-2); }
+.mode-opt.on { background: var(--surface); color: var(--primary); box-shadow: var(--shadow-1); }
+.mode-opt:disabled { cursor: default; }
+.mode-bar-desc { font-size: 11.5px; color: var(--muted); }
+.mode-bar-note { margin-left: auto; font-size: 11px; color: var(--muted); }
+
+/* ============ 使い方ガイド ============ */
+.g-banner { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; background: var(--primary-soft); border: 1px solid var(--primary); border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; }
+.g-banner-t { font-weight: 700; font-size: 14.5px; color: var(--primary); }
+.g-banner-s { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; }
+.g-banner .btn { margin-left: auto; }
+.g-sec { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-1); padding: 18px 20px; margin-bottom: 16px; }
+.g-sec-head { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+.g-sec-no { flex: none; width: 30px; height: 30px; border-radius: 8px; background: var(--primary); color: #fff; font-weight: 800; font-size: 13px; display: grid; place-items: center; }
+.g-sec-head h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.g-sec-lead { color: var(--ink-2); font-size: 14px; margin: 4px 0 14px; }
+.g-steps { display: grid; gap: 10px; margin: 12px 0; }
+.g-step { display: grid; grid-template-columns: 30px 1fr; gap: 12px; background: var(--bg-sub); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+.g-step-n { width: 30px; height: 30px; border-radius: 8px; background: var(--primary-soft); color: var(--primary); font-weight: 800; font-size: 13px; display: grid; place-items: center; }
+.g-step-b h4 { margin: 3px 0 3px; font-size: 14px; font-weight: 700; }
+.g-step-b p { margin: 0; font-size: 13px; color: var(--ink-2); line-height: 1.6; }
+.g-tbl td, .g-tbl th { vertical-align: top; }
+.g-note { font-size: 12.5px; color: var(--ink-2); background: var(--warn-soft); border: 1px solid var(--warn); border-radius: 9px; padding: 9px 12px; margin: 12px 0 0; }
+.g-flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 14px; }
+.g-node { background: var(--bg-sub); border: 1px solid var(--line); border-radius: 999px; padding: 5px 13px; font-size: 12.5px; font-weight: 700; }
+.g-arw { color: var(--primary); font-weight: 900; }
+.g-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 6px 0 8px; }
+@media (max-width: 620px) { .g-cols { grid-template-columns: 1fr; } }
+.g-ed { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: var(--bg-sub); }
+.g-ed.agency { border-top: 3px solid var(--primary); }
+.g-ed.client { border-top: 3px solid var(--warn); }
+.g-ed h4 { margin: 2px 0 6px; font-size: 14.5px; }
+.g-ed ul { margin: 0; padding-left: 18px; font-size: 13px; color: var(--ink-2); }
+.g-ed li { margin: 3px 0; }
+
 @media (prefers-reduced-motion: reduce) {
   .skel::after { animation: none; }
   * { transition-duration: 0s !important; }

@@ -12,6 +12,7 @@ import type {
   WidgetDimension,
   WidgetType,
 } from '@adgrid/shared';
+import { INDUSTRY_PROFILES } from '@adgrid/shared';
 
 /* 媒体色はダークモードで反転するため hex ではなく CSS 変数で参照する */
 export const PLATFORM_COLOR_VAR: Record<Platform, string> = {
@@ -187,11 +188,8 @@ export const MATCH_TYPE_LABEL: Record<string, string> = {
   broad: '部分一致',
 };
 
-export const INDUSTRY_LABEL: Record<string, string> = {
-  ec: 'EC・通販',
-  beauty: '美容・サロン',
-  saas: 'SaaS・IT',
-  finance: '金融',
-  hr: '人材',
-  other: 'その他',
-};
+/* 業種ラベルは共有の業種プロファイルから生成し、相場・診断・広告文・用語の
+   最適化と選択肢を常に一致させる (ドリフト防止) */
+export const INDUSTRY_LABEL: Record<string, string> = Object.fromEntries(
+  Object.entries(INDUSTRY_PROFILES).map(([code, p]) => [code, p.label]),
+);

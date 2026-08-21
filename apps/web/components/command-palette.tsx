@@ -55,6 +55,7 @@ export function CommandPalette({
       { label: '変更履歴', href: '/changelog', keywords: 'changelog henkou rireki 履歴 変更 タイムライン 監査' },
       { label: 'API接続', href: '/connections', keywords: 'connections api setsuzoku 接続 同期 oauth', feature: 'connections' },
       { label: '設定', href: '/settings', keywords: 'settings settei' },
+      { label: '使い方ガイド', href: '/guide', keywords: 'guide manual tsukaikata 使い方 マニュアル ヘルプ help ガイド' },
     ];
     const nav = navRaw.filter((n) => !n.feature || editionAllows(me.edition, n.feature));
     const navItems: PaletteItem[] = nav.map((n) => ({
