@@ -24,6 +24,16 @@ const NAV_MAIN: NavItem[] = [
     ),
   },
   {
+    href: '/clients',
+    label: 'クライアント',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <circle cx="7" cy="4.5" r="2.3" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M2.5 12c.7-2.4 2.5-3.6 4.5-3.6s3.8 1.2 4.5 3.6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: '/dashboard',
     label: 'ダッシュボード',
     icon: (

@@ -1,13 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
+import type { MemberDto, MemberRole, UsageDto } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantId } from '../common/tenant';
-
-export interface UsageDto {
-  monthCostJpy: number;
-  monthCallCount: number;
-  byFeature: Array<{ feature: string; costJpy: number; count: number }>;
-  mockedNote: boolean;
-}
 
 @Controller('usage')
 export class UsageController {
@@ -38,5 +32,21 @@ export class UsageController {
         mockedNote: !process.env.ANTHROPIC_API_KEY,
       };
     });
+  }
+
+  /** テナントのメンバー一覧 (設定画面用)。認証テーブルはRLS外のためアプリ層でテナント絞り込み */
+  @Get('members')
+  async members(@TenantId() tenantId: string): Promise<MemberDto[]> {
+    const rows = await this.prisma.tenantMember.findMany({
+      where: { tenantId },
+      include: { user: true },
+      orderBy: { role: 'asc' },
+    });
+    return rows.map((m) => ({
+      userId: m.userId,
+      name: m.user.name,
+      email: m.user.email,
+      role: m.role as MemberRole,
+    }));
   }
 }

@@ -2,11 +2,21 @@ import { Body, Controller, Get, HttpStatus, Post, Query } from '@nestjs/common';
 import type { ReportRunDto } from '@adgrid/shared';
 import { TenantId } from '../common/tenant';
 import { AppError } from '../common/errors';
+import { SchedulerService } from '../scheduler/scheduler.service';
 import { ReportService } from './report.service';
 
 @Controller('reports')
 export class ReportController {
-  constructor(private readonly reports: ReportService) {}
+  constructor(
+    private readonly reports: ReportService,
+    private readonly scheduler: SchedulerService,
+  ) {}
+
+  /** スケジューラの手動実行 (開発・検証用)。本番は週次cronで自動実行 */
+  @Post('run-weekly-all')
+  runWeeklyAll(@TenantId() _tenantId: string) {
+    return this.scheduler.runWeeklyForAllTenants();
+  }
 
   @Post('run')
   run(

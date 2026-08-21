@@ -24,6 +24,11 @@ Base URL: `http://localhost:4000`。DTO の型定義は `@adgrid/shared` (`packa
 
 | Method | Path | 説明 | レスポンス型 |
 |---|---|---|---|
+| GET | `/clients/overview` | クライアント俯瞰 (7日KPI・未対応指摘数・最終レポート日時) | `ClientOverviewDto[]` |
+| GET | `/dashboard/campaigns?clientId=&platform=&days=` | キャンペーン別ドリルダウン | `CampaignBreakdownDto[]` |
+| GET | `/usage` | 当月のAI利用量・原価 | `UsageDto` |
+| GET | `/usage/members` | テナントのメンバー一覧 | `MemberDto[]` |
+| POST | `/reports/run-weekly-all` | 週次レポート自動生成の手動トリガ (開発用。cronはJST月曜07:00) | `{generated,skipped,failed}` |
 | GET | `/home` | 今日の司令室 (優先度順タスク) | `HomeDto` |
 | GET | `/clients` | クライアント一覧 | `ClientDto[]` |
 | GET | `/clients/:clientId/accounts` | クライアント配下の広告アカウント | `AdAccountDto[]` |

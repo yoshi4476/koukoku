@@ -1,13 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { DailyPointDto, DashboardDto, Platform } from '@adgrid/shared';
+import type { CampaignBreakdownDto, DailyPointDto, DashboardDto, Platform } from '@adgrid/shared';
 import { ALL_PLATFORMS } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
 import { TrendChart } from '@/components/trend-chart';
-import { DeltaPill, DeltaText, ErrorCard, PlatformTag, Skeleton } from '@/components/ui';
+import { DeltaPill, DeltaText, ErrorCard, PlatformTag, Skeleton, SkeletonLines } from '@/components/ui';
 import { PLATFORM_SHORT_LABEL } from '@/lib/labels';
 import { formatNumber, formatPercent, formatPeriod, formatYen } from '@/lib/format';
 
@@ -106,11 +106,25 @@ function DashboardSkeleton() {
 export default function DashboardPage() {
   const { selectedClientId } = useClients();
   const [platform, setPlatform] = useState<'' | Platform>('');
+  // 媒体別表の行クリックで展開するキャンペーンドリルダウン (null = 閉じている)
+  const [expanded, setExpanded] = useState<Platform | null>(null);
+
+  // 媒体タブ・クライアント切替時は展開状態をリセットする
+  useEffect(() => {
+    setExpanded(null);
+  }, [platform, selectedClientId]);
 
   const params = new URLSearchParams({ days: '7' });
   if (selectedClientId) params.set('clientId', selectedClientId);
   if (platform) params.set('platform', platform);
   const { data, loading, error, retry } = useApi<DashboardDto>(`/dashboard?${params.toString()}`);
+
+  const campaignParams = new URLSearchParams({ days: '7' });
+  if (selectedClientId) campaignParams.set('clientId', selectedClientId);
+  if (expanded) campaignParams.set('platform', expanded);
+  const campaigns = useApi<CampaignBreakdownDto[]>(
+    expanded ? `/dashboard/campaigns?${campaignParams.toString()}` : null,
+  );
 
   const hasData = data !== null && (data.kpi.impressions > 0 || data.kpi.cost > 0 || data.byPlatform.length > 0);
 
@@ -172,7 +186,7 @@ export default function DashboardPage() {
           <div className="card">
             <div className="c-head">
               <h2>媒体別ブレイクダウン</h2>
-              <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--muted)' }}>前週比はCPA基準 (▼=良化)</span>
+              <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--muted)' }}>行クリックでキャンペーン別に展開 · 前週比はCPA基準 (▼=良化)</span>
             </div>
             <div className="c-body tbl-scroll" style={{ padding: 0 }}>
               {data.byPlatform.length === 0 ? (
@@ -195,18 +209,75 @@ export default function DashboardPage() {
                   </thead>
                   <tbody>
                     {data.byPlatform.map((row) => (
-                      <tr key={row.platform}>
-                        <td><PlatformTag platform={row.platform} /></td>
-                        <td>{formatYen(row.cost)}</td>
-                        <td>{formatNumber(row.impressions)}</td>
-                        <td>{formatNumber(row.clicks)}</td>
-                        <td>{formatPercent(row.ctr, 2)}</td>
-                        <td>{formatPercent(row.cvr, 2)}</td>
-                        <td>{formatNumber(row.conversions)}</td>
-                        <td>{formatYen(row.cpa)}</td>
-                        <td>{row.roas === null ? '—' : `${Math.round(row.roas)}%`}</td>
-                        <td><DeltaText value={row.cpaDelta} invert /></td>
-                      </tr>
+                      <Fragment key={row.platform}>
+                        <tr
+                          className="drill-row"
+                          aria-expanded={expanded === row.platform}
+                          title={expanded === row.platform ? 'クリックで閉じる' : 'クリックでキャンペーン別に展開'}
+                          onClick={() => setExpanded((p) => (p === row.platform ? null : row.platform))}
+                        >
+                          <td><PlatformTag platform={row.platform} /></td>
+                          <td>{formatYen(row.cost)}</td>
+                          <td>{formatNumber(row.impressions)}</td>
+                          <td>{formatNumber(row.clicks)}</td>
+                          <td>{formatPercent(row.ctr, 2)}</td>
+                          <td>{formatPercent(row.cvr, 2)}</td>
+                          <td>{formatNumber(row.conversions)}</td>
+                          <td>{formatYen(row.cpa)}</td>
+                          <td>{row.roas === null ? '—' : `${Math.round(row.roas)}%`}</td>
+                          <td><DeltaText value={row.cpaDelta} invert /></td>
+                        </tr>
+                        {expanded === row.platform ? (
+                          <tr>
+                            <td className="drill-cell" colSpan={10}>
+                              {campaigns.loading ? (
+                                <div style={{ padding: '12px 16px' }}>
+                                  <SkeletonLines count={3} />
+                                </div>
+                              ) : campaigns.error ? (
+                                <div style={{ padding: '12px 16px' }}>
+                                  <ErrorCard error={campaigns.error} onRetry={campaigns.retry} />
+                                </div>
+                              ) : (campaigns.data ?? []).length === 0 ? (
+                                <p style={{ padding: '12px 16px', margin: 0, color: 'var(--muted)', fontSize: 12.5 }}>
+                                  この媒体のキャンペーンデータがありません。
+                                </p>
+                              ) : (
+                                <table className="data-tbl">
+                                  <thead>
+                                    <tr>
+                                      <th>キャンペーン</th>
+                                      <th>消化額</th>
+                                      <th>Imp</th>
+                                      <th>Click</th>
+                                      <th>CTR</th>
+                                      <th>CV</th>
+                                      <th>CPA</th>
+                                      <th>ROAS</th>
+                                      <th>前週比 (CPA)</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {(campaigns.data ?? []).map((c) => (
+                                      <tr key={c.campaignId}>
+                                        <td>{c.campaignName}</td>
+                                        <td>{formatYen(c.cost)}</td>
+                                        <td>{formatNumber(c.impressions)}</td>
+                                        <td>{formatNumber(c.clicks)}</td>
+                                        <td>{formatPercent(c.ctr, 2)}</td>
+                                        <td>{formatNumber(c.conversions)}</td>
+                                        <td>{formatYen(c.cpa)}</td>
+                                        <td>{c.roas === null ? '—' : `${Math.round(c.roas)}%`}</td>
+                                        <td><DeltaText value={c.cpaDelta} invert /></td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              )}
+                            </td>
+                          </tr>
+                        ) : null}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>

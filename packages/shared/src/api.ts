@@ -165,6 +165,46 @@ export interface CsvImportResultDto {
   warnings: string[];
 }
 
+/* ---- クライアント管理 ---- */
+export interface ClientOverviewDto {
+  client: ClientDto;
+  cost7d: number;
+  conversions7d: number;
+  cpa7d: number | null;
+  cpaDelta: number | null;
+  openFindings: number;
+  lastReportAt: string | null;
+}
+
+export interface CampaignBreakdownDto {
+  campaignId: string;
+  campaignName: string;
+  platform: Platform;
+  cost: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  ctr: number | null;
+  cpa: number | null;
+  roas: number | null;
+  cpaDelta: number | null;
+}
+
+/* ---- 設定 ---- */
+export interface MemberDto {
+  userId: string;
+  name: string;
+  email: string;
+  role: MemberRole;
+}
+
+export interface UsageDto {
+  monthCostJpy: number;
+  monthCallCount: number;
+  byFeature: Array<{ feature: string; costJpy: number; count: number }>;
+  mockedNote: boolean;
+}
+
 /* ---- 媒体窓口 ---- */
 export interface PortalCardDto {
   platform: Platform;

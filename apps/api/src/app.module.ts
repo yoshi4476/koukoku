@@ -19,6 +19,7 @@ import { TrailService } from './common/trail.service';
 import { AuthController } from './auth/auth.controller';
 import { OnboardingController } from './onboarding/onboarding.controller';
 import { UsageController } from './usage/usage.controller';
+import { SchedulerService } from './scheduler/scheduler.service';
 
 @Module({
   imports: [PrismaModule],
@@ -38,6 +39,7 @@ import { UsageController } from './usage/usage.controller';
   providers: [
     AuthService,
     TrailService,
+    SchedulerService,
     MetricsService,
     LlmService,
     AuditService,

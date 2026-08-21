@@ -1,4 +1,4 @@
-import type { Platform, ConnectionStatus } from '@adgrid/shared';
+import type { Platform, ConnectionStatus, MemberRole } from '@adgrid/shared';
 
 /* 媒体色はダークモードで反転するため hex ではなく CSS 変数で参照する */
 export const PLATFORM_COLOR_VAR: Record<Platform, string> = {
@@ -51,4 +51,27 @@ export const REPORT_SECTION_LABEL: Record<string, string> = {
   result: '結果',
   cause: '要因',
   action: '次のアクション',
+};
+
+export const MEMBER_ROLE_LABEL: Record<MemberRole, string> = {
+  owner: 'オーナー',
+  admin: '管理者',
+  operator: 'オペレーター',
+  viewer: '閲覧のみ',
+};
+
+export const USAGE_FEATURE_LABEL: Record<string, string> = {
+  audit: 'AI診断',
+  report: 'レポート',
+  copy: '広告文',
+  format_detect: 'CSV判定',
+};
+
+export const INDUSTRY_LABEL: Record<string, string> = {
+  ec: 'EC・通販',
+  beauty: '美容・サロン',
+  saas: 'SaaS・IT',
+  finance: '金融',
+  hr: '人材',
+  other: 'その他',
 };

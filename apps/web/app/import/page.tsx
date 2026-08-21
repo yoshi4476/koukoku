@@ -17,6 +17,16 @@ export default function ImportPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<ApiError | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // クライアント管理などからの遷移 (?clientId=) では先頭アカウントを自動選択する
+  const [autoSelectAccount, setAutoSelectAccount] = useState(false);
+
+  useEffect(() => {
+    const qClientId = new URLSearchParams(window.location.search).get('clientId');
+    if (qClientId) {
+      setClientId(qClientId);
+      setAutoSelectAccount(true);
+    }
+  }, []);
 
   useEffect(() => {
     if (selectedClientId) setClientId(selectedClientId);
@@ -27,6 +37,13 @@ export default function ImportPage() {
   useEffect(() => {
     setAdAccountId('');
   }, [clientId]);
+
+  useEffect(() => {
+    if (!autoSelectAccount || !accounts.data) return;
+    const first = accounts.data[0];
+    if (first) setAdAccountId(first.id);
+    setAutoSelectAccount(false);
+  }, [autoSelectAccount, accounts.data]);
 
   const canUpload = adAccountId !== '' && file !== null && !uploading;
 

@@ -59,6 +59,12 @@ export default function ReportPage() {
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<ApiError | null>(null);
 
+  // クライアント管理などからの遷移 (?clientId=) を反映する
+  useEffect(() => {
+    const qClientId = new URLSearchParams(window.location.search).get('clientId');
+    if (qClientId) setClientId(qClientId);
+  }, []);
+
   useEffect(() => {
     if (selectedClientId) setClientId(selectedClientId);
   }, [selectedClientId]);
