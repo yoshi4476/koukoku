@@ -96,6 +96,10 @@ export function apiPatch<T>(path: string, body: unknown): Promise<T> {
   });
 }
 
+export function apiDelete<T>(path: string): Promise<T> {
+  return request<T>(path, { method: 'DELETE' });
+}
+
 /** multipart/form-data 送信 (Content-Type はブラウザが boundary 付きで付与する) */
 export function apiUpload<T>(path: string, form: FormData): Promise<T> {
   return request<T>(path, { method: 'POST', body: form });

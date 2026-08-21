@@ -114,6 +114,17 @@ const NAV_DATA: NavItem[] = [
 
 const NAV_SETTINGS: NavItem[] = [
   {
+    href: '/connections',
+    label: 'API接続',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <path d="M4.5 1.5v3M9.5 1.5v3" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M3 4.5h8v1.5a4 4 0 0 1-4 4 4 4 0 0 1-4-4z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+        <path d="M7 10v2.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: '/settings',
     label: '設定',
     icon: (

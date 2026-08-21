@@ -162,7 +162,11 @@ model MediaConnection {
   tenantId     String    @map("tenant_id")
   platform     String
   status       String    @default("not_connected") // connected / needs_reauth / error / not_connected
+  // mock = デモ接続 (擬似データ同期) / oauth = 実API接続 (Phase 2で媒体認証情報設定後)
+  mode         String    @default("mock")
   lastSyncedAt DateTime? @map("last_synced_at")
+  lastSyncRows Int       @default(0) @map("last_sync_rows")
+  errorMessage String    @default("") @map("error_message")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 

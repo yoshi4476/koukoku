@@ -109,6 +109,12 @@ export default function DashboardPage() {
   // 媒体別表の行クリックで展開するキャンペーンドリルダウン (null = 閉じている)
   const [expanded, setExpanded] = useState<Platform | null>(null);
 
+  // API接続完了画面などからの ?platform= 指定で初期タブを合わせる
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get('platform');
+    if (q && (ALL_PLATFORMS as string[]).includes(q)) setPlatform(q as Platform);
+  }, []);
+
   // 媒体タブ・クライアント切替時は展開状態をリセットする
   useEffect(() => {
     setExpanded(null);

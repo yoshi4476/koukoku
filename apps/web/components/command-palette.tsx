@@ -43,6 +43,7 @@ export function CommandPalette({
       { label: '媒体窓口', href: '/portal', keywords: 'portal baitai リンク' },
       { label: 'アラート', href: '/alerts', keywords: 'alerts arato 通知 検知 異常' },
       { label: 'データ取込', href: '/import', keywords: 'import csv torikomi' },
+      { label: 'API接続', href: '/connections', keywords: 'connections api setsuzoku 接続 同期 oauth' },
       { label: '設定', href: '/settings', keywords: 'settings settei' },
     ];
     const navItems: PaletteItem[] = nav.map((n) => ({

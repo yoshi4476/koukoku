@@ -4,6 +4,7 @@ import IORedis from 'ioredis';
 import { PrismaClient } from '@prisma/client';
 import { ReportService } from '../ai/report.service';
 import { AlertsService } from '../alerts/alerts.service';
+import { MediaSyncService } from '../media-connector/sync.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { daysAgo } from '../metrics/metrics.service';
 
@@ -13,6 +14,9 @@ const WEEKLY_CRON = '0 22 * * 0';
 const ALERT_QUEUE_NAME = 'alert-detection';
 // 毎時0分に異常検知 (F-13)。/home からの遅延検知が補完するため厳密性は不要
 const ALERT_CRON = '0 * * * *';
+const SYNC_QUEUE_NAME = 'media-sync';
+// 当日分は3時間毎の増分同期 (別冊D §⑤。MVPは30日洗い替えで代替)
+const SYNC_CRON = '30 */3 * * *';
 
 const LOCAL_REDIS_URL = 'redis://localhost:56379';
 const LOCAL_ADMIN_DB_URL =
@@ -25,6 +29,8 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private worker: Worker | null = null;
   private alertQueue: Queue | null = null;
   private alertWorker: Worker | null = null;
+  private syncQueue: Queue | null = null;
+  private syncWorker: Worker | null = null;
   private connection: IORedis | null = null;
   // テナント一覧の列挙のみ管理者接続を使う (RLS下のアプリロールでは他テナントが見えないため)。
   // 業務データの読み書きは従来どおり withTenant (RLS) を通す。
@@ -34,6 +40,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly reports: ReportService,
     private readonly alerts: AlertsService,
+    private readonly mediaSync: MediaSyncService,
   ) {}
 
   async onModuleInit() {
@@ -78,8 +85,22 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
         this.logger.error(`alert detection job failed: ${err.message}`),
       );
 
+      this.syncQueue = new Queue(SYNC_QUEUE_NAME, { connection: this.connection });
+      await this.syncQueue.upsertJobScheduler('every-3h', { pattern: SYNC_CRON, tz: 'UTC' });
+      this.syncWorker = new Worker(
+        SYNC_QUEUE_NAME,
+        async () => {
+          const n = await this.runMediaSyncForAllTenants();
+          this.logger.log(`media sync: ${n} connections synced`);
+        },
+        { connection: this.connection },
+      );
+      this.syncWorker.on('failed', (_job, err) =>
+        this.logger.error(`media sync job failed: ${err.message}`),
+      );
+
       this.logger.log(
-        `scheduler ready (${QUEUE_NAME} cron ${WEEKLY_CRON} UTC / ${ALERT_QUEUE_NAME} cron ${ALERT_CRON} UTC)`,
+        `scheduler ready (${QUEUE_NAME} ${WEEKLY_CRON} / ${ALERT_QUEUE_NAME} ${ALERT_CRON} / ${SYNC_QUEUE_NAME} ${SYNC_CRON} UTC)`,
       );
     } catch (e) {
       this.logger.warn(`scheduler disabled (redis unavailable): ${String(e)}`);
@@ -159,11 +180,35 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     return total;
   }
 
+  /** 全テナントの媒体同期。列挙のみ管理者接続 */
+  async runMediaSyncForAllTenants(): Promise<number> {
+    if (!this.adminPrisma) {
+      this.adminPrisma = new PrismaClient({
+        datasources: { db: { url: process.env.DATABASE_URL ?? LOCAL_ADMIN_DB_URL } },
+      });
+    }
+    const tenants = await this.adminPrisma.tenant.findMany({
+      where: { status: 'active' },
+      select: { id: true },
+    });
+    let total = 0;
+    for (const t of tenants) {
+      try {
+        total += await this.mediaSync.syncAllForTenant(t.id);
+      } catch (e) {
+        this.logger.warn(`media sync failed tenant=${t.id}: ${String(e)}`);
+      }
+    }
+    return total;
+  }
+
   private async cleanup() {
     await this.worker?.close().catch(() => undefined);
     await this.queue?.close().catch(() => undefined);
     await this.alertWorker?.close().catch(() => undefined);
     await this.alertQueue?.close().catch(() => undefined);
+    await this.syncWorker?.close().catch(() => undefined);
+    await this.syncQueue?.close().catch(() => undefined);
     this.connection?.disconnect();
     this.worker = null;
     this.queue = null;

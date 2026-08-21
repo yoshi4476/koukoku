@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import type { PortalCardDto } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { ErrorCard, Skeleton } from '@/components/ui';
@@ -26,6 +27,9 @@ function PortalCard({ card }: { card: PortalCardDto }) {
         <div className="p-note">API未提供 (認定パートナー限定) — CSV連携で代替</div>
       ) : null}
       <div className="p-links">
+        {card.connectionStatus !== 'connected' ? (
+          <Link className="btn sm pri" href="/connections">接続を管理</Link>
+        ) : null}
         <a className="btn sm sec" href={card.adminUrl} target="_blank" rel="noopener noreferrer">管理画面</a>
         <a className="btn sm sec" href={card.helpUrl} target="_blank" rel="noopener noreferrer">ヘルプ</a>
         <a className="btn sm sec" href={card.developerUrl} target="_blank" rel="noopener noreferrer">API</a>

@@ -242,6 +242,58 @@ export interface AlertRunResultDto {
   notified: number;
 }
 
+/* ---- プラン (要件書 §⑦。課金処理はStripe接続後) ---- */
+export type PlanId = 'starter' | 'business' | 'agency' | 'enterprise';
+
+export interface PlanDef {
+  id: PlanId;
+  label: string;
+  monthlyPriceJpy: number | null; // null = 個別見積
+  accountLimit: number | null; // null = 無制限
+  seatLimit: number | null;
+}
+
+export const PLANS: Record<PlanId, PlanDef> = {
+  starter: { id: 'starter', label: 'Starter', monthlyPriceJpy: 29800, accountLimit: 5, seatLimit: 3 },
+  business: { id: 'business', label: 'Business', monthlyPriceJpy: 98000, accountLimit: 20, seatLimit: 10 },
+  agency: { id: 'agency', label: 'Agency', monthlyPriceJpy: 298000, accountLimit: 75, seatLimit: 30 },
+  enterprise: { id: 'enterprise', label: 'Enterprise', monthlyPriceJpy: null, accountLimit: null, seatLimit: null },
+};
+
+export interface BillingDto {
+  plan: PlanDef;
+  accountsUsed: number;
+  accountLimit: number | null;
+  /** Stripe未接続の間は常にtrial扱い */
+  billingConfigured: boolean;
+}
+
+/* ---- 媒体API接続 (S-18 / 別冊D) ---- */
+export interface ConnectionDto {
+  id: string;
+  platform: Platform;
+  status: ConnectionStatus;
+  mode: 'mock' | 'oauth';
+  lastSyncedAt: string | null;
+  lastSyncRows: number;
+  errorMessage: string;
+  accountCount: number;
+}
+
+export interface AuthorizeResultDto {
+  mode: 'mock' | 'oauth';
+  /** mock: 接続候補アカウント一覧を即時返す */
+  candidates?: Array<{ externalAccountId: string; name: string }>;
+  /** oauth: 媒体認可画面URL (実API認証情報の設定後に有効) */
+  authUrl?: string;
+}
+
+export interface SyncResultDto {
+  rows: number;
+  since: string;
+  until: string;
+}
+
 /* ---- 媒体窓口 ---- */
 export interface PortalCardDto {
   platform: Platform;

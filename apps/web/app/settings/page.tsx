@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import type { MemberDto, UsageDto } from '@adgrid/shared';
+import type { BillingDto, ConnectionDto, MemberDto, UsageDto } from '@adgrid/shared';
+import { PLANS } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
-import { ErrorCard, SkeletonLines } from '@/components/ui';
+import { ErrorCard, Skeleton, SkeletonLines } from '@/components/ui';
 import { apiPost, ApiError, toApiError } from '@/lib/api';
 import { MEMBER_ROLE_LABEL, USAGE_FEATURE_LABEL } from '@/lib/labels';
 import { formatNumber, formatYen } from '@/lib/format';
@@ -76,6 +77,12 @@ export default function SettingsPage() {
   const { me } = useAuth();
   const usage = useApi<UsageDto>('/usage');
   const members = useApi<MemberDto[]>('/usage/members');
+  const billing = useApi<BillingDto>('/billing');
+  const connections = useApi<ConnectionDto[]>('/connections');
+
+  const planPrice = billing.data ? PLANS[billing.data.plan.id].monthlyPriceJpy : null;
+  const connectedCount = (connections.data ?? []).filter((c) => c.status === 'connected').length;
+  const syncedAccounts = (connections.data ?? []).reduce((sum, c) => sum + c.accountCount, 0);
 
   return (
     <>
@@ -96,7 +103,46 @@ export default function SettingsPage() {
               </tr>
               <tr>
                 <td style={{ color: 'var(--muted)', fontSize: 12 }}>プラン</td>
-                <td style={{ textAlign: 'left' }}>Business (トライアル)</td>
+                <td style={{ textAlign: 'left' }}>
+                  {billing.loading ? (
+                    <Skeleton w={140} h={12} />
+                  ) : billing.data ? (
+                    <>
+                      {billing.data.plan.label}
+                      {!billing.data.billingConfigured ? (
+                        <span style={{ marginLeft: 8, fontSize: 11.5, color: 'var(--muted)' }}>
+                          トライアル中 (決済は未設定)
+                        </span>
+                      ) : null}
+                    </>
+                  ) : (
+                    '—'
+                  )}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ color: 'var(--muted)', fontSize: 12 }}>月額</td>
+                <td style={{ textAlign: 'left' }} className="num">
+                  {billing.loading ? (
+                    <Skeleton w={90} h={12} />
+                  ) : billing.data ? (
+                    planPrice === null ? '個別見積' : `${formatYen(planPrice)} / 月`
+                  ) : (
+                    '—'
+                  )}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ color: 'var(--muted)', fontSize: 12 }}>アカウント使用数</td>
+                <td style={{ textAlign: 'left' }} className="num">
+                  {billing.loading ? (
+                    <Skeleton w={70} h={12} />
+                  ) : billing.data ? (
+                    `${formatNumber(billing.data.accountsUsed)} / ${billing.data.accountLimit === null ? '無制限' : formatNumber(billing.data.accountLimit)}`
+                  ) : (
+                    '—'
+                  )}
+                </td>
               </tr>
               <tr>
                 <td style={{ color: 'var(--muted)', fontSize: 12 }}>あなたのロール</td>
@@ -105,6 +151,11 @@ export default function SettingsPage() {
             </tbody>
           </table>
         </div>
+        {billing.error ? (
+          <div className="c-body" style={{ borderTop: '1px solid var(--line)' }}>
+            <ErrorCard error={billing.error} onRetry={billing.retry} />
+          </div>
+        ) : null}
       </div>
 
       {/* カード2: AI利用量 (今月) */}
@@ -208,10 +259,24 @@ export default function SettingsPage() {
       <AutoReportCard />
 
       {/* カード5: API接続 */}
-      <div className="empty" style={{ maxWidth: 640 }}>
-        <div className="e-title">API接続は Phase 2 で実装予定です</div>
-        <div className="e-sub">各媒体とのOAuth接続・自動同期はここに追加されます。それまでの実績データはCSV取込をご利用ください。</div>
-        <Link href="/import" className="btn pri">CSVを取り込む</Link>
+      <div className="card" style={{ marginBottom: 16, maxWidth: 640 }}>
+        <div className="c-head"><h2>API接続</h2></div>
+        {connections.loading ? (
+          <div className="c-body"><SkeletonLines count={2} /></div>
+        ) : connections.error ? (
+          <div className="c-body"><ErrorCard error={connections.error} onRetry={connections.retry} /></div>
+        ) : (
+          <div className="c-body form-grid">
+            <p style={{ margin: 0, fontSize: 12.5, color: 'var(--ink-2)' }} className="num">
+              {connectedCount === 0
+                ? '接続中の媒体はありません。媒体APIを接続すると実績データを自動同期できます。'
+                : `接続中 ${connectedCount}媒体 · アカウント ${syncedAccounts}件を自動同期しています。`}
+            </p>
+            <div>
+              <Link href="/connections" className="btn pri">API接続を管理</Link>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

@@ -36,6 +36,12 @@ Base URL: `http://localhost:4000`。DTO の型定義は `@adgrid/shared` (`packa
 | POST | `/alerts/run` | 検知の手動実行 (毎時cron+home遅延検知が通常経路) | `AlertRunResultDto` |
 | GET | `/alerts/events?limit=` | 発生履歴 (新しい順) | `AlertEventDto[]` |
 | POST | `/alerts/events/:id/ack` | イベントを確認済みにする (homeから消える) | `{ok:true}` |
+| GET | `/billing` | プラン・アカウント使用数 (上限超過時のアカウント追加は402) | `BillingDto` |
+| GET | `/connections` | 媒体API接続一覧 (S-18) | `ConnectionDto[]` |
+| POST | `/connections/:platform/authorize` | 認可開始。実API未設定はデモ接続候補を返す。LINEは400 (CSV誘導) | `AuthorizeResultDto` |
+| POST | `/connections/:platform/complete` body `{accounts:[{externalAccountId,name,clientId,monthlyBudget?}]}` | 接続確定+アカウント作成+初回30日同期 | `{connection, sync}` |
+| POST | `/connections/:id/sync` | 今すぐ同期 (30日洗い替え。3時間毎cronもあり) | `SyncResultDto` |
+| DELETE | `/connections/:id` | 切断 (データ・アカウントは保持) | `{ok:true}` |
 | GET | `/home` | 今日の司令室 (優先度順タスク) | `HomeDto` |
 | GET | `/clients` | クライアント一覧 | `ClientDto[]` |
 | GET | `/clients/:clientId/accounts` | クライアント配下の広告アカウント | `AdAccountDto[]` |

@@ -23,6 +23,10 @@ import { SchedulerService } from './scheduler/scheduler.service';
 import { AlertsService } from './alerts/alerts.service';
 import { AlertsController } from './alerts/alerts.controller';
 import { ReportExportService } from './exports/report-export.service';
+import { BillingService } from './billing/billing.service';
+import { BillingController } from './billing/billing.controller';
+import { MediaSyncService } from './media-connector/sync.service';
+import { ConnectionsController } from './media-connector/connections.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -31,6 +35,8 @@ import { ReportExportService } from './exports/report-export.service';
     OnboardingController,
     UsageController,
     AlertsController,
+    BillingController,
+    ConnectionsController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -46,6 +52,8 @@ import { ReportExportService } from './exports/report-export.service';
     AlertsService,
     SchedulerService,
     ReportExportService,
+    BillingService,
+    MediaSyncService,
     MetricsService,
     LlmService,
     AuditService,

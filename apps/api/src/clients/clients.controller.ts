@@ -12,12 +12,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TenantId } from '../common/tenant';
 import { AppError } from '../common/errors';
 import { MetricsService, daysAgo } from '../metrics/metrics.service';
+import { BillingService } from '../billing/billing.service';
 
 @Controller('clients')
 export class ClientsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
+    private readonly billing: BillingService,
   ) {}
 
   /** クライアント管理画面用の俯瞰 (直近7日KPI・未対応指摘・最終レポート) */
@@ -114,6 +116,7 @@ export class ClientsController {
         '媒体 (Google広告など) を選択してください。',
       );
     }
+    await this.billing.assertAccountCapacity(tenantId, 1);
     const account = await this.prisma.withTenant(tenantId, async (tx) => {
       const client = await tx.client.findUnique({ where: { id: clientId } });
       if (!client) {
