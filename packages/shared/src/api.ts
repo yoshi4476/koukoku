@@ -595,6 +595,91 @@ export interface PortalCardDto {
   accountCount: number;
 }
 
+/* ---- プロジェクト (F-19) ---- */
+export type ProjectGoal = 'conversion' | 'awareness' | 'traffic' | 'store';
+export type ProjectStatus = 'active' | 'paused' | 'ended';
+
+export const PROJECT_GOAL_LABEL: Record<ProjectGoal, string> = {
+  conversion: '獲得 (CV)',
+  awareness: '認知',
+  traffic: '誘導',
+  store: '来店・予約',
+};
+
+export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
+  active: '配信中',
+  paused: '一時停止',
+  ended: '終了',
+};
+
+/** プロジェクト一覧の1件。掲示・推移・アラート・改善の要約を1枚に集約 */
+export interface ProjectDto {
+  id: string;
+  name: string;
+  clientId: string;
+  clientName: string;
+  industryCode: string;
+  goal: ProjectGoal;
+  status: ProjectStatus;
+  note: string;
+  accountCount: number;
+  platforms: Platform[];
+  cost7d: number;
+  conversions7d: number;
+  cpa7d: number | null;
+  cpaDelta: number | null;
+  alertCount: number;
+  openFindings: number;
+  lastReportAt: string | null;
+  createdAt: string;
+}
+
+/** プロジェクト内の1媒体アカウント (掲示タブ) */
+export interface ProjectAccountDto {
+  adAccountId: string;
+  name: string;
+  platform: Platform;
+  connectionStatus: ConnectionStatus;
+  monthlyBudget: number | null;
+  cost7d: number;
+  conversions7d: number;
+  cpa7d: number | null;
+}
+
+export interface ProjectDetailDto {
+  id: string;
+  name: string;
+  clientId: string;
+  clientName: string;
+  industryCode: string;
+  goal: ProjectGoal;
+  status: ProjectStatus;
+  note: string;
+  kpi: KpiSummaryDto;
+  trend: DailyPointDto[];
+  accounts: ProjectAccountDto[];
+  alerts: AlertEventDto[];
+  openFindings: number;
+  lastReportAt: string | null;
+  createdAt: string;
+}
+
+export interface CreateProjectInput {
+  clientId: string;
+  name: string;
+  goal?: ProjectGoal;
+  note?: string;
+  accountIds?: string[];
+}
+
+export interface UpdateProjectInput {
+  name?: string;
+  goal?: ProjectGoal;
+  status?: ProjectStatus;
+  note?: string;
+  accountIds?: string[];
+}
+
 /* ---- キーワード最適化 (F-18) ---- */
 /** 各キーワードへの推奨アクション。増額/維持/減額/停止 */
 export type KeywordAction = 'increase' | 'keep' | 'decrease' | 'pause';

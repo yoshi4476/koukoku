@@ -68,8 +68,29 @@ model Tenant {
   changeLogs  ChangeLog[]
   dashboards  Dashboard[]
   keywordStats KeywordStat[]
+  projects    Project[]
 
   @@map("tenants")
+}
+
+// プロジェクト (目的・施策単位)。1クライアントに複数、複数の媒体アカウントを束ねる。
+// クライアントが「掲示・推移・アラート・改善」を1か所で行うためのハブ (F-19)。
+model Project {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  clientId  String   @map("client_id")
+  name      String
+  goal      String   @default("conversion") // conversion / awareness / traffic / store
+  status    String   @default("active") // active / paused / ended
+  note      String   @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id])
+  client     Client      @relation(fields: [clientId], references: [id])
+  adAccounts AdAccount[]
+
+  @@index([tenantId, clientId])
+  @@map("projects")
 }
 
 // カスタムダッシュボード (ロードマップ B-5)。テナントが自作・保存・共有する。
@@ -274,6 +295,7 @@ model Client {
   copyJobs     CopyJob[]
   abTests      AbTest[]
   keywordStats KeywordStat[]
+  projects     Project[]
 
   @@index([tenantId])
   @@map("clients")
@@ -313,6 +335,7 @@ model AdAccount {
   id                String  @id @default(cuid())
   tenantId          String  @map("tenant_id")
   clientId          String  @map("client_id")
+  projectId         String? @map("project_id")
   platform          String
   externalAccountId String  @map("external_account_id")
   name              String
@@ -322,6 +345,7 @@ model AdAccount {
 
   tenant     Tenant             @relation(fields: [tenantId], references: [id])
   client     Client             @relation(fields: [clientId], references: [id])
+  project    Project?           @relation(fields: [projectId], references: [id])
   facts      FactAdPerformance[]
   audits       Audit[]
   csvImports   CsvImport[]

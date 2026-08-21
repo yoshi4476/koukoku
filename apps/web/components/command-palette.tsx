@@ -38,6 +38,7 @@ export function CommandPalette({
   const items = useMemo<PaletteItem[]>(() => {
     const navRaw: Array<{ label: string; href: string; keywords: string; feature?: EditionFeature }> = [
       { label: 'ホーム', href: '/', keywords: 'home kanri 司令室' },
+      { label: 'プロジェクト', href: '/projects', keywords: 'projects purojekuto 施策 キャンペーン 案件' },
       { label: 'クライアント', href: '/clients', keywords: 'clients kuraianto 管理 一覧' },
       { label: 'ダッシュボード', href: '/dashboard', keywords: 'dashboard kpi' },
       { label: 'カスタムボード', href: '/boards', keywords: 'boards custom dashboard looker widget uijetto カスタム ボード ウィジェット' },

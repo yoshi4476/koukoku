@@ -5,6 +5,7 @@ import { PrismaService, Tx } from '../prisma/prisma.service';
 export interface FactFilter {
   clientId?: string;
   adAccountId?: string;
+  adAccountIds?: string[];
   platform?: string;
 }
 
@@ -51,6 +52,7 @@ export class MetricsService {
     return {
       date: { gte: since, lte: until },
       ...(filter.adAccountId ? { adAccountId: filter.adAccountId } : {}),
+      ...(filter.adAccountIds ? { adAccountId: { in: filter.adAccountIds } } : {}),
       ...(filter.platform ? { platform: filter.platform } : {}),
       ...(filter.clientId ? { adAccount: { clientId: filter.clientId } } : {}),
     };

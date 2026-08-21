@@ -98,6 +98,7 @@ async function main() {
   await prisma.llmCall.deleteMany({});
   await prisma.mediaConnection.deleteMany({});
   await prisma.adAccount.deleteMany({});
+  await prisma.project.deleteMany({});
   await prisma.client.deleteMany({});
   await prisma.tenantMember.deleteMany({});
   await prisma.user.deleteMany({});
@@ -243,6 +244,17 @@ async function main() {
     { keyword: '勤怠 安い', matchType: 'broad', bid: 300, qs: 4, impr: 18000, clicks: 270, cost: 81000, conv: 1, convValue: 150000 },
   ]);
 
+  // プロジェクト (目的・施策単位)。複数媒体をまとめ、掲示/推移/アラート/改善のハブに
+  const mkProject = async (
+    id: string, clientId: string, name: string, goal: string, accountIds: string[], note = '',
+  ) => {
+    await prisma.project.create({ data: { id, tenantId: TENANT_ID, clientId, name, goal, note } });
+    await prisma.adAccount.updateMany({ where: { id: { in: accountIds } }, data: { projectId: id } });
+  };
+  await mkProject('p_a_spring', clientA.id, '春の新規獲得キャンペーン', 'conversion', [accAGoogle.id, accAMeta.id], 'Google検索とMetaで新規顧客を獲得する主力施策');
+  await mkProject('p_b_repeat', clientB.id, 'リピート促進 (LINE/Meta)', 'store', [accBMeta.id, accBLine.id], '既存顧客の再来店・再購入を狙う');
+  await mkProject('p_c_lead', clientC.id, 'BtoBリード獲得', 'conversion', [accCGoogle.id, accCYahoo.id], '検索広告で問い合わせ・資料請求を獲得');
+
   await prisma.mediaConnection.createMany({
     data: [
       { tenantId: TENANT_ID, platform: 'google_ads', status: 'connected', lastSyncedAt: new Date() },
@@ -370,6 +382,10 @@ async function main() {
       { tenantId: CLIENT_TENANT, platform: 'meta', status: 'connected', lastSyncedAt: new Date() },
     ],
   });
+  await prisma.project.create({
+    data: { id: 'p_cc_main', tenantId: CLIENT_TENANT, clientId: ecClient.id, name: '自社EC 集客プロジェクト', goal: 'conversion', note: 'Google・Metaで自社ストアの売上を伸ばす' },
+  });
+  await prisma.adAccount.updateMany({ where: { id: { in: [ccGoogle.id, ccMeta.id] } }, data: { projectId: 'p_cc_main' } });
 
   console.log('Seed done. tenants =', TENANT_ID, '/', CLIENT_TENANT);
 }

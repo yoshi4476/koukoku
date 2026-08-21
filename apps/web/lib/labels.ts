@@ -25,6 +25,9 @@ export const PLATFORM_COLOR_VAR: Record<Platform, string> = {
   x_ads: 'var(--m-x)',
   microsoft_ads: 'var(--m-ms)',
   amazon_ads: 'var(--m-amazon)',
+  smartnews_ads: 'var(--m-smartnews)',
+  criteo: 'var(--m-criteo)',
+  pinterest: 'var(--m-pinterest)',
 };
 
 export const PLATFORM_SHORT_LABEL: Record<Platform, string> = {
@@ -37,6 +40,9 @@ export const PLATFORM_SHORT_LABEL: Record<Platform, string> = {
   x_ads: 'X',
   microsoft_ads: 'Microsoft',
   amazon_ads: 'Amazon',
+  smartnews_ads: 'SmartNews',
+  criteo: 'Criteo',
+  pinterest: 'Pinterest',
 };
 
 export const CONNECTION_STATUS_META: Record<ConnectionStatus, { label: string; colorVar: string }> = {

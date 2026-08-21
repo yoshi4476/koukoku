@@ -33,6 +33,17 @@ const NAV_MAIN: NavItem[] = [
     ),
   },
   {
+    href: '/projects',
+    label: 'プロジェクト',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <rect x="1.8" y="2.5" width="10.4" height="9" rx="1.4" fill="none" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M1.8 5h10.4M4.5 2.5v2.5" fill="none" stroke="currentColor" strokeWidth="1.4" />
+        <path d="M4 7.5h3.5M4 9.3h5" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: '/clients',
     label: 'クライアント',
     icon: (
@@ -251,14 +262,13 @@ interface NavPhase {
   hrefs: string[];
 }
 
+// プロジェクト中心のシンプルなナビ。掲示・推移・アラート・改善はプロジェクト詳細に集約し、
+// グローバルには「横断で使うもの」だけを残す。
 const NAV_PHASES: NavPhase[] = [
-  { label: null, hrefs: ['/'] },
-  { label: '① 準備する', hrefs: ['/clients', '/connections', '/import', '/portal'] },
-  { label: '② 作る', hrefs: ['/copy', '/abtests', '/knowledge'] },
-  { label: '③ 見る（計測）', hrefs: ['/dashboard', '/boards', '/pacing', '/changelog'] },
-  { label: '④ 直す（診断・改善）', hrefs: ['/audit', '/keywords', '/approvals', '/alerts'] },
-  { label: '⑤ 報告する', hrefs: ['/report'] },
-  { label: '設定', hrefs: ['/settings', '/guide'] },
+  { label: null, hrefs: ['/', '/projects'] },
+  { label: '作る（横断）', hrefs: ['/copy', '/knowledge'] },
+  { label: '報告する', hrefs: ['/report'] },
+  { label: '管理・設定', hrefs: ['/clients', '/settings', '/guide'] },
 ];
 
 function NavLinks({ items, pathname }: { items: NavItem[]; pathname: string }) {

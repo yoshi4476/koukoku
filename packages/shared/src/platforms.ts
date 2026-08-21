@@ -8,7 +8,10 @@ export type Platform =
   | 'tiktok'
   | 'x_ads'
   | 'microsoft_ads'
-  | 'amazon_ads';
+  | 'amazon_ads'
+  | 'smartnews_ads'
+  | 'criteo'
+  | 'pinterest';
 
 export type ConnectionStatus = 'connected' | 'needs_reauth' | 'error' | 'not_connected';
 
@@ -106,6 +109,33 @@ export const PLATFORM_META: Record<Platform, PlatformMeta> = {
     adminUrl: 'https://advertising.amazon.com',
     helpUrl: 'https://advertising.amazon.com',
     developerUrl: 'https://advertising.amazon.com/API/docs',
+  },
+  smartnews_ads: {
+    platform: 'smartnews_ads',
+    label: 'SmartNews Ads',
+    brandColor: '#E64A19',
+    apiAvailability: 'partner_only',
+    adminUrl: 'https://partners.smartnews-ads.com',
+    helpUrl: 'https://ads-help.smartnews.com',
+    developerUrl: 'https://partners.smartnews-ads.com',
+  },
+  criteo: {
+    platform: 'criteo',
+    label: 'Criteo',
+    brandColor: '#FF6D2D',
+    apiAvailability: 'oauth',
+    adminUrl: 'https://marketing.criteo.com',
+    helpUrl: 'https://help.criteo.com',
+    developerUrl: 'https://developers.criteo.com',
+  },
+  pinterest: {
+    platform: 'pinterest',
+    label: 'Pinterest広告',
+    brandColor: '#E60023',
+    apiAvailability: 'oauth',
+    adminUrl: 'https://ads.pinterest.com',
+    helpUrl: 'https://help.pinterest.com/business',
+    developerUrl: 'https://developers.pinterest.com',
   },
 };
 
