@@ -82,6 +82,22 @@ const NAV_MAIN: NavItem[] = [
       </svg>
     ),
   },
+  {
+    href: '/alerts',
+    label: 'アラート',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <path
+          d="M7 1.8a3.4 3.4 0 0 0-3.4 3.4c0 2.5-.8 3.5-1.3 4.1h9.4c-.5-.6-1.3-1.6-1.3-4.1A3.4 3.4 0 0 0 7 1.8z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinejoin="round"
+        />
+        <path d="M5.7 11.5a1.4 1.4 0 0 0 2.6 0" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ];
 
 const NAV_DATA: NavItem[] = [

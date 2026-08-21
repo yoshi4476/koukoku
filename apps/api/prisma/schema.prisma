@@ -44,6 +44,8 @@ model Tenant {
   name      String
   plan      String   @default("starter")
   status    String   @default("active")
+  // 通知設定等のテナント設定 (slackWebhookUrl など)
+  settings  Json     @default("{}")
   createdAt DateTime @default(now()) @map("created_at")
 
   members     TenantMember[]
@@ -56,8 +58,49 @@ model Tenant {
   llmCalls    LlmCall[]
   connections MediaConnection[]
   auditTrail  AuditTrail[]
+  alertRules  AlertRule[]
+  alertEvents AlertEvent[]
 
   @@map("tenants")
+}
+
+// 異常検知ルール (F-13)。テナント×メトリクスで1件。初回アクセス時にデフォルトを自動作成
+model AlertRule {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  metric    String // budget_pace / cpa_spike / cv_zero / spend_drop
+  threshold Float
+  enabled   Boolean  @default(true)
+  channels  Json     @default("[\"inapp\"]") // inapp / slack
+  createdAt DateTime @default(now()) @map("created_at")
+
+  tenant Tenant       @relation(fields: [tenantId], references: [id])
+  events AlertEvent[]
+
+  @@unique([tenantId, metric])
+  @@map("alert_rules")
+}
+
+model AlertEvent {
+  id          String    @id @default(cuid())
+  tenantId    String    @map("tenant_id")
+  ruleId      String    @map("rule_id")
+  adAccountId String    @map("ad_account_id")
+  severity    String // bad / warn
+  title       String
+  body        String
+  payload     Json      @default("{}")
+  firedAt     DateTime  @default(now()) @map("fired_at")
+  notifiedAt  DateTime? @map("notified_at")
+  ackedAt     DateTime? @map("acked_at")
+  ackedBy     String?   @map("acked_by")
+
+  tenant Tenant    @relation(fields: [tenantId], references: [id])
+  rule   AlertRule @relation(fields: [ruleId], references: [id])
+
+  @@index([tenantId, firedAt])
+  @@index([tenantId, adAccountId, ruleId, firedAt])
+  @@map("alert_events")
 }
 
 // 操作証跡 (F-10)。追記専用 — adgrid_app のUPDATE/DELETE権限をマイグレーションで剥奪

@@ -304,6 +304,33 @@ a.pill { text-decoration: none; }
 .data-tbl td.drill-cell { background: var(--bg-sub); padding: 0; }
 .drill-cell .data-tbl tbody tr:hover { background: var(--surface); }
 
+/* ---------- alerts (検知ルール / 発生履歴) ---------- */
+.rules-tbl th, .rules-tbl td { text-align: left; white-space: normal; }
+.rules-tbl tbody tr.saving { opacity: .55; }
+.rule-name { font-weight: 600; font-size: 13px; }
+.rule-desc { font-size: 11.5px; color: var(--muted); }
+.rule-thresh { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.rule-thresh .input { width: 84px; text-align: right; font-variant-numeric: tabular-nums; }
+.rule-unit { font-size: 11.5px; color: var(--muted); }
+
+.switch { position: relative; display: inline-flex; width: 34px; height: 20px; flex: none; cursor: pointer; }
+.switch input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.switch .sw-track { width: 34px; height: 20px; border-radius: 999px; background: var(--line-strong); transition: background .15s ease; }
+.switch .sw-knob { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); box-shadow: var(--shadow-1); transition: left .15s ease; }
+.switch input:checked + .sw-track { background: var(--primary); }
+.switch input:checked ~ .sw-knob { left: 17px; }
+.switch input:focus-visible + .sw-track { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.alert-ev { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); font-size: 12.5px; flex-wrap: wrap; }
+.alert-ev:last-child { border-bottom: none; }
+.alert-ev.acked { opacity: .55; }
+.alert-ev .sev-ico { flex: none; font-size: 11px; line-height: 1; }
+.alert-ev .sev-ico.bad { color: var(--bad); }
+.alert-ev .sev-ico.warn { color: var(--warn); }
+.alert-ev .ev-time { flex: none; font-variant-numeric: tabular-nums; color: var(--muted); }
+.alert-ev .ev-title { flex: 1 1 220px; min-width: 0; font-weight: 600; }
+.alert-ev .ev-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+
 /* ---------- misc ---------- */
 .section-gap { margin-top: 24px; }
 .row-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }

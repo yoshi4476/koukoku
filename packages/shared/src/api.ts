@@ -205,6 +205,43 @@ export interface UsageDto {
   mockedNote: boolean;
 }
 
+/* ---- アラート (F-13) ---- */
+export type AlertMetric = 'budget_pace' | 'cpa_spike' | 'cv_zero' | 'spend_drop';
+export type AlertChannel = 'inapp' | 'slack';
+
+export interface AlertRuleDto {
+  id: string;
+  metric: AlertMetric;
+  threshold: number;
+  enabled: boolean;
+  channels: AlertChannel[];
+}
+
+export interface AlertEventDto {
+  id: string;
+  metric: AlertMetric;
+  severity: 'bad' | 'warn';
+  title: string;
+  body: string;
+  clientName: string;
+  accountName: string;
+  platform: Platform;
+  adAccountId: string;
+  firedAt: string;
+  notified: boolean;
+  acked: boolean;
+}
+
+export interface AlertSettingsDto {
+  slackWebhookUrl: string;
+}
+
+export interface AlertRunResultDto {
+  fired: number;
+  suppressed: number;
+  notified: number;
+}
+
 /* ---- 媒体窓口 ---- */
 export interface PortalCardDto {
   platform: Platform;

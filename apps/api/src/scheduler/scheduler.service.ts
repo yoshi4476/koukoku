@@ -3,12 +3,16 @@ import { Queue, Worker } from 'bullmq';
 import IORedis from 'ioredis';
 import { PrismaClient } from '@prisma/client';
 import { ReportService } from '../ai/report.service';
+import { AlertsService } from '../alerts/alerts.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { daysAgo } from '../metrics/metrics.service';
 
 const QUEUE_NAME = 'weekly-reports';
 // JST 月曜 07:00 (= UTC 日曜 22:00) に全テナントの週次レポートを自動生成 (F-14)
 const WEEKLY_CRON = '0 22 * * 0';
+const ALERT_QUEUE_NAME = 'alert-detection';
+// 毎時0分に異常検知 (F-13)。/home からの遅延検知が補完するため厳密性は不要
+const ALERT_CRON = '0 * * * *';
 
 const LOCAL_REDIS_URL = 'redis://localhost:56379';
 const LOCAL_ADMIN_DB_URL =
@@ -19,6 +23,8 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SchedulerService.name);
   private queue: Queue | null = null;
   private worker: Worker | null = null;
+  private alertQueue: Queue | null = null;
+  private alertWorker: Worker | null = null;
   private connection: IORedis | null = null;
   // テナント一覧の列挙のみ管理者接続を使う (RLS下のアプリロールでは他テナントが見えないため)。
   // 業務データの読み書きは従来どおり withTenant (RLS) を通す。
@@ -27,6 +33,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly reports: ReportService,
+    private readonly alerts: AlertsService,
   ) {}
 
   async onModuleInit() {
@@ -56,7 +63,24 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
         { connection: this.connection },
       );
       this.worker.on('failed', (_job, err) => this.logger.error(`weekly job failed: ${err.message}`));
-      this.logger.log(`scheduler ready (${QUEUE_NAME}, cron ${WEEKLY_CRON} UTC)`);
+
+      this.alertQueue = new Queue(ALERT_QUEUE_NAME, { connection: this.connection });
+      await this.alertQueue.upsertJobScheduler('hourly', { pattern: ALERT_CRON, tz: 'UTC' });
+      this.alertWorker = new Worker(
+        ALERT_QUEUE_NAME,
+        async () => {
+          const r = await this.runAlertDetectionForAllTenants();
+          this.logger.log(`alert detection: fired ${r.fired}, suppressed ${r.suppressed}, notified ${r.notified}`);
+        },
+        { connection: this.connection },
+      );
+      this.alertWorker.on('failed', (_job, err) =>
+        this.logger.error(`alert detection job failed: ${err.message}`),
+      );
+
+      this.logger.log(
+        `scheduler ready (${QUEUE_NAME} cron ${WEEKLY_CRON} UTC / ${ALERT_QUEUE_NAME} cron ${ALERT_CRON} UTC)`,
+      );
     } catch (e) {
       this.logger.warn(`scheduler disabled (redis unavailable): ${String(e)}`);
       await this.cleanup();
@@ -110,12 +134,41 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     return { generated, skipped, failed };
   }
 
+  /** 全テナントの異常検知 (毎時ジョブ)。列挙のみ管理者接続 */
+  async runAlertDetectionForAllTenants(): Promise<{ fired: number; suppressed: number; notified: number }> {
+    if (!this.adminPrisma) {
+      this.adminPrisma = new PrismaClient({
+        datasources: { db: { url: process.env.DATABASE_URL ?? LOCAL_ADMIN_DB_URL } },
+      });
+    }
+    const tenants = await this.adminPrisma.tenant.findMany({
+      where: { status: 'active' },
+      select: { id: true },
+    });
+    const total = { fired: 0, suppressed: 0, notified: 0 };
+    for (const t of tenants) {
+      try {
+        const r = await this.alerts.runDetection(t.id);
+        total.fired += r.fired;
+        total.suppressed += r.suppressed;
+        total.notified += r.notified;
+      } catch (e) {
+        this.logger.warn(`alert detection failed tenant=${t.id}: ${String(e)}`);
+      }
+    }
+    return total;
+  }
+
   private async cleanup() {
     await this.worker?.close().catch(() => undefined);
     await this.queue?.close().catch(() => undefined);
+    await this.alertWorker?.close().catch(() => undefined);
+    await this.alertQueue?.close().catch(() => undefined);
     this.connection?.disconnect();
     this.worker = null;
     this.queue = null;
+    this.alertWorker = null;
+    this.alertQueue = null;
     this.connection = null;
   }
 

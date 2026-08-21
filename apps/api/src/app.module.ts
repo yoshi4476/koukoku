@@ -20,6 +20,8 @@ import { AuthController } from './auth/auth.controller';
 import { OnboardingController } from './onboarding/onboarding.controller';
 import { UsageController } from './usage/usage.controller';
 import { SchedulerService } from './scheduler/scheduler.service';
+import { AlertsService } from './alerts/alerts.service';
+import { AlertsController } from './alerts/alerts.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -27,6 +29,7 @@ import { SchedulerService } from './scheduler/scheduler.service';
     AuthController,
     OnboardingController,
     UsageController,
+    AlertsController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -39,6 +42,7 @@ import { SchedulerService } from './scheduler/scheduler.service';
   providers: [
     AuthService,
     TrailService,
+    AlertsService,
     SchedulerService,
     MetricsService,
     LlmService,

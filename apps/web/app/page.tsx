@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import type { HomeDto, HomeTaskDto, OnboardingStatusDto, TaskKind } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { ErrorCard, PlatformTag, Skeleton } from '@/components/ui';
+import { apiPost, ApiError, toApiError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 
 const GROUPS: Array<{ kind: TaskKind; title: string }> = [
@@ -20,8 +22,22 @@ const ACTION_LABEL: Record<TaskKind, string> = {
   report: '開く',
 };
 
-function TaskRow({ task }: { task: HomeTaskDto }) {
+const ALERT_ID_PREFIX = 'alert-';
+
+function TaskRow({
+  task,
+  acking,
+  onAck,
+}: {
+  task: HomeTaskDto;
+  acking: boolean;
+  onAck: (eventId: string) => void;
+}) {
   const primary = task.kind === 'ai_proposal' || task.kind === 'report';
+  const eventId =
+    task.kind === 'alert' && task.id.startsWith(ALERT_ID_PREFIX)
+      ? task.id.slice(ALERT_ID_PREFIX.length)
+      : null;
   return (
     <div className={`task sev-${task.severity}`}>
       <div className="t-body">
@@ -34,6 +50,16 @@ function TaskRow({ task }: { task: HomeTaskDto }) {
         <Link href={task.href} className={`btn sm ${primary ? 'pri' : 'sec'}`}>
           {ACTION_LABEL[task.kind]}
         </Link>
+        {eventId ? (
+          <button
+            type="button"
+            className="btn sm sec"
+            onClick={() => onAck(eventId)}
+            disabled={acking}
+          >
+            {acking ? '更新中…' : '確認済にする'}
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -59,6 +85,23 @@ export default function HomePage() {
   const { data, loading, error, retry } = useApi<HomeDto>('/home');
   const onboarding = useApi<OnboardingStatusDto>('/onboarding/status');
   const needsSetup = onboarding.data?.needsOnboarding === true;
+  const [ackingId, setAckingId] = useState<string | null>(null);
+  const [ackError, setAckError] = useState<ApiError | null>(null);
+
+  const ack = (eventId: string) => {
+    if (ackingId !== null) return;
+    setAckingId(eventId);
+    setAckError(null);
+    apiPost<{ ok: true }>(`/alerts/events/${eventId}/ack`, {})
+      .then(() => {
+        setAckingId(null);
+        retry();
+      })
+      .catch((e: unknown) => {
+        setAckError(toApiError(e));
+        setAckingId(null);
+      });
+  };
 
   return (
     <>
@@ -72,6 +115,7 @@ export default function HomePage() {
       </div>
 
       {error ? <ErrorCard error={error} onRetry={retry} /> : null}
+      {ackError ? <ErrorCard error={ackError} /> : null}
       {loading ? <HomeSkeleton /> : null}
 
       {data && data.tasks.length === 0 ? (
@@ -102,7 +146,12 @@ export default function HomePage() {
                 </div>
                 <div className="queue" style={{ marginBottom: 4 }}>
                   {tasks.map((t) => (
-                    <TaskRow key={t.id} task={t} />
+                    <TaskRow
+                      key={t.id}
+                      task={t}
+                      acking={ackingId !== null && t.id === `${ALERT_ID_PREFIX}${ackingId}`}
+                      onAck={ack}
+                    />
                   ))}
                 </div>
               </section>

@@ -1,4 +1,4 @@
-import type { Platform, ConnectionStatus, MemberRole } from '@adgrid/shared';
+import type { Platform, ConnectionStatus, MemberRole, AlertMetric } from '@adgrid/shared';
 
 /* 媒体色はダークモードで反転するため hex ではなく CSS 変数で参照する */
 export const PLATFORM_COLOR_VAR: Record<Platform, string> = {
@@ -65,6 +65,29 @@ export const USAGE_FEATURE_LABEL: Record<string, string> = {
   report: 'レポート',
   copy: '広告文',
   format_detect: 'CSV判定',
+};
+
+export const ALERT_METRIC_META: Record<AlertMetric, { label: string; description: string; unit: string }> = {
+  budget_pace: {
+    label: '予算超過ペース',
+    description: '月予算の消化ペースが経過率を上回ったら通知',
+    unit: '%以上',
+  },
+  cpa_spike: {
+    label: 'CPA急変',
+    description: '直近7日CPAが前週比で悪化したら通知',
+    unit: '%悪化',
+  },
+  cv_zero: {
+    label: 'CV計測ゼロ',
+    description: 'クリックがあるのにCVが0件 (計測欠落疑い)',
+    unit: 'クリック以上',
+  },
+  spend_drop: {
+    label: '消化急減',
+    description: '昨日の消化が7日平均から急減 (配信停止疑い)',
+    unit: '%減少',
+  },
 };
 
 export const INDUSTRY_LABEL: Record<string, string> = {

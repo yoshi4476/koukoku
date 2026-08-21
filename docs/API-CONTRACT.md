@@ -29,6 +29,13 @@ Base URL: `http://localhost:4000`。DTO の型定義は `@adgrid/shared` (`packa
 | GET | `/usage` | 当月のAI利用量・原価 | `UsageDto` |
 | GET | `/usage/members` | テナントのメンバー一覧 | `MemberDto[]` |
 | POST | `/reports/run-weekly-all` | 週次レポート自動生成の手動トリガ (開発用。cronはJST月曜07:00) | `{generated,skipped,failed}` |
+| GET | `/alerts/rules` | アラートルール一覧 (初回アクセスでデフォルト4種を自動作成) | `AlertRuleDto[]` |
+| PATCH | `/alerts/rules/:id` body `{threshold?, enabled?, channels?}` | ルール更新 (channels: inapp/slack) | `AlertRuleDto[]` |
+| GET | `/alerts/settings` / PUT 同 body `{slackWebhookUrl}` | Slack Webhook設定 | `AlertSettingsDto` |
+| POST | `/alerts/settings/test` | Slackテスト送信 (URL未設定は400) | `{ok:true}` |
+| POST | `/alerts/run` | 検知の手動実行 (毎時cron+home遅延検知が通常経路) | `AlertRunResultDto` |
+| GET | `/alerts/events?limit=` | 発生履歴 (新しい順) | `AlertEventDto[]` |
+| POST | `/alerts/events/:id/ack` | イベントを確認済みにする (homeから消える) | `{ok:true}` |
 | GET | `/home` | 今日の司令室 (優先度順タスク) | `HomeDto` |
 | GET | `/clients` | クライアント一覧 | `ClientDto[]` |
 | GET | `/clients/:clientId/accounts` | クライアント配下の広告アカウント | `AdAccountDto[]` |
