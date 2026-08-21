@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { isApprover } from '@adgrid/shared';
 import { limitsFor, widthUnits } from '../src/ai/copy-limits';
 import { scanLawDictionary } from '../src/ai/law-dictionary';
 import { normalizeHeader, parseCsv, parseDate, parseNumber } from '../src/imports/csv.service';
+import { readSettings } from '../src/common/tenant-settings';
 
 describe('widthUnits (全角=2/半角=1)', () => {
   it('半角英数は1、全角は2で数える', () => {
@@ -35,6 +37,22 @@ describe('scanLawDictionary (薬機法/景表法/金商法)', () => {
   });
   it('適法な表現は誤検出しない', () => {
     expect(scanLawDictionary('うるおいを与える薬用クリーム。資料請求はこちら。')).toHaveLength(0);
+  });
+});
+
+describe('権限・設定 (承認フローのガード)', () => {
+  it('承認者は owner/admin のみ', () => {
+    expect(isApprover('owner')).toBe(true);
+    expect(isApprover('admin')).toBe(true);
+    expect(isApprover('operator')).toBe(false);
+    expect(isApprover('viewer')).toBe(false);
+  });
+  it('kill switch: applyEnabled は false の明示時のみ無効 (既定は有効)', () => {
+    expect(readSettings({ applyEnabled: false }).applyEnabled).toBe(false);
+    expect(readSettings({}).applyEnabled).toBeUndefined(); // undefined→呼出側で「有効」扱い
+    expect(readSettings(null).applyEnabled).toBeUndefined();
+    // 文字列 'false' 等の壊れた値は boolean false ではないので「無効化」に倒れない
+    expect(readSettings({ applyEnabled: 'false' }).applyEnabled as unknown).not.toBe(false);
   });
 });
 

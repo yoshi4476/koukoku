@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Post, Put } from '@nestjs/common';
 import type { CreateProposalInput, ProposalDto } from '@adgrid/shared';
 import { SessionInfo, SessionInfoValue, TenantId } from '../common/tenant';
+import { AppError } from '../common/errors';
 import { ProposalsService } from './proposals.service';
 
 @Controller('proposals')
@@ -48,6 +49,15 @@ export class ProposalsController {
     return this.proposals.rollback(tenantId, user, id);
   }
 
+  @Post(':id/requeue')
+  requeue(
+    @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
+    @Param('id') id: string,
+  ): Promise<ProposalDto> {
+    return this.proposals.requeue(tenantId, user, id);
+  }
+
   @Get('settings')
   async settings(@TenantId() tenantId: string): Promise<{ applyEnabled: boolean }> {
     return { applyEnabled: await this.proposals.getApplyEnabled(tenantId) };
@@ -59,8 +69,14 @@ export class ProposalsController {
     @SessionInfo() user: SessionInfoValue,
     @Body() body: { applyEnabled?: boolean },
   ): Promise<{ applyEnabled: boolean }> {
-    return {
-      applyEnabled: await this.proposals.setApplyEnabled(tenantId, body?.applyEnabled !== false, user),
-    };
+    // kill switch は誤操作で「有効化」に倒れると危険なため、真偽値の明示を必須にする
+    if (typeof body?.applyEnabled !== 'boolean') {
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        'applyEnabled は true / false で指定してください。',
+        '自動適用の有効・無効を明示的に送信してください。',
+      );
+    }
+    return { applyEnabled: await this.proposals.setApplyEnabled(tenantId, body.applyEnabled, user) };
   }
 }

@@ -5,6 +5,7 @@ import { PLATFORM_META } from '@adgrid/shared';
 import type { Platform } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
+import { fmtYen } from '../common/format';
 import { TrailService } from '../common/trail.service';
 import { MetricsService, Totals, daysAgo, isoDate } from '../metrics/metrics.service';
 import { LlmService } from './llm.service';
@@ -25,9 +26,6 @@ function jpDate(iso: string): string {
   return `${d.getMonth() + 1}/${d.getDate()}(${w})`;
 }
 
-function fmtYen(n: number): string {
-  return '¥' + Math.round(n).toLocaleString('ja-JP');
-}
 
 function pct(cur: number, prev: number): string {
   if (!prev) return '—';

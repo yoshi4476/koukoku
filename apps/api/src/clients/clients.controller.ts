@@ -169,22 +169,27 @@ export class ClientsController {
     @TenantId() tenantId: string,
     @Param('accountId') accountId: string,
   ): Promise<AdAccountDto> {
-    const a = await this.prisma.withTenant(tenantId, (tx) =>
-      tx.adAccount.findUnique({ where: { id: accountId } }),
-    );
-    if (!a) {
+    const dto = await this.prisma.withTenant(tenantId, async (tx) => {
+      const a = await tx.adAccount.findUnique({ where: { id: accountId } });
+      if (!a) return null;
+      const conn = await tx.mediaConnection.findUnique({
+        where: { tenantId_platform: { tenantId, platform: a.platform } },
+      });
+      return {
+        id: a.id,
+        clientId: a.clientId,
+        platform: a.platform as Platform,
+        externalAccountId: a.externalAccountId,
+        name: a.name,
+        currency: a.currency,
+        connectionStatus: (conn?.status ?? 'not_connected') as ConnectionStatus,
+        lastSyncedAt: conn?.lastSyncedAt?.toISOString() ?? null,
+      };
+    });
+    if (!dto) {
       throw new AppError(HttpStatus.NOT_FOUND, '広告アカウントが見つかりません。', 'アカウントを選び直してください。');
     }
-    return {
-      id: a.id,
-      clientId: a.clientId,
-      platform: a.platform as Platform,
-      externalAccountId: a.externalAccountId,
-      name: a.name,
-      currency: a.currency,
-      connectionStatus: 'not_connected',
-      lastSyncedAt: null,
-    };
+    return dto;
   }
 
   @Get(':clientId/accounts')

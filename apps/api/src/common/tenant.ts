@@ -28,7 +28,12 @@ export interface SessionInfoValue {
   role: 'owner' | 'admin' | 'operator' | 'viewer';
 }
 
-/** セッションのユーザーID・ロール。ヘッダフォールバック時 (開発ツール) は owner 扱い */
+/**
+ * セッションのユーザーID・ロール。
+ * 有効なセッションが無い場合は最小権限 (viewer) を返す (fail-safe)。
+ * 承認等の特権操作は必ず有効なログインを要求する。
+ * 開発ツールで特権が必要な場合のみ ALLOW_DEV_OWNER=true で owner に昇格 (本番では設定しない)。
+ */
 export const SessionInfo = createParamDecorator((_: unknown, ctx: ExecutionContext): SessionInfoValue => {
   const req = ctx.switchToHttp().getRequest<Request>();
   const token = (req.cookies ?? {})[SESSION_COOKIE] as string | undefined;
@@ -36,7 +41,8 @@ export const SessionInfo = createParamDecorator((_: unknown, ctx: ExecutionConte
     const session = verifySession(token);
     if (session) return { userId: session.sub, role: session.role };
   }
-  return { userId: null, role: 'owner' };
+  if (process.env.ALLOW_DEV_OWNER === 'true') return { userId: null, role: 'owner' };
+  return { userId: null, role: 'viewer' };
 });
 
 export const TenantId = createParamDecorator((_: unknown, ctx: ExecutionContext): string => {

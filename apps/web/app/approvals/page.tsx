@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import type { ProposalDto, ProposalStatus } from '@adgrid/shared';
+import { isApprover } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
 import { EmptyState, ErrorCard, PlatformTag, Skeleton, SkeletonLines } from '@/components/ui';
@@ -10,7 +11,7 @@ import { apiPost, ApiError, toApiError } from '@/lib/api';
 import { CONFIDENCE_LABEL, PROPOSAL_ACTION_LABEL, PROPOSAL_STATUS_LABEL } from '@/lib/labels';
 import { formatDateTime } from '@/lib/format';
 
-type BusyKind = 'approve' | 'reject' | 'rollback';
+type BusyKind = 'approve' | 'reject' | 'rollback' | 'requeue';
 
 interface Busy {
   id: string;
@@ -96,13 +97,15 @@ function PendingCard({
 function HistoryRow({
   p,
   busy,
+  canApprove,
   onAction,
 }: {
   p: ProposalDto;
   busy: Busy | null;
+  canApprove: boolean;
   onAction: (id: string, kind: BusyKind) => void;
 }) {
-  const rollingBack = busy !== null && busy.id === p.id && busy.kind === 'rollback';
+  const active = (kind: BusyKind) => busy !== null && busy.id === p.id && busy.kind === kind;
 
   return (
     <div className="prop-row">
@@ -115,9 +118,14 @@ function HistoryRow({
       <span className="num" style={{ marginLeft: 'auto', color: 'var(--muted)' }}>
         {formatDateTime(p.executedAt ?? p.approvedAt ?? p.createdAt)}
       </span>
-      {p.canRollback ? (
+      {canApprove && p.status === 'failed' ? (
+        <button type="button" className="btn sm sec" disabled={busy !== null} onClick={() => onAction(p.id, 'requeue')}>
+          {active('requeue') ? '実行中…' : '再試行する'}
+        </button>
+      ) : null}
+      {canApprove && p.canRollback ? (
         <button type="button" className="btn sm sec" disabled={busy !== null} onClick={() => onAction(p.id, 'rollback')}>
-          {rollingBack ? '実行中…' : '元に戻す'}
+          {active('rollback') ? '実行中…' : '元に戻す'}
         </button>
       ) : null}
     </div>
@@ -126,7 +134,7 @@ function HistoryRow({
 
 export default function ApprovalsPage() {
   const { me } = useAuth();
-  const canApprove = me.role === 'owner' || me.role === 'admin';
+  const canApprove = isApprover(me.role);
   const proposals = useApi<ProposalDto[]>('/proposals');
   const settings = useApi<{ applyEnabled: boolean }>('/proposals/settings');
   const [busy, setBusy] = useState<Busy | null>(null);
@@ -135,6 +143,7 @@ export default function ApprovalsPage() {
   const act = (id: string, kind: BusyKind) => {
     if (busy) return;
     if (kind === 'rollback' && !window.confirm('この提案の変更を実行前の値に戻しますか？')) return;
+    if (kind === 'requeue' && !window.confirm('この提案を承認待ちに戻して再試行しますか？')) return;
     setBusy({ id, kind });
     setActionError(null);
     apiPost<ProposalDto>(`/proposals/${id}/${kind}`, {})
@@ -212,7 +221,7 @@ export default function ApprovalsPage() {
             ) : (
               <div>
                 {history.map((p) => (
-                  <HistoryRow key={p.id} p={p} busy={busy} onAction={act} />
+                  <HistoryRow key={p.id} p={p} busy={busy} canApprove={canApprove} onAction={act} />
                 ))}
               </div>
             )}

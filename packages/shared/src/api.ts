@@ -9,6 +9,11 @@ import type { AuditResult, FindingStatus, ReportResult, CopyResult } from './ai'
 /* ---- 認証 ---- */
 export type MemberRole = 'owner' | 'admin' | 'operator' | 'viewer';
 
+/** 承認・実行・自動適用設定を操作できるロール (フロント/バックで共有) */
+export function isApprover(role: MemberRole): boolean {
+  return role === 'owner' || role === 'admin';
+}
+
 export interface MeDto {
   userId: string;
   email: string;

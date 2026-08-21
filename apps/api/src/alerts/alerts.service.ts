@@ -10,6 +10,7 @@ import type {
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { MetricsService, daysAgo } from '../metrics/metrics.service';
 import { TrailService } from '../common/trail.service';
+import { readSettings, patchSettings } from '../common/tenant-settings';
 
 /** デフォルトルール (閾値はUIで変更可能) */
 const DEFAULT_RULES: Array<{ metric: AlertMetric; threshold: number }> = [
@@ -93,18 +94,13 @@ export class AlertsService {
 
   async getSettings(tenantId: string): Promise<{ slackWebhookUrl: string }> {
     const tenant = await this.prisma.withTenant(tenantId, (tx) =>
-      tx.tenant.findUnique({ where: { id: tenantId } }),
+      tx.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } }),
     );
-    const s = (tenant?.settings ?? {}) as Record<string, unknown>;
-    return { slackWebhookUrl: typeof s.slackWebhookUrl === 'string' ? s.slackWebhookUrl : '' };
+    return { slackWebhookUrl: readSettings(tenant?.settings).slackWebhookUrl ?? '' };
   }
 
   async updateSettings(tenantId: string, slackWebhookUrl: string): Promise<{ slackWebhookUrl: string }> {
-    await this.prisma.withTenant(tenantId, async (tx) => {
-      const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
-      const settings = { ...((tenant?.settings ?? {}) as Record<string, unknown>), slackWebhookUrl };
-      await tx.tenant.update({ where: { id: tenantId }, data: { settings } });
-    });
+    await this.prisma.withTenant(tenantId, (tx) => patchSettings(tx, tenantId, { slackWebhookUrl }));
     return { slackWebhookUrl };
   }
 

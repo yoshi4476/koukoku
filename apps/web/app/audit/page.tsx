@@ -347,10 +347,11 @@ export default function AuditPage() {
     }
   }, []);
 
-  // トップバーでクライアントを切り替えたら診断対象にも反映する
+  // トップバーでクライアントを切り替えたら診断対象にも反映する。
+  // ただしディープリンク解決中 (pendingAccountId が残っている間) は上書きしない
   useEffect(() => {
-    if (selectedClientId) setClientId(selectedClientId);
-  }, [selectedClientId]);
+    if (selectedClientId && !pendingAccountId) setClientId(selectedClientId);
+  }, [selectedClientId, pendingAccountId]);
 
   const accounts = useApi<AdAccountDto[]>(clientId ? `/clients/${clientId}/accounts` : null);
 
@@ -358,11 +359,14 @@ export default function AuditPage() {
     setAdAccountId('');
   }, [clientId]);
 
-  // アカウント一覧の取得後に、URLで指定されたアカウントを選択状態にする
+  // アカウント一覧の取得後に、URLで指定されたアカウントを選択状態にする。
+  // 一覧に対象が無い場合は「別クライアントの一覧」の可能性があるため pending を消さない
   useEffect(() => {
     if (!pendingAccountId || !accounts.data) return;
-    if (accounts.data.some((a) => a.id === pendingAccountId)) setAdAccountId(pendingAccountId);
-    setPendingAccountId(null);
+    if (accounts.data.some((a) => a.id === pendingAccountId)) {
+      setAdAccountId(pendingAccountId);
+      setPendingAccountId(null);
+    }
   }, [pendingAccountId, accounts.data]);
 
   const history = useApi<AuditRunDto[]>(adAccountId ? `/audits?adAccountId=${encodeURIComponent(adAccountId)}` : '/audits');

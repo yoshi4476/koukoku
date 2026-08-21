@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import type { BillingDto, ConnectionDto, MemberDto, UsageDto } from '@adgrid/shared';
-import { PLANS } from '@adgrid/shared';
+import { PLANS, isApprover } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
 import { ErrorCard, Skeleton, SkeletonLines } from '@/components/ui';
@@ -76,7 +76,7 @@ function AutoReportCard() {
 /* ---- カード5: 自動適用 (kill switch / F-16) ---- */
 function ApplySettingsCard() {
   const { me } = useAuth();
-  const canEdit = me.role === 'owner' || me.role === 'admin';
+  const canEdit = isApprover(me.role);
   const settings = useApi<{ applyEnabled: boolean }>('/proposals/settings');
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);

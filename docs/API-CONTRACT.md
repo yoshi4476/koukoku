@@ -47,6 +47,7 @@ Base URL: `http://localhost:4000`。DTO の型定義は `@adgrid/shared` (`packa
 | POST | `/proposals/:id/approve` | 承認→即実行 (owner/adminのみ。kill switch停止中は409)。adjust_budgetは実適用+ロールバック可、他はデモ実行 | `ProposalDto` |
 | POST | `/proposals/:id/reject` | 却下 (owner/adminのみ) | `ProposalDto` |
 | POST | `/proposals/:id/rollback` | 実行済みadjust_budgetを変更前値に戻す | `ProposalDto` |
+| POST | `/proposals/:id/requeue` | 失敗した提案を承認待ちに戻す (再試行) | `ProposalDto` |
 | GET/PUT | `/proposals/settings` body `{applyEnabled}` | kill switch (テナント単位の適用停止) | `{applyEnabled}` |
 | GET | `/home` | 今日の司令室 (優先度順タスク) | `HomeDto` |
 | GET | `/clients` | クライアント一覧 | `ClientDto[]` |
