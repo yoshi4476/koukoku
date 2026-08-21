@@ -1,22 +1,42 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import type {
+  AssetStatus,
+  AssetType,
   AuditResult,
   ConnectionStatus,
+  CreateAssetInput,
   CreateProjectInput,
   Platform,
   ProjectAccountDto,
+  ProjectAssetDto,
   ProjectDetailDto,
   ProjectDto,
   ProjectGoal,
   ProjectStatus,
+  UpdateAssetInput,
   UpdateProjectInput,
 } from '@adgrid/shared';
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 import { MetricsService, daysAgo } from '../metrics/metrics.service';
 import { AlertsService } from '../alerts/alerts.service';
+import type { SessionInfoValue } from '../common/tenant';
 
 const GOALS: ProjectGoal[] = ['conversion', 'awareness', 'traffic', 'store'];
+const ASSET_TYPES: AssetType[] = ['copy', 'lp', 'flyer', 'video'];
+const ASSET_STATUSES: AssetStatus[] = ['draft', 'review', 'approved', 'published'];
+
+type AssetRow = {
+  id: string; projectId: string; type: string; title: string; content: string;
+  url: string; status: string; note: string; createdAt: Date; publishedAt: Date | null;
+};
+function toAssetDto(r: AssetRow): ProjectAssetDto {
+  return {
+    id: r.id, projectId: r.projectId, type: r.type as AssetType, title: r.title,
+    content: r.content, url: r.url, status: r.status as AssetStatus, note: r.note,
+    createdAt: r.createdAt.toISOString(), publishedAt: r.publishedAt?.toISOString() ?? null,
+  };
+}
 
 @Injectable()
 export class ProjectsService {
@@ -56,7 +76,11 @@ export class ProjectsService {
     const events = await this.alerts.unackedEvents(tenantId).catch(() => []);
     return this.prisma.withTenant(tenantId, async (tx) => {
       const projects = await tx.project.findMany({
-        include: { client: true, adAccounts: { select: { id: true, platform: true } } },
+        include: {
+          client: true,
+          adAccounts: { select: { id: true, platform: true } },
+          assets: { select: { status: true } },
+        },
         orderBy: { createdAt: 'desc' },
       });
       const out: ProjectDto[] = [];
@@ -88,6 +112,8 @@ export class ProjectsService {
           cpaDelta: cpa !== null && prevCpa ? +(((cpa - prevCpa) / prevCpa) * 100).toFixed(1) : null,
           alertCount: events.filter((e) => acctSet.has(e.adAccountId)).length,
           openFindings,
+          assetCount: p.assets.length,
+          publishedCount: p.assets.filter((a) => a.status === 'published').length,
           lastReportAt: lastReport?.createdAt.toISOString() ?? null,
           createdAt: p.createdAt.toISOString(),
         });
@@ -102,7 +128,11 @@ export class ProjectsService {
     return this.prisma.withTenant(tenantId, async (tx) => {
       const p = await tx.project.findUnique({
         where: { id },
-        include: { client: true, adAccounts: { orderBy: { name: 'asc' } } },
+        include: {
+          client: true,
+          adAccounts: { orderBy: { name: 'asc' } },
+          assets: { orderBy: { createdAt: 'desc' } },
+        },
       });
       if (!p) {
         throw new AppError(HttpStatus.NOT_FOUND, 'プロジェクトが見つかりません。', '一覧から選び直してください。');
@@ -150,10 +180,99 @@ export class ProjectsService {
         accounts,
         alerts: events.filter((e) => acctSet.has(e.adAccountId)),
         openFindings,
+        assets: (p.assets as AssetRow[]).map(toAssetDto),
         lastReportAt: lastReport?.createdAt.toISOString() ?? null,
         createdAt: p.createdAt.toISOString(),
       };
     });
+  }
+
+  /* ---------------- 制作物 (assets) ---------------- */
+
+  async listAssets(tenantId: string, projectId: string): Promise<ProjectAssetDto[]> {
+    const rows = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.projectAsset.findMany({ where: { projectId }, orderBy: { createdAt: 'desc' } }),
+    );
+    return (rows as AssetRow[]).map(toAssetDto);
+  }
+
+  async createAsset(tenantId: string, projectId: string, input: CreateAssetInput): Promise<ProjectAssetDto> {
+    if (!ASSET_TYPES.includes(input?.type)) {
+      throw new AppError(HttpStatus.BAD_REQUEST, '制作物の種別が不正です。', '広告文・LP・チラシ・動画から選択してください。');
+    }
+    if (!input?.title?.trim()) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'タイトルが未入力です。', 'タイトルを入力してください。');
+    }
+    const row = await this.prisma.withTenant(tenantId, async (tx) => {
+      const project = await tx.project.findUnique({ where: { id: projectId } });
+      if (!project) {
+        throw new AppError(HttpStatus.NOT_FOUND, 'プロジェクトが見つかりません。', '一覧から選び直してください。');
+      }
+      return tx.projectAsset.create({
+        data: {
+          tenantId,
+          projectId,
+          type: input.type,
+          title: input.title.trim(),
+          content: input.content ?? '',
+          url: input.url ?? '',
+          note: input.note ?? '',
+        },
+      });
+    });
+    return toAssetDto(row as AssetRow);
+  }
+
+  async updateAsset(tenantId: string, assetId: string, input: UpdateAssetInput): Promise<ProjectAssetDto> {
+    const row = await this.prisma.withTenant(tenantId, async (tx) => {
+      const asset = await tx.projectAsset.findUnique({ where: { id: assetId } });
+      if (!asset) {
+        throw new AppError(HttpStatus.NOT_FOUND, '制作物が見つかりません。', '再読み込みしてください。');
+      }
+      const data: Record<string, unknown> = {};
+      if (typeof input.title === 'string' && input.title.trim()) data.title = input.title.trim();
+      if (typeof input.content === 'string') data.content = input.content;
+      if (typeof input.url === 'string') data.url = input.url;
+      if (typeof input.note === 'string') data.note = input.note;
+      if (input.status && ASSET_STATUSES.includes(input.status)) {
+        data.status = input.status;
+        // 公開/公開解除で publishedAt を整合させる
+        if (input.status === 'published') data.publishedAt = new Date();
+        else data.publishedAt = null;
+      }
+      return tx.projectAsset.update({ where: { id: assetId }, data });
+    });
+    return toAssetDto(row as AssetRow);
+  }
+
+  /** 制作物を公開する。承認者(owner/admin)かつ自社運用版のみ。掲載可否の最終操作 */
+  async publishAsset(tenantId: string, assetId: string, user: SessionInfoValue): Promise<ProjectAssetDto> {
+    if (user.role !== 'owner' && user.role !== 'admin') {
+      throw new AppError(
+        HttpStatus.FORBIDDEN,
+        '公開の権限がありません。',
+        '公開はオーナーまたは管理者のみ実行できます。',
+      );
+    }
+    const row = await this.prisma.withTenant(tenantId, async (tx) => {
+      const tenant = await tx.tenant.findUnique({ where: { id: tenantId }, select: { edition: true } });
+      if (tenant?.edition === 'client') {
+        throw new AppError(
+          HttpStatus.FORBIDDEN,
+          'この版では公開操作はできません。',
+          '公開は運用担当(自社運用版)側で行われます。',
+        );
+      }
+      const asset = await tx.projectAsset.findUnique({ where: { id: assetId } });
+      if (!asset) {
+        throw new AppError(HttpStatus.NOT_FOUND, '制作物が見つかりません。', '再読み込みしてください。');
+      }
+      return tx.projectAsset.update({
+        where: { id: assetId },
+        data: { status: 'published', publishedAt: new Date() },
+      });
+    });
+    return toAssetDto(row as AssetRow);
   }
 
   async create(tenantId: string, input: CreateProjectInput): Promise<ProjectDto> {

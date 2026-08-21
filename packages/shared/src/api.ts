@@ -630,6 +630,8 @@ export interface ProjectDto {
   cpaDelta: number | null;
   alertCount: number;
   openFindings: number;
+  assetCount: number;
+  publishedCount: number;
   lastReportAt: string | null;
   createdAt: string;
 }
@@ -660,6 +662,7 @@ export interface ProjectDetailDto {
   accounts: ProjectAccountDto[];
   alerts: AlertEventDto[];
   openFindings: number;
+  assets: ProjectAssetDto[];
   lastReportAt: string | null;
   createdAt: string;
 }
@@ -678,6 +681,62 @@ export interface UpdateProjectInput {
   status?: ProjectStatus;
   note?: string;
   accountIds?: string[];
+}
+
+/* ---- プロジェクトの制作物 (広告文/LP/チラシ/動画) ---- */
+export type AssetType = 'copy' | 'lp' | 'flyer' | 'video';
+export type AssetStatus = 'draft' | 'review' | 'approved' | 'published';
+
+export const ASSET_TYPE_LABEL: Record<AssetType, string> = {
+  copy: '広告文',
+  lp: 'LP (ランディングページ)',
+  flyer: 'チラシ',
+  video: '動画',
+};
+
+export const ASSET_TYPE_ICON: Record<AssetType, string> = {
+  copy: '📝',
+  lp: '🖥️',
+  flyer: '🖼️',
+  video: '🎬',
+};
+
+export const ASSET_STATUS_LABEL: Record<AssetStatus, string> = {
+  draft: '下書き',
+  review: 'レビュー中',
+  approved: '承認済み',
+  published: '公開中',
+};
+
+export interface ProjectAssetDto {
+  id: string;
+  projectId: string;
+  type: AssetType;
+  title: string;
+  /** copy=本文 / その他=説明 */
+  content: string;
+  /** LP・動画・チラシのリンク or 画像URL */
+  url: string;
+  status: AssetStatus;
+  note: string;
+  createdAt: string;
+  publishedAt: string | null;
+}
+
+export interface CreateAssetInput {
+  type: AssetType;
+  title: string;
+  content?: string;
+  url?: string;
+  note?: string;
+}
+
+export interface UpdateAssetInput {
+  title?: string;
+  content?: string;
+  url?: string;
+  status?: AssetStatus;
+  note?: string;
 }
 
 /* ---- キーワード最適化 (F-18) ---- */

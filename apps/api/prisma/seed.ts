@@ -80,6 +80,7 @@ async function seedFacts(
 async function main() {
   console.log('Seeding ADGRID demo data...');
   // 子テーブルから順に削除 (FK制約対応)
+  await prisma.projectAsset.deleteMany({});
   await prisma.keywordStat.deleteMany({});
   await prisma.dashboard.deleteMany({});
   await prisma.changeLog.deleteMany({});
@@ -254,6 +255,20 @@ async function main() {
   await mkProject('p_a_spring', clientA.id, '春の新規獲得キャンペーン', 'conversion', [accAGoogle.id, accAMeta.id], 'Google検索とMetaで新規顧客を獲得する主力施策');
   await mkProject('p_b_repeat', clientB.id, 'リピート促進 (LINE/Meta)', 'store', [accBMeta.id, accBLine.id], '既存顧客の再来店・再購入を狙う');
   await mkProject('p_c_lead', clientC.id, 'BtoBリード獲得', 'conversion', [accCGoogle.id, accCYahoo.id], '検索広告で問い合わせ・資料請求を獲得');
+
+  // 制作物 (広告文/LP/チラシ/動画) のデモ。下書き〜公開の各段階を含む
+  await prisma.projectAsset.createMany({
+    data: [
+      { tenantId: TENANT_ID, projectId: 'p_a_spring', type: 'copy', title: '検索広告 見出しA', content: '今だけ送料無料｜人気スキンケアをまとめ買い', status: 'published', publishedAt: daysAgo(3) },
+      { tenantId: TENANT_ID, projectId: 'p_a_spring', type: 'lp', title: '春キャンペーン特設LP', url: 'https://example.com/lp/spring', content: '季節訴求のランディングページ', status: 'review' },
+      { tenantId: TENANT_ID, projectId: 'p_a_spring', type: 'video', title: '紹介動画 (15秒)', url: 'https://example.com/video/spring15.mp4', content: 'Meta/リール用の縦型動画', status: 'draft' },
+      { tenantId: TENANT_ID, projectId: 'p_a_spring', type: 'flyer', title: '店頭チラシ A4', url: 'https://example.com/flyer/spring_a4.png', content: '店頭配布用', status: 'approved' },
+      { tenantId: TENANT_ID, projectId: 'p_b_repeat', type: 'copy', title: 'LINE配信 メッセージ', content: '【会員限定】ご来店で使える20%OFFクーポン配布中', status: 'published', publishedAt: daysAgo(1) },
+      { tenantId: TENANT_ID, projectId: 'p_b_repeat', type: 'flyer', title: '再来店DMハガキ', url: 'https://example.com/flyer/dm.png', status: 'draft' },
+      { tenantId: TENANT_ID, projectId: 'p_c_lead', type: 'copy', title: 'ホワイトペーパー訴求 見出し', content: '勤怠管理の「隠れコスト」を可視化｜無料DL', status: 'review' },
+      { tenantId: TENANT_ID, projectId: 'p_c_lead', type: 'lp', title: '資料請求LP', url: 'https://example.com/lp/wp', status: 'published', publishedAt: daysAgo(5) },
+    ],
+  });
 
   await prisma.mediaConnection.createMany({
     data: [

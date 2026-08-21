@@ -135,6 +135,11 @@ function ProjectCard({ p }: { p: ProjectDto }) {
         {p.platforms.map((pl) => <PlatformTag key={pl} platform={pl} />)}
         <span className="proj-acct-n">媒体{p.accountCount}件</span>
       </div>
+      {p.assetCount > 0 ? (
+        <div className="proj-assets-line">
+          📎 制作物{p.assetCount}件{p.publishedCount > 0 ? <span className="pill up">公開中{p.publishedCount}</span> : null}
+        </div>
+      ) : null}
       <div className="proj-kpis">
         <div><div className="pk-l">消化 (7日)</div><div className="pk-v">{formatYen(p.cost7d)}</div></div>
         <div><div className="pk-l">CV</div><div className="pk-v">{formatNumber(p.conversions7d)}</div></div>

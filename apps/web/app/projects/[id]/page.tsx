@@ -1,23 +1,45 @@
 'use client';
 
-import { use, useMemo, useState } from 'react';
+import { use, useMemo, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { DailyPointDto, ProjectDetailDto } from '@adgrid/shared';
-import { PROJECT_GOAL_LABEL, PROJECT_STATUS_LABEL } from '@adgrid/shared';
+import type {
+  AssetStatus,
+  AssetType,
+  CreateAssetInput,
+  DailyPointDto,
+  ProjectAssetDto,
+  ProjectDetailDto,
+} from '@adgrid/shared';
+import {
+  ASSET_STATUS_LABEL,
+  ASSET_TYPE_ICON,
+  ASSET_TYPE_LABEL,
+  PROJECT_GOAL_LABEL,
+  PROJECT_STATUS_LABEL,
+  isApprover,
+} from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
+import { useAuth } from '@/components/auth-context';
 import { useClients } from '@/components/client-context';
 import { DeltaText, ErrorCard, PlatformTag, SkeletonLines } from '@/components/ui';
+import { apiPost, apiPut, toApiError, type ApiError } from '@/lib/api';
 import { CONNECTION_STATUS_META, INDUSTRY_LABEL } from '@/lib/labels';
-import { formatDate, formatDateTime, formatNumber, formatPercent, formatYen } from '@/lib/format';
+import { formatDate, formatNumber, formatYen } from '@/lib/format';
 
-type Tab = 'overview' | 'delivery' | 'alerts' | 'improve';
+type Tab = 'overview' | 'delivery' | 'assets' | 'alerts' | 'improve';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: '概要（推移）' },
   { key: 'delivery', label: '掲示' },
+  { key: 'assets', label: '制作物' },
   { key: 'alerts', label: 'アラート' },
   { key: 'improve', label: '改善' },
 ];
+
+const ASSET_TYPES: AssetType[] = ['copy', 'lp', 'flyer', 'video'];
+const ASSET_STATUS_CLS: Record<AssetStatus, string> = { draft: 'flat', review: 'warn', approved: 'ai', published: 'up' };
+/* 次に進める状態 (公開は専用ボタン) */
+const NEXT_STATUS: Partial<Record<AssetStatus, AssetStatus>> = { draft: 'review', review: 'approved' };
 
 const STATUS_CLS: Record<string, string> = { active: 'up', paused: 'warn', ended: 'flat' };
 
@@ -41,6 +63,157 @@ function TrendChart({ points }: { points: DailyPointDto[] }) {
           </circle>
         ))}
       </svg>
+    </div>
+  );
+}
+
+function AddAssetForm({ projectId, onDone, onCancel }: { projectId: string; onDone: () => void; onCancel: () => void }) {
+  const [type, setType] = useState<AssetType>('copy');
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [url, setUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const body: CreateAssetInput = { type, title: title.trim(), content, url };
+    apiPost<ProjectAssetDto>(`/projects/${projectId}/assets`, body)
+      .then(() => onDone())
+      .catch((err: unknown) => { setError(toApiError(err)); setBusy(false); });
+  };
+
+  return (
+    <form className="card asset-form" onSubmit={submit}>
+      <div className="c-body form-grid">
+        {error ? <ErrorCard error={error} /> : null}
+        <div className="asset-type-pick">
+          {ASSET_TYPES.map((t) => (
+            <button type="button" key={t} className={`asset-type-opt${type === t ? ' on' : ''}`} onClick={() => setType(t)}>
+              {ASSET_TYPE_ICON[t]} {ASSET_TYPE_LABEL[t]}
+            </button>
+          ))}
+        </div>
+        <div className="field">
+          <label htmlFor="as-title">タイトル</label>
+          <input id="as-title" className="input" value={title} onChange={(e) => setTitle(e.target.value)}
+            placeholder={type === 'copy' ? '例: 検索広告 見出しA' : '例: 春キャンペーンLP'} required />
+        </div>
+        {type === 'copy' ? (
+          <div className="field">
+            <label htmlFor="as-content">広告文の本文</label>
+            <textarea id="as-content" className="textarea" rows={3} value={content} onChange={(e) => setContent(e.target.value)}
+              placeholder="見出し・説明文を入力（AIで作る場合は「広告文」画面から）" />
+          </div>
+        ) : (
+          <>
+            <div className="field">
+              <label htmlFor="as-url">{type === 'video' ? '動画のURL' : type === 'lp' ? 'LPのURL' : 'チラシ画像のURL'}</label>
+              <input id="as-url" className="input" value={url} onChange={(e) => setUrl(e.target.value)}
+                placeholder="https://…" />
+            </div>
+            <div className="field">
+              <label htmlFor="as-note">説明 (任意)</label>
+              <input id="as-note" className="input" value={content} onChange={(e) => setContent(e.target.value)}
+                placeholder="用途・サイズなど" />
+            </div>
+          </>
+        )}
+        <div className="f-actions">
+          <button type="submit" className="btn pri" disabled={busy || !title.trim()}>{busy ? '追加中…' : '制作物を追加'}</button>
+          <button type="button" className="btn sec" onClick={onCancel}>キャンセル</button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
+function AssetCard({ asset, canPublish, onChanged }: { asset: ProjectAssetDto; canPublish: boolean; onChanged: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+
+  const advance = (status: AssetStatus) => {
+    setBusy(true); setError(null);
+    apiPut<ProjectAssetDto>(`/projects/assets/${asset.id}`, { status })
+      .then(() => onChanged())
+      .catch((e: unknown) => { setError(toApiError(e)); setBusy(false); });
+  };
+  const publish = () => {
+    setBusy(true); setError(null);
+    apiPost<ProjectAssetDto>(`/projects/assets/${asset.id}/publish`, {})
+      .then(() => onChanged())
+      .catch((e: unknown) => { setError(toApiError(e)); setBusy(false); });
+  };
+  const next = NEXT_STATUS[asset.status];
+
+  return (
+    <div className={`asset-card${asset.status === 'published' ? ' pub' : ''}`}>
+      <div className="asset-head">
+        <span className="asset-ico">{ASSET_TYPE_ICON[asset.type]}</span>
+        <span className="asset-type">{ASSET_TYPE_LABEL[asset.type]}</span>
+        <span className={`pill ${ASSET_STATUS_CLS[asset.status]}`} style={{ marginLeft: 'auto' }}>
+          {ASSET_STATUS_LABEL[asset.status]}
+        </span>
+      </div>
+      <div className="asset-title">{asset.title}</div>
+      {asset.content ? <div className="asset-content">{asset.content}</div> : null}
+      {asset.url ? (
+        <a className="asset-url" href={asset.url} target="_blank" rel="noopener noreferrer">{asset.url} ↗</a>
+      ) : null}
+      {asset.publishedAt ? <div className="asset-pubdate">公開日: {formatDate(asset.publishedAt)}</div> : null}
+      {error ? <div style={{ fontSize: 11.5, color: 'var(--bad)' }}>{error.message}</div> : null}
+      <div className="asset-actions">
+        {next ? (
+          <button className="btn sm sec" disabled={busy} onClick={() => advance(next)}>
+            {next === 'review' ? 'レビューへ' : '承認する'}
+          </button>
+        ) : null}
+        {asset.status !== 'published' && canPublish ? (
+          <button className="btn sm pri" disabled={busy} onClick={publish}>🚀 公開する</button>
+        ) : null}
+        {asset.status === 'published' && canPublish ? (
+          <button className="btn sm sec" disabled={busy} onClick={() => advance('approved')}>公開を停止</button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function AssetsTab({ project, onChanged }: { project: ProjectDetailDto; onChanged: () => void }) {
+  const { me } = useAuth();
+  const [showForm, setShowForm] = useState(false);
+  const canPublish = me.edition === 'agency' && isApprover(me.role);
+  const assets = project.assets;
+
+  return (
+    <div className="card">
+      <div className="c-head">
+        <h2>制作物（広告文・LP・チラシ・動画）</h2>
+        <button className="btn sm pri" style={{ marginLeft: 'auto' }} onClick={() => setShowForm((v) => !v)}>
+          {showForm ? '閉じる' : '＋ 制作物を追加'}
+        </button>
+      </div>
+      <div className="c-body">
+        {showForm ? <AddAssetForm projectId={project.id} onDone={() => { setShowForm(false); onChanged(); }} onCancel={() => setShowForm(false)} /> : null}
+        {assets.length === 0 && !showForm ? (
+          <p style={{ margin: 0, color: 'var(--muted)' }}>
+            まだ制作物がありません。「＋ 制作物を追加」から広告文・LP・チラシ・動画を登録し、<mark>下書き → レビュー → 承認 → 公開</mark>まで進められます。
+          </p>
+        ) : null}
+        {assets.length > 0 ? (
+          <div className="asset-grid">
+            {assets.map((a) => <AssetCard key={a.id} asset={a} canPublish={canPublish} onChanged={onChanged} />)}
+          </div>
+        ) : null}
+        {!canPublish && assets.length > 0 ? (
+          <p style={{ marginTop: 12, fontSize: 12, color: 'var(--muted)' }}>
+            ※ 公開は自社運用版のオーナー / 管理者のみ行えます。
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -95,6 +268,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             {TABS.map((t) => (
               <button key={t.key} className={`tab ${tab === t.key ? 'on' : ''}`} onClick={() => setTab(t.key)}>
                 {t.label}
+                {t.key === 'assets' && d.assets.length > 0 ? <span className="wtab-count">{d.assets.length}</span> : null}
                 {t.key === 'alerts' && d.alerts.length > 0 ? <span className="wtab-count">{d.alerts.length}</span> : null}
                 {t.key === 'improve' && d.openFindings > 0 ? <span className="wtab-count">{d.openFindings}</span> : null}
               </button>
@@ -150,6 +324,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               </div>
             </div>
           ) : null}
+
+          {/* --- 制作物 --- */}
+          {tab === 'assets' ? <AssetsTab project={d} onChanged={detail.retry} /> : null}
 
           {/* --- アラート --- */}
           {tab === 'alerts' ? (
