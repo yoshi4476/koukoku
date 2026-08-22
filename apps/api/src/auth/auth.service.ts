@@ -10,6 +10,8 @@ export interface SessionPayload {
   sub: string; // userId
   tenantId: string;
   role: MemberRole;
+  /** 提供先(client)アクセスの場合の限定クライアントID */
+  clientScopeId?: string | null;
 }
 
 export const SESSION_COOKIE = 'adgrid_session';
@@ -29,7 +31,12 @@ export function verifySession(token: string): SessionPayload | null {
     if (typeof decoded !== 'object' || decoded === null) return null;
     const d = decoded as Record<string, unknown>;
     if (typeof d.sub !== 'string' || typeof d.tenantId !== 'string') return null;
-    return { sub: d.sub, tenantId: d.tenantId, role: (d.role as MemberRole) ?? 'operator' };
+    return {
+      sub: d.sub,
+      tenantId: d.tenantId,
+      role: (d.role as MemberRole) ?? 'operator',
+      clientScopeId: typeof d.clientScopeId === 'string' ? d.clientScopeId : null,
+    };
   } catch {
     return null;
   }
@@ -101,6 +108,8 @@ export class AuthService {
         tenantName: input.tenantName.trim(),
         role: 'owner',
         edition: 'agency',
+        clientScopeId: null,
+        clientScopeName: null,
       },
       token: signSession(payload),
     };
@@ -130,13 +139,17 @@ export class AuthService {
         '招待メールを確認するか、新規登録からワークスペースを作成してください。',
       );
     }
-    const tenant = await this.prisma.withTenant(membership.tenantId, (tx) =>
-      tx.tenant.findUnique({ where: { id: membership.tenantId } }),
-    );
+    const scopeId = membership.role === 'client' ? membership.clientId ?? null : null;
+    const { tenant, clientScopeName } = await this.prisma.withTenant(membership.tenantId, async (tx) => {
+      const tenant = await tx.tenant.findUnique({ where: { id: membership.tenantId } });
+      const client = scopeId ? await tx.client.findUnique({ where: { id: scopeId } }) : null;
+      return { tenant, clientScopeName: client?.name ?? null };
+    });
     const payload: SessionPayload = {
       sub: user.id,
       tenantId: membership.tenantId,
       role: membership.role as MemberRole,
+      clientScopeId: scopeId,
     };
     return {
       me: {
@@ -146,7 +159,10 @@ export class AuthService {
         tenantId: membership.tenantId,
         tenantName: tenant?.name ?? '',
         role: membership.role as MemberRole,
-        edition: (tenant?.edition as Edition) ?? 'agency',
+        // 提供先アクセスは常に提供先版(client)として振る舞う
+        edition: scopeId ? 'client' : ((tenant?.edition as Edition) ?? 'agency'),
+        clientScopeId: scopeId,
+        clientScopeName,
       },
       token: signSession(payload),
     };
@@ -165,9 +181,12 @@ export class AuthService {
         'もう一度ログインしてください。',
       );
     }
-    const tenant = await this.prisma.withTenant(session.tenantId, (tx) =>
-      tx.tenant.findUnique({ where: { id: session.tenantId } }),
-    );
+    const scopeId = membership.role === 'client' ? membership.clientId ?? null : null;
+    const { tenant, clientScopeName } = await this.prisma.withTenant(session.tenantId, async (tx) => {
+      const tenant = await tx.tenant.findUnique({ where: { id: session.tenantId } });
+      const client = scopeId ? await tx.client.findUnique({ where: { id: scopeId } }) : null;
+      return { tenant, clientScopeName: client?.name ?? null };
+    });
     return {
       userId: user.id,
       email: user.email,
@@ -175,7 +194,9 @@ export class AuthService {
       tenantId: membership.tenantId,
       tenantName: tenant?.name ?? '',
       role: membership.role as MemberRole,
-      edition: (tenant?.edition as Edition) ?? 'agency',
+      edition: scopeId ? 'client' : ((tenant?.edition as Edition) ?? 'agency'),
+      clientScopeId: scopeId,
+      clientScopeName,
     };
   }
 

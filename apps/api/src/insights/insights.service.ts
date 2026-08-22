@@ -11,8 +11,8 @@ import { ProjectsService } from '../projects/projects.service';
 export class InsightsService {
   constructor(private readonly projects: ProjectsService) {}
 
-  async digest(tenantId: string): Promise<InsightDigestDto> {
-    const list = await this.projects.list(tenantId);
+  async digest(tenantId: string, scope?: string | null): Promise<InsightDigestDto> {
+    const list = await this.projects.list(tenantId, scope);
     const items: InsightItemDto[] = [];
 
     for (const p of list) {

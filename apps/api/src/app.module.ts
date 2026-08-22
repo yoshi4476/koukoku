@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
+import { ClientScopeGuard } from './common/client-scope.guard';
 import { MetricsService } from './metrics/metrics.service';
 import { DashboardController } from './metrics/dashboard.controller';
 import { ClientsController } from './clients/clients.controller';
@@ -48,6 +50,10 @@ import { ProjectsService } from './projects/projects.service';
 import { ProjectsController } from './projects/projects.controller';
 import { InsightsService } from './insights/insights.service';
 import { InsightsController } from './insights/insights.controller';
+import { AccessService } from './access/access.service';
+import { AccessController } from './access/access.controller';
+import { FeedbackService } from './feedback/feedback.service';
+import { FeedbackController } from './feedback/feedback.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -70,6 +76,8 @@ import { InsightsController } from './insights/insights.controller';
     KeywordsController,
     ProjectsController,
     InsightsController,
+    AccessController,
+    FeedbackController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -80,6 +88,7 @@ import { InsightsController } from './insights/insights.controller';
     ImportsController,
   ],
   providers: [
+    { provide: APP_GUARD, useClass: ClientScopeGuard },
     AuthService,
     TrailService,
     AlertsService,
@@ -96,6 +105,8 @@ import { InsightsController } from './insights/insights.controller';
     KeywordsService,
     ProjectsService,
     InsightsService,
+    AccessService,
+    FeedbackService,
     MetricsService,
     LlmService,
     AuditService,

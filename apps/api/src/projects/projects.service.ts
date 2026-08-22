@@ -86,11 +86,12 @@ export class ProjectsService {
     return open;
   }
 
-  async list(tenantId: string): Promise<ProjectDto[]> {
+  async list(tenantId: string, scope?: string | null): Promise<ProjectDto[]> {
     await this.alerts.ensureFreshDetection(tenantId).catch(() => undefined);
     const events = await this.alerts.unackedEvents(tenantId).catch(() => []);
     return this.prisma.withTenant(tenantId, async (tx) => {
       const projects = await tx.project.findMany({
+        where: scope ? { clientId: scope } : undefined,
         include: {
           client: true,
           adAccounts: { select: { id: true, platform: true } },
@@ -137,7 +138,7 @@ export class ProjectsService {
     });
   }
 
-  async detail(tenantId: string, id: string): Promise<ProjectDetailDto> {
+  async detail(tenantId: string, id: string, scope?: string | null): Promise<ProjectDetailDto> {
     await this.alerts.ensureFreshDetection(tenantId).catch(() => undefined);
     const events = await this.alerts.unackedEvents(tenantId).catch(() => []);
     return this.prisma.withTenant(tenantId, async (tx) => {
@@ -149,7 +150,7 @@ export class ProjectsService {
           assets: { orderBy: { createdAt: 'desc' } },
         },
       });
-      if (!p) {
+      if (!p || (scope && p.clientId !== scope)) {
         throw new AppError(HttpStatus.NOT_FOUND, 'プロジェクトが見つかりません。', '一覧から選び直してください。');
       }
       const accountIds = p.adAccounts.map((a) => a.id);
@@ -258,11 +259,13 @@ export class ProjectsService {
   }
 
   /** 媒体審査シミュレーション。公開前に審査で落ちやすい表現を検知 (F-21) */
-  async reviewAsset(tenantId: string, assetId: string): Promise<ReviewSimDto> {
+  async reviewAsset(tenantId: string, assetId: string, scope?: string | null): Promise<ReviewSimDto> {
     const asset = await this.prisma.withTenant(tenantId, (tx) =>
       tx.projectAsset.findUnique({ where: { id: assetId }, include: { project: { include: { client: true } } } }),
     );
-    if (!asset) throw new AppError(HttpStatus.NOT_FOUND, '制作物が見つかりません。', '再読み込みしてください。');
+    if (!asset || (scope && asset.project.clientId !== scope)) {
+      throw new AppError(HttpStatus.NOT_FOUND, '制作物が見つかりません。', '再読み込みしてください。');
+    }
     const profile = industryProfileFor(asset.project.client.industryCode);
     const text = `${asset.title} ${asset.content}`.trim();
     const issues: ReviewIssueDto[] = [];
@@ -399,13 +402,13 @@ export class ProjectsService {
   }
 
   /** 制作物の改善ポイント (公開後の修正案)。業種相性・法規・種別別チェックで算出 */
-  async adviceForAsset(tenantId: string, assetId: string): Promise<AssetAdviceDto> {
+  async adviceForAsset(tenantId: string, assetId: string, scope?: string | null): Promise<AssetAdviceDto> {
     const data = await this.prisma.withTenant(tenantId, async (tx) => {
       const asset = await tx.projectAsset.findUnique({
         where: { id: assetId },
         include: { project: { include: { client: true } } },
       });
-      if (!asset) {
+      if (!asset || (scope && asset.project.clientId !== scope)) {
         throw new AppError(HttpStatus.NOT_FOUND, '制作物が見つかりません。', '再読み込みしてください。');
       }
       return asset;
@@ -473,16 +476,18 @@ export class ProjectsService {
     return { assetId, type, summary, items };
   }
 
-  private async projectAccountIds(tx: Tx, projectId: string): Promise<{ accountIds: string[] }> {
+  private async projectAccountIds(tx: Tx, projectId: string, scope?: string | null): Promise<{ accountIds: string[] }> {
     const p = await tx.project.findUnique({ where: { id: projectId }, include: { adAccounts: { select: { id: true } } } });
-    if (!p) throw new AppError(HttpStatus.NOT_FOUND, 'プロジェクトが見つかりません。', '一覧から選び直してください。');
+    if (!p || (scope && p.clientId !== scope)) {
+      throw new AppError(HttpStatus.NOT_FOUND, 'プロジェクトが見つかりません。', '一覧から選び直してください。');
+    }
     return { accountIds: p.adAccounts.map((a) => a.id) };
   }
 
   /** 予算の最適配分 (F-20)。キャンペーン別の効率から、非効率→効率へ再配分し CV最大化 */
-  async budgetPlan(tenantId: string, projectId: string): Promise<BudgetPlanDto> {
+  async budgetPlan(tenantId: string, projectId: string, scope?: string | null): Promise<BudgetPlanDto> {
     return this.prisma.withTenant(tenantId, async (tx) => {
-      const { accountIds } = await this.projectAccountIds(tx, projectId);
+      const { accountIds } = await this.projectAccountIds(tx, projectId, scope);
       if (accountIds.length === 0) {
         return { totalMonthly: 0, reallocatable: 0, expectedCvGain: 0, items: [], note: '媒体アカウントがありません。' };
       }
@@ -573,9 +578,9 @@ export class ProjectsService {
   }
 
   /** クリエイティブ疲弊検知 (F-20)。直近7日と前7日のCTR/CVR低下から差し替え時期を判定 */
-  async creativeFatigue(tenantId: string, projectId: string): Promise<FatigueReportDto> {
+  async creativeFatigue(tenantId: string, projectId: string, scope?: string | null): Promise<FatigueReportDto> {
     return this.prisma.withTenant(tenantId, async (tx) => {
-      const { accountIds } = await this.projectAccountIds(tx, projectId);
+      const { accountIds } = await this.projectAccountIds(tx, projectId, scope);
       if (accountIds.length === 0) return { items: [], fatiguedCount: 0, watchCount: 0 };
       const agg = (since: Date, until: Date) =>
         tx.factAdPerformance.groupBy({

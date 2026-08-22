@@ -1,7 +1,21 @@
 import { createParamDecorator, ExecutionContext, HttpStatus } from '@nestjs/common';
 import type { Request } from 'express';
+import type { MemberRole } from '@adgrid/shared';
 import { AppError } from './errors';
 import { SESSION_COOKIE, verifySession } from '../auth/auth.service';
+
+/** セッションの提供先スコープ(限定クライアントID)。通常ユーザーは null */
+export function clientScopeOf(req: Request): string | null {
+  const token = (req.cookies ?? {})[SESSION_COOKIE] as string | undefined;
+  if (!token) return null;
+  const session = verifySession(token);
+  return session?.clientScopeId ?? null;
+}
+
+/** 提供先アクセス(client)のときの限定クライアントID。それ以外は null */
+export const ClientScope = createParamDecorator((_: unknown, ctx: ExecutionContext): string | null =>
+  clientScopeOf(ctx.switchToHttp().getRequest<Request>()),
+);
 
 /**
  * テナント解決の優先順位:
@@ -25,7 +39,8 @@ export function resolveTenantId(req: Request): string | null {
 
 export interface SessionInfoValue {
   userId: string | null;
-  role: 'owner' | 'admin' | 'operator' | 'viewer';
+  role: MemberRole;
+  clientScopeId: string | null;
 }
 
 /**
@@ -39,10 +54,10 @@ export const SessionInfo = createParamDecorator((_: unknown, ctx: ExecutionConte
   const token = (req.cookies ?? {})[SESSION_COOKIE] as string | undefined;
   if (token) {
     const session = verifySession(token);
-    if (session) return { userId: session.sub, role: session.role };
+    if (session) return { userId: session.sub, role: session.role, clientScopeId: session.clientScopeId ?? null };
   }
-  if (process.env.ALLOW_DEV_OWNER === 'true') return { userId: null, role: 'owner' };
-  return { userId: null, role: 'viewer' };
+  if (process.env.ALLOW_DEV_OWNER === 'true') return { userId: null, role: 'owner', clientScopeId: null };
+  return { userId: null, role: 'viewer', clientScopeId: null };
 });
 
 export const TenantId = createParamDecorator((_: unknown, ctx: ExecutionContext): string => {

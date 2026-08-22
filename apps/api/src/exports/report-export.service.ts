@@ -9,6 +9,7 @@ import { isoDate } from '../metrics/metrics.service';
 
 export interface ExportableReport {
   id: string;
+  clientId: string;
   clientName: string;
   periodType: string;
   periodStart: string;
@@ -48,6 +49,7 @@ export class ReportExportService implements OnModuleDestroy {
     }
     return {
       id: row.id,
+      clientId: row.clientId,
       clientName: row.client.name,
       periodType: row.periodType,
       periodStart: isoDate(row.periodStart),

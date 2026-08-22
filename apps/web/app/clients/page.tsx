@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type {
   AdAccountDto,
+  ClientAccessDto,
   ClientDto,
   ClientOverviewDto,
+  CreateClientAccessInput,
   Platform,
   SampleDataResultDto,
 } from '@adgrid/shared';
@@ -14,7 +16,7 @@ import { ALL_PLATFORMS, PLATFORM_META, industryModeFor } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
 import { DeltaPill, ErrorCard, HintBar, Skeleton } from '@/components/ui';
-import { apiPost, ApiError, toApiError } from '@/lib/api';
+import { apiDelete, apiGet, apiPost, ApiError, toApiError } from '@/lib/api';
 import { AUDIT_CATEGORY_LABEL, INDUSTRY_LABEL } from '@/lib/labels';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
 
@@ -222,9 +224,57 @@ function IndustryModePanel({ industryCode }: { industryCode: string }) {
   );
 }
 
+/* 提供先アクセス発行 (このクライアント専用ログイン) */
+function ClientAccessPanel({ clientId }: { clientId: string }) {
+  const access = useApi<ClientAccessDto[]>(`/clients/${clientId}/access`);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+
+  const issue = (e: FormEvent) => {
+    e.preventDefault();
+    if (busy || !email.trim() || password.length < 8) return;
+    setBusy(true);
+    setError(null);
+    const body: CreateClientAccessInput = { email: email.trim(), password };
+    apiPost<ClientAccessDto>(`/clients/${clientId}/access`, body)
+      .then(() => { setEmail(''); setPassword(''); access.retry(); })
+      .catch((err: unknown) => setError(toApiError(err)))
+      .finally(() => setBusy(false));
+  };
+  const revoke = (userId: string) => {
+    apiDelete(`/clients/${clientId}/access/${userId}`).then(() => access.retry()).catch(() => undefined);
+  };
+
+  const list = access.data ?? [];
+  return (
+    <div className="cl-access">
+      <div className="cl-access-h">🔑 提供先アクセス（この会社専用ログイン）</div>
+      {list.length > 0 ? (
+        <div className="cl-access-list">
+          {list.map((a) => (
+            <div key={a.userId} className="cl-access-row">
+              <span className="cl-access-mail">{a.email}</span>
+              <button type="button" className="btn sm sec" onClick={() => revoke(a.userId)}>無効化</button>
+            </div>
+          ))}
+        </div>
+      ) : <p className="cl-access-empty">まだ発行していません。下から発行できます。</p>}
+      {error ? <ErrorCard error={error} /> : null}
+      <form className="cl-access-form" onSubmit={issue}>
+        <input className="input" type="email" placeholder="提供先のメール" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <input className="input" type="password" placeholder="初期パスワード(8文字以上)" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <button type="submit" className="btn sm pri" disabled={busy || !email.trim() || password.length < 8}>{busy ? '発行中…' : 'アクセスを発行'}</button>
+      </form>
+    </div>
+  );
+}
+
 function ClientCard({ o, onChanged }: { o: ClientOverviewDto; onChanged: () => void }) {
   const [formOpen, setFormOpen] = useState(false);
   const [modeOpen, setModeOpen] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
   const c = o.client;
   const qs = `clientId=${encodeURIComponent(c.id)}`;
 
@@ -276,7 +326,9 @@ function ClientCard({ o, onChanged }: { o: ClientOverviewDto; onChanged: () => v
       <div className="cl-actions">
         <Link className="btn sm sec" href={`/audit?${qs}`}>診断</Link>
         <Link className="btn sm sec" href={`/report?${qs}`}>レポート</Link>
-        <Link className="btn sm sec" href={`/import?${qs}`}>取込</Link>
+        <button type="button" className="btn sm sec" aria-expanded={accessOpen} onClick={() => setAccessOpen((v) => !v)}>
+          {accessOpen ? '閉じる' : '🔑 提供先アクセス'}
+        </button>
         <button
           type="button"
           className="btn sm sec"
@@ -287,6 +339,8 @@ function ClientCard({ o, onChanged }: { o: ClientOverviewDto; onChanged: () => v
           {formOpen ? '閉じる' : 'アカウントを追加'}
         </button>
       </div>
+
+      {accessOpen ? <ClientAccessPanel clientId={c.id} /> : null}
 
       {formOpen ? (
         <AddAccountForm

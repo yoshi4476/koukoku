@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpStatus, Param, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { ReportRunDto } from '@adgrid/shared';
-import { TenantId } from '../common/tenant';
+import { ClientScope, TenantId } from '../common/tenant';
 import { AppError } from '../common/errors';
 import { SchedulerService } from '../scheduler/scheduler.service';
 import { ReportExportService } from '../exports/report-export.service';
@@ -27,10 +27,14 @@ export class ReportController {
   @Get(':id/pdf')
   async pdf(
     @TenantId() tenantId: string,
+    @ClientScope() scope: string | null,
     @Param('id') id: string,
     @Res() res: Response,
   ): Promise<void> {
     const report = await this.exporter.load(tenantId, id);
+    if (scope && report.clientId !== scope) {
+      throw new AppError(HttpStatus.NOT_FOUND, 'レポートが見つかりません。', 'レポート一覧から選び直してください。');
+    }
     const buf = await this.exporter.toPdf(tenantId, id);
     attachmentHeaders(res, `ADGRID_${report.clientName}_${report.periodStart}.pdf`, 'application/pdf');
     res.end(buf);
@@ -39,10 +43,14 @@ export class ReportController {
   @Get(':id/pptx')
   async pptx(
     @TenantId() tenantId: string,
+    @ClientScope() scope: string | null,
     @Param('id') id: string,
     @Res() res: Response,
   ): Promise<void> {
     const report = await this.exporter.load(tenantId, id);
+    if (scope && report.clientId !== scope) {
+      throw new AppError(HttpStatus.NOT_FOUND, 'レポートが見つかりません。', 'レポート一覧から選び直してください。');
+    }
     const buf = await this.exporter.toPptx(tenantId, id);
     attachmentHeaders(
       res,
@@ -74,7 +82,11 @@ export class ReportController {
   }
 
   @Get()
-  list(@TenantId() tenantId: string, @Query('clientId') clientId?: string): Promise<ReportRunDto[]> {
-    return this.reports.list(tenantId, clientId || undefined);
+  list(
+    @TenantId() tenantId: string,
+    @ClientScope() scope: string | null,
+    @Query('clientId') clientId?: string,
+  ): Promise<ReportRunDto[]> {
+    return this.reports.list(tenantId, scope ?? clientId ?? undefined);
   }
 }

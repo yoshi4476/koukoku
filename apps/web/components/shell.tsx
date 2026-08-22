@@ -249,6 +249,15 @@ const NAV_SETTINGS: NavItem[] = [
       </svg>
     ),
   },
+  {
+    href: '/feedback',
+    label: 'フィードバック',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <path d="M2 3.5h10v6H6l-2.5 2v-2H2z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
 ];
 
 // 広告運用の手順どおりにメニューを並べ替える (準備→作る→見る→直す→報告)。
@@ -268,7 +277,13 @@ const NAV_PHASES: NavPhase[] = [
   { label: null, hrefs: ['/', '/projects'] },
   { label: '作る（横断）', hrefs: ['/copy', '/knowledge'] },
   { label: '報告する', hrefs: ['/report'] },
-  { label: '管理・設定', hrefs: ['/clients', '/settings', '/guide'] },
+  { label: '管理・設定', hrefs: ['/clients', '/feedback', '/settings', '/guide'] },
+];
+
+// 提供先(client)アクセス専用の最小ナビ (自分のクライアントの閲覧+フィードバックのみ)
+const CLIENT_NAV_PHASES: NavPhase[] = [
+  { label: null, hrefs: ['/projects', '/report'] },
+  { label: null, hrefs: ['/feedback'] },
 ];
 
 function NavLinks({ items, pathname }: { items: NavItem[]; pathname: string }) {
@@ -337,19 +352,21 @@ export function Shell({ children }: { children: ReactNode }) {
   const { me } = useAuth();
   const { clients, selectedClientId, setSelectedClientId } = useClients();
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const clientScoped = me.clientScopeId != null;
+  const phases = clientScoped ? CLIENT_NAV_PHASES : NAV_PHASES;
 
   return (
     <div className="app">
       <aside className="sidebar">
-        <Link href="/" className="brand">
+        <Link href={clientScoped ? '/projects' : '/'} className="brand">
           AD<span className="bx">GRID</span>
         </Link>
         {me.edition === 'client' ? (
           <div className="edition-badge" title="提供先版: 自社データの閲覧が中心の画面構成です">
-            {EDITION_LABEL[me.edition]}
+            {clientScoped && me.clientScopeName ? me.clientScopeName : EDITION_LABEL[me.edition]}
           </div>
         ) : null}
-        {NAV_PHASES.map((phase, i) => {
+        {phases.map((phase, i) => {
           const items = phase.hrefs
             .filter((h) => {
               const f = HREF_FEATURE[h];
@@ -368,22 +385,28 @@ export function Shell({ children }: { children: ReactNode }) {
       </aside>
       <div className="main">
         <div className="topbar">
-          <select
-            className="client-sw"
-            value={selectedClientId}
-            onChange={(e) => setSelectedClientId(e.target.value)}
-            aria-label="クライアントで絞り込む"
-          >
-            <option value="">クライアント: すべて</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <button type="button" className="cmdk" title="コマンドパレットを開く" onClick={() => setPaletteOpen(true)}>
-            クライアント・機能を検索… <span className="kbd">⌘K</span>
-          </button>
+          {clientScoped ? (
+            <span className="client-fixed">{me.clientScopeName ?? 'マイアカウント'}</span>
+          ) : (
+            <select
+              className="client-sw"
+              value={selectedClientId}
+              onChange={(e) => setSelectedClientId(e.target.value)}
+              aria-label="クライアントで絞り込む"
+            >
+              <option value="">クライアント: すべて</option>
+              {clients.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
+          {clientScoped ? null : (
+            <button type="button" className="cmdk" title="コマンドパレットを開く" onClick={() => setPaletteOpen(true)}>
+              クライアント・機能を検索… <span className="kbd">⌘K</span>
+            </button>
+          )}
           <AvatarMenu />
         </div>
         <main className="content">{children}</main>

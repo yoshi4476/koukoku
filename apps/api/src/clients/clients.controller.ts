@@ -9,7 +9,7 @@ import type {
 } from '@adgrid/shared';
 import { ALL_PLATFORMS } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import { TenantId } from '../common/tenant';
+import { ClientScope, TenantId } from '../common/tenant';
 import { AppError } from '../common/errors';
 import { MetricsService, daysAgo } from '../metrics/metrics.service';
 import { BillingService } from '../billing/billing.service';
@@ -24,10 +24,10 @@ export class ClientsController {
 
   /** クライアント管理画面用の俯瞰 (直近7日KPI・未対応指摘・最終レポート) */
   @Get('overview')
-  async overview(@TenantId() tenantId: string): Promise<ClientOverviewDto[]> {
+  async overview(@TenantId() tenantId: string, @ClientScope() scope: string | null): Promise<ClientOverviewDto[]> {
     return this.prisma.withTenant(tenantId, async (tx) => {
       const clients = await tx.client.findMany({
-        where: { status: 'active' },
+        where: scope ? { id: scope } : { status: 'active' },
         include: { _count: { select: { adAccounts: true } } },
         orderBy: { name: 'asc' },
       });
@@ -146,10 +146,10 @@ export class ClientsController {
   }
 
   @Get()
-  async list(@TenantId() tenantId: string): Promise<ClientDto[]> {
+  async list(@TenantId() tenantId: string, @ClientScope() scope: string | null): Promise<ClientDto[]> {
     return this.prisma.withTenant(tenantId, async (tx) => {
       const clients = await tx.client.findMany({
-        where: { status: 'active' },
+        where: scope ? { id: scope } : { status: 'active' },
         include: { _count: { select: { adAccounts: true } } },
         orderBy: { name: 'asc' },
       });

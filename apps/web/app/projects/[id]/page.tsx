@@ -572,9 +572,11 @@ function AssetsTab({ project, onChanged }: { project: ProjectDetailDto; onChange
     <div className="card">
       <div className="c-head">
         <h2>制作物（広告文・LP・チラシ・動画）</h2>
-        <button className="btn sm pri" style={{ marginLeft: 'auto' }} onClick={() => setShowForm((v) => !v)}>
-          {showForm ? '閉じる' : '＋ 制作物を追加'}
-        </button>
+        {me.edition === 'agency' ? (
+          <button className="btn sm pri" style={{ marginLeft: 'auto' }} onClick={() => setShowForm((v) => !v)}>
+            {showForm ? '閉じる' : '＋ 制作物を追加'}
+          </button>
+        ) : null}
       </div>
       <div className="c-body">
         {showForm ? <AddAssetForm projectId={project.id} onDone={() => { setShowForm(false); onChanged(); }} onCancel={() => setShowForm(false)} /> : null}
@@ -654,6 +656,8 @@ const FATIGUE_META: Record<string, { label: string; cls: string }> = {
 };
 
 function ImproveTab({ project, goFiltered }: { project: ProjectDetailDto; goFiltered: (href: string) => void }) {
+  const { me } = useAuth();
+  const isAgency = me.edition === 'agency';
   const budget = useApi<BudgetPlanDto>(`/projects/${project.id}/budget-plan`);
   const fatigue = useApi<FatigueReportDto>(`/projects/${project.id}/fatigue`);
 
@@ -740,10 +744,10 @@ function ImproveTab({ project, goFiltered }: { project: ProjectDetailDto; goFilt
             未対応の改善提案は <b className="num" style={{ color: project.openFindings > 0 ? 'var(--warn)' : 'var(--good)' }}>{project.openFindings}件</b> です。
           </p>
           <div className="proj-actions">
-            <button className="btn pri" onClick={() => goFiltered('/audit')}>🩺 AI診断</button>
+            {isAgency ? <button className="btn pri" onClick={() => goFiltered('/audit')}>🩺 AI診断</button> : null}
             <button className="btn sec" onClick={() => goFiltered('/keywords')}>🔍 キーワード最適化・発見</button>
-            <button className="btn sec" onClick={() => goFiltered('/approvals')}>✅ 承認キュー</button>
-            <button className="btn sec" onClick={() => goFiltered('/report')}>📄 レポート作成</button>
+            {isAgency ? <button className="btn sec" onClick={() => goFiltered('/approvals')}>✅ 承認キュー</button> : null}
+            <button className="btn sec" onClick={() => goFiltered('/report')}>📄 レポート{isAgency ? '作成' : ''}</button>
           </div>
         </div>
       </div>
@@ -754,6 +758,8 @@ function ImproveTab({ project, goFiltered }: { project: ProjectDetailDto; goFilt
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const { me } = useAuth();
+  const isAgency = me.edition === 'agency';
   const { setSelectedClientId } = useClients();
   const detail = useApi<ProjectDetailDto>(`/projects/${id}`);
   const [tab, setTab] = useState<Tab>('overview');
@@ -835,7 +841,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           {tab === 'delivery' ? (
             <div className="card">
               <div className="c-head"><h2>掲示（配信中の媒体）</h2>
-                <button className="btn sm sec" style={{ marginLeft: 'auto' }} onClick={() => goFiltered('/connections')}>媒体接続を管理</button>
+                {isAgency ? <button className="btn sm sec" style={{ marginLeft: 'auto' }} onClick={() => goFiltered('/connections')}>媒体接続を管理</button> : null}
               </div>
               <div className="c-body tbl-scroll" style={{ padding: 0 }}>
                 <table className="data-tbl">
@@ -873,7 +879,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           {tab === 'alerts' ? (
             <div className="card">
               <div className="c-head"><h2>このプロジェクトのアラート</h2>
-                <button className="btn sm sec" style={{ marginLeft: 'auto' }} onClick={() => goFiltered('/alerts')}>アラート設定へ</button>
+                {isAgency ? <button className="btn sm sec" style={{ marginLeft: 'auto' }} onClick={() => goFiltered('/alerts')}>アラート設定へ</button> : null}
               </div>
               <div className="c-body">
                 {d.alerts.length === 0 ? (

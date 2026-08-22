@@ -135,6 +135,19 @@ async function main() {
     data: { id: 'c_c', tenantId: TENANT_ID, name: 'クライアントC (BtoB SaaS)', industryCode: 'saas' },
   });
 
+  // 提供先アクセスのデモ: クライアントA専用ログイン (自社ワークスペース内・A社のみ閲覧)
+  // ログイン: clienta@adgrid.jp / demo-pass-2026
+  const clientAUser = await prisma.user.create({
+    data: {
+      email: 'clienta@adgrid.jp',
+      passwordHash: await bcrypt.hash('demo-pass-2026', 10),
+      name: 'クライアントA 担当者',
+    },
+  });
+  await prisma.tenantMember.create({
+    data: { userId: clientAUser.id, tenantId: TENANT_ID, role: 'client', clientId: clientA.id },
+  });
+
   const accAGoogle = await prisma.adAccount.create({
     data: {
       id: 'acc_a_google', tenantId: TENANT_ID, clientId: clientA.id,

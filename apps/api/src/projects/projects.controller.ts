@@ -12,7 +12,7 @@ import type {
   UpdateAssetInput,
   UpdateProjectInput,
 } from '@adgrid/shared';
-import { SessionInfo, SessionInfoValue, TenantId } from '../common/tenant';
+import { ClientScope, SessionInfo, SessionInfoValue, TenantId } from '../common/tenant';
 import { ProjectsService } from './projects.service';
 
 @Controller('projects')
@@ -20,13 +20,13 @@ export class ProjectsController {
   constructor(private readonly projects: ProjectsService) {}
 
   @Get()
-  list(@TenantId() tenantId: string): Promise<ProjectDto[]> {
-    return this.projects.list(tenantId);
+  list(@TenantId() tenantId: string, @ClientScope() scope: string | null): Promise<ProjectDto[]> {
+    return this.projects.list(tenantId, scope);
   }
 
   @Get(':id')
-  detail(@TenantId() tenantId: string, @Param('id') id: string): Promise<ProjectDetailDto> {
-    return this.projects.detail(tenantId, id);
+  detail(@TenantId() tenantId: string, @ClientScope() scope: string | null, @Param('id') id: string): Promise<ProjectDetailDto> {
+    return this.projects.detail(tenantId, id, scope);
   }
 
   @Post()
@@ -78,22 +78,22 @@ export class ProjectsController {
   }
 
   @Get('assets/:assetId/advice')
-  advice(@TenantId() tenantId: string, @Param('assetId') assetId: string): Promise<AssetAdviceDto> {
-    return this.projects.adviceForAsset(tenantId, assetId);
+  advice(@TenantId() tenantId: string, @ClientScope() scope: string | null, @Param('assetId') assetId: string): Promise<AssetAdviceDto> {
+    return this.projects.adviceForAsset(tenantId, assetId, scope);
   }
 
   @Get('assets/:assetId/review')
-  review(@TenantId() tenantId: string, @Param('assetId') assetId: string): Promise<ReviewSimDto> {
-    return this.projects.reviewAsset(tenantId, assetId);
+  review(@TenantId() tenantId: string, @ClientScope() scope: string | null, @Param('assetId') assetId: string): Promise<ReviewSimDto> {
+    return this.projects.reviewAsset(tenantId, assetId, scope);
   }
 
   @Get(':id/budget-plan')
-  budgetPlan(@TenantId() tenantId: string, @Param('id') id: string): Promise<BudgetPlanDto> {
-    return this.projects.budgetPlan(tenantId, id);
+  budgetPlan(@TenantId() tenantId: string, @ClientScope() scope: string | null, @Param('id') id: string): Promise<BudgetPlanDto> {
+    return this.projects.budgetPlan(tenantId, id, scope);
   }
 
   @Get(':id/fatigue')
-  fatigue(@TenantId() tenantId: string, @Param('id') id: string): Promise<FatigueReportDto> {
-    return this.projects.creativeFatigue(tenantId, id);
+  fatigue(@TenantId() tenantId: string, @ClientScope() scope: string | null, @Param('id') id: string): Promise<FatigueReportDto> {
+    return this.projects.creativeFatigue(tenantId, id, scope);
   }
 }

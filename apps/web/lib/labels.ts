@@ -78,6 +78,7 @@ export const MEMBER_ROLE_LABEL: Record<MemberRole, string> = {
   admin: '管理者',
   operator: 'オペレーター',
   viewer: '閲覧のみ',
+  client: '提供先',
 };
 
 export const USAGE_FEATURE_LABEL: Record<string, string> = {

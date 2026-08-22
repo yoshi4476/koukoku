@@ -30,7 +30,9 @@ model TenantMember {
   id       String @id @default(cuid())
   userId   String @map("user_id")
   tenantId String @map("tenant_id")
-  role     String @default("owner") // owner / admin / operator / viewer
+  role     String @default("owner") // owner / admin / operator / viewer / client
+  // role=client のとき、この1クライアントのデータだけに限定される (提供先アクセス)
+  clientId String? @map("client_id")
 
   user   User   @relation(fields: [userId], references: [id])
   tenant Tenant @relation(fields: [tenantId], references: [id])
@@ -70,8 +72,27 @@ model Tenant {
   keywordStats KeywordStat[]
   projects    Project[]
   projectAssets ProjectAsset[]
+  feedback    Feedback[]
 
   @@map("tenants")
+}
+
+// 提供先(他社)からのフィードバック。提供先ユーザーが送り、自社(運用)が確認する。
+model Feedback {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  clientId   String   @map("client_id")
+  userId     String?  @map("user_id")
+  authorName String   @default("") @map("author_name")
+  projectId  String?  @map("project_id")
+  message    String
+  status     String   @default("open") // open / resolved
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, clientId, createdAt])
+  @@map("feedback")
 }
 
 // プロジェクト (目的・施策単位)。1クライアントに複数、複数の媒体アカウントを束ねる。

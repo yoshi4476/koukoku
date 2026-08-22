@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { ClientDto } from '@adgrid/shared';
 import { apiGet, ApiError, toApiError } from '@/lib/api';
+import { useAuth } from '@/components/auth-context';
 
 interface ClientContextValue {
   clients: ClientDto[];
@@ -17,13 +18,17 @@ interface ClientContextValue {
 const Ctx = createContext<ClientContextValue | null>(null);
 
 export function ClientProvider({ children }: { children: ReactNode }) {
+  const { me } = useAuth();
+  const scope = me.clientScopeId; // 提供先アクセスは常にこのクライアントに固定
   const [clients, setClients] = useState<ClientDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
-  const [selectedClientId, setSelectedClientId] = useState('');
+  const [selectedClientId, setSelectedClientId] = useState(scope ?? '');
   const [tick, setTick] = useState(0);
 
   const reload = useCallback(() => setTick((t) => t + 1), []);
+  // 提供先アクセスではクライアント切替を無効化 (常に自分のクライアント)
+  const setSelected = useCallback((id: string) => setSelectedClientId(scope ?? id), [scope]);
 
   useEffect(() => {
     let alive = true;
@@ -46,7 +51,7 @@ export function ClientProvider({ children }: { children: ReactNode }) {
   }, [tick]);
 
   return (
-    <Ctx.Provider value={{ clients, loading, error, selectedClientId, setSelectedClientId, reload }}>
+    <Ctx.Provider value={{ clients, loading, error, selectedClientId: scope ?? selectedClientId, setSelectedClientId: setSelected, reload }}>
       {children}
     </Ctx.Provider>
   );

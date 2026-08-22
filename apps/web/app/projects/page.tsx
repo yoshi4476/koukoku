@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { AdAccountDto, ClientDto, CreateProjectInput, ProjectDto, ProjectGoal } from '@adgrid/shared';
 import { PROJECT_GOAL_LABEL, PROJECT_STATUS_LABEL } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
+import { useAuth } from '@/components/auth-context';
 import { useClients } from '@/components/client-context';
 import { DeltaPill, EmptyState, ErrorCard, HintBar, PlatformTag, SkeletonLines } from '@/components/ui';
 import { apiGet, apiPost, ApiError, toApiError } from '@/lib/api';
@@ -150,6 +151,8 @@ function ProjectCard({ p }: { p: ProjectDto }) {
 }
 
 export default function ProjectsPage() {
+  const { me } = useAuth();
+  const isAgency = me.edition === 'agency';
   const projects = useApi<ProjectDto[]>('/projects');
   const [showForm, setShowForm] = useState(false);
   const list = projects.data ?? [];
@@ -159,13 +162,17 @@ export default function ProjectsPage() {
       <div className="page-h">
         <h1>プロジェクト</h1>
         <span className="sub">施策ごとに媒体をまとめ、掲示・推移・アラート・改善を1か所で</span>
-        <button type="button" className="btn pri" style={{ marginLeft: 'auto' }} onClick={() => setShowForm((v) => !v)}>
-          {showForm ? '閉じる' : '＋ プロジェクトを作成'}
-        </button>
+        {isAgency ? (
+          <button type="button" className="btn pri" style={{ marginLeft: 'auto' }} onClick={() => setShowForm((v) => !v)}>
+            {showForm ? '閉じる' : '＋ プロジェクトを作成'}
+          </button>
+        ) : null}
       </div>
 
       <HintBar id="projects" title="プロジェクトの使い方">
-        プロジェクトは<mark>「1つの目的（施策）」の単位</mark>です。関係する媒体（Google・Metaなど）をまとめておくと、そのプロジェクトを開くだけで<mark>掲示（配信状況）・推移・アラート・改善</mark>がひと目でわかります。まずは<mark>「＋ プロジェクトを作成」</mark>から。
+        {isAgency
+          ? <>プロジェクトは<mark>「1つの目的（施策）」の単位</mark>です。関係する媒体（Google・Metaなど）をまとめておくと、そのプロジェクトを開くだけで<mark>掲示（配信状況）・推移・アラート・改善</mark>がひと目でわかります。まずは<mark>「＋ プロジェクトを作成」</mark>から。</>
+          : <>あなたの<mark>広告の状況</mark>を施策ごとにまとめています。各プロジェクトを開くと<mark>推移・掲示・改善・制作物</mark>が見られます。ご要望は「フィードバック」からいつでもどうぞ。</>}
       </HintBar>
 
       {showForm ? <CreateProjectForm onDone={() => { setShowForm(false); projects.retry(); }} onCancel={() => setShowForm(false)} /> : null}
@@ -176,8 +183,8 @@ export default function ProjectsPage() {
       {projects.data && list.length === 0 && !showForm ? (
         <EmptyState
           title="まだプロジェクトがありません"
-          sub="施策（例: 春の新規獲得キャンペーン）ごとにプロジェクトを作り、媒体をまとめましょう。"
-          action={<button className="btn pri" onClick={() => setShowForm(true)}>＋ プロジェクトを作成</button>}
+          sub={isAgency ? '施策（例: 春の新規獲得キャンペーン）ごとにプロジェクトを作り、媒体をまとめましょう。' : '運用担当がプロジェクトを準備すると、ここに表示されます。'}
+          action={isAgency ? <button className="btn pri" onClick={() => setShowForm(true)}>＋ プロジェクトを作成</button> : undefined}
         />
       ) : null}
 

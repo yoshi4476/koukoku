@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { Edition, HomeDto, HomeTaskDto, InsightDigestDto, MeDto, OnboardingStatusDto, TaskKind } from '@adgrid/shared';
 import { EDITION_LABEL } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
@@ -163,11 +164,21 @@ function InsightDigest() {
 }
 
 export default function HomePage() {
-  const { data, loading, error, retry } = useApi<HomeDto>('/home');
-  const onboarding = useApi<OnboardingStatusDto>('/onboarding/status');
+  const { me } = useAuth();
+  const router = useRouter();
+  const scoped = me.clientScopeId != null;
+  // 提供先アクセスは司令室を持たず、プロジェクト一覧をホームにする
+  useEffect(() => {
+    if (scoped) router.replace('/projects');
+  }, [scoped, router]);
+
+  const { data, loading, error, retry } = useApi<HomeDto>(scoped ? null : '/home');
+  const onboarding = useApi<OnboardingStatusDto>(scoped ? null : '/onboarding/status');
   const needsSetup = onboarding.data?.needsOnboarding === true;
   const [ackingId, setAckingId] = useState<string | null>(null);
   const [ackError, setAckError] = useState<ApiError | null>(null);
+
+  if (scoped) return null;
 
   const ack = (eventId: string) => {
     if (ackingId !== null) return;

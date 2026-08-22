@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Post, Query } from '@nestjs/common';
 import type { KeywordDiscoveryDto, KeywordOptimizeDto, ProposalDto } from '@adgrid/shared';
-import { SessionInfo, SessionInfoValue, TenantId } from '../common/tenant';
+import { ClientScope, SessionInfo, SessionInfoValue, TenantId } from '../common/tenant';
 import { KeywordsService } from './keywords.service';
 
 @Controller('keywords')
@@ -10,15 +10,21 @@ export class KeywordsController {
   @Get('optimize')
   optimize(
     @TenantId() tenantId: string,
+    @ClientScope() scope: string | null,
     @Query('clientId') clientId?: string,
     @Query('q') q?: string,
   ): Promise<KeywordOptimizeDto> {
-    return this.keywords.optimize(tenantId, { clientId: clientId || undefined, query: q || undefined });
+    // 提供先アクセスは自分のクライアントに強制固定 (指定clientIdは無視)
+    return this.keywords.optimize(tenantId, { clientId: scope ?? clientId ?? undefined, query: q || undefined });
   }
 
   @Get('discover')
-  discover(@TenantId() tenantId: string, @Query('clientId') clientId?: string): Promise<KeywordDiscoveryDto> {
-    return this.keywords.discover(tenantId, clientId || undefined);
+  discover(
+    @TenantId() tenantId: string,
+    @ClientScope() scope: string | null,
+    @Query('clientId') clientId?: string,
+  ): Promise<KeywordDiscoveryDto> {
+    return this.keywords.discover(tenantId, scope ?? clientId ?? undefined);
   }
 
   @Post(':id/propose')

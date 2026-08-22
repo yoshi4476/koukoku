@@ -7,7 +7,8 @@ import type { AuditResult, FindingStatus, ReportResult, CopyResult } from './ai'
  * ============================================================ */
 
 /* ---- 認証 ---- */
-export type MemberRole = 'owner' | 'admin' | 'operator' | 'viewer';
+// client = 提供先(他社)アクセス。1クライアントのデータのみ閲覧できる限定ユーザー
+export type MemberRole = 'owner' | 'admin' | 'operator' | 'viewer' | 'client';
 
 /** 承認・実行・自動適用設定を操作できるロール (フロント/バックで共有) */
 export function isApprover(role: MemberRole): boolean {
@@ -58,6 +59,39 @@ export interface MeDto {
   tenantName: string;
   role: MemberRole;
   edition: Edition;
+  /** 提供先(client)アクセスの場合、閲覧を許可された唯一のクライアントID (それ以外は null) */
+  clientScopeId: string | null;
+  clientScopeName: string | null;
+}
+
+/* ---- 提供先アクセス発行 (F-22) ---- */
+export interface ClientAccessDto {
+  userId: string;
+  email: string;
+  name: string;
+  clientId: string;
+  createdAt: string;
+}
+export interface CreateClientAccessInput {
+  email: string;
+  password: string;
+  name?: string;
+}
+
+/* ---- フィードバック (提供先→自社) ---- */
+export interface FeedbackDto {
+  id: string;
+  clientId: string;
+  clientName: string;
+  authorName: string;
+  projectId: string | null;
+  message: string;
+  status: 'open' | 'resolved';
+  createdAt: string;
+}
+export interface CreateFeedbackInput {
+  message: string;
+  projectId?: string;
 }
 
 /* ---- オンボーディング ---- */

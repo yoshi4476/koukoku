@@ -74,7 +74,8 @@ export default function LoginPage() {
         </p>
         <p className="auth-demo">
           デモ環境 (パスワード共通 <b>demo-pass-2026</b>):<br />
-          自社運用版 <b>demo@adgrid.jp</b> / 提供先版 <b>client@adgrid.jp</b>
+          自社運用版 <b>demo@adgrid.jp</b> / 提供先版 <b>client@adgrid.jp</b><br />
+          提供先アクセス(A社限定) <b>clienta@adgrid.jp</b>
         </p>
       </div>
     </div>
