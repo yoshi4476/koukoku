@@ -8,6 +8,7 @@ import { ClientsController } from './clients/clients.controller';
 import { PortalController } from './portal/portal.controller';
 import { HomeController } from './home/home.controller';
 import { LlmService } from './ai/llm.service';
+import { ImageGenService } from './ai/image-gen.service';
 import { AuditService } from './ai/audit.service';
 import { AuditController } from './ai/audit.controller';
 import { ReportService } from './ai/report.service';
@@ -113,6 +114,7 @@ import { ResellerController } from './reseller/reseller.controller';
     ResellerService,
     MetricsService,
     LlmService,
+    ImageGenService,
     AuditService,
     ReportService,
     CopyService,

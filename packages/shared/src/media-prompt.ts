@@ -7,6 +7,14 @@ import type { ProjectBrief, ProjectGoal } from './api';
  * 画像モデルは英語プロンプトで品質が出やすいため英語を主とし、日本語併記する。
  */
 
+/** 画像生成(Imagen)の結果 */
+export interface ImageGenResultDto {
+  url: string;
+  model: string;
+  count: number;
+  costJpy: number;
+}
+
 export interface MediaPromptSet {
   /** 画像生成AI用 (英語・推奨) */
   imagePrompt: string;

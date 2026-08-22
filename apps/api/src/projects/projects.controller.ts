@@ -9,6 +9,7 @@ import type {
   CreateProjectInput,
   CreativeGenDto,
   FatigueReportDto,
+  ImageGenResultDto,
   ProjectAssetDto,
   ProjectDetailDto,
   ProjectDto,
@@ -19,10 +20,14 @@ import type {
 import { ClientScope, SessionInfo, SessionInfoValue, TenantId } from '../common/tenant';
 import { assertEditor } from '../common/authz';
 import { ProjectsService } from './projects.service';
+import { ImageGenService } from '../ai/image-gen.service';
 
 @Controller('projects')
 export class ProjectsController {
-  constructor(private readonly projects: ProjectsService) {}
+  constructor(
+    private readonly projects: ProjectsService,
+    private readonly imageGen: ImageGenService,
+  ) {}
 
   @Get()
   list(@TenantId() tenantId: string, @ClientScope() scope: string | null): Promise<ProjectDto[]> {
@@ -87,6 +92,22 @@ export class ProjectsController {
     @Param('assetId') assetId: string,
   ): Promise<ProjectAssetDto> {
     return this.projects.publishAsset(tenantId, assetId, user);
+  }
+
+  @Post('assets/:assetId/generate-image')
+  generateImage(
+    @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
+    @Param('assetId') assetId: string,
+    @Body() body: { prompt?: string; aspectRatio?: string; model?: string; count?: number },
+  ): Promise<ImageGenResultDto> {
+    assertEditor(user);
+    return this.imageGen.generateForAsset(tenantId, assetId, {
+      prompt: body?.prompt ?? '',
+      aspectRatio: body?.aspectRatio,
+      model: body?.model,
+      count: body?.count,
+    });
   }
 
   @Post('assets/:assetId/upload')

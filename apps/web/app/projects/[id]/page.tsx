@@ -603,7 +603,7 @@ function AssetCard({ asset, project, canPublish, canEdit, onChanged }: {
 
       {showPreview ? (
         <Modal title={`広告プレビュー — ${asset.title}`} onClose={() => setShowPreview(false)}>
-          <AdPreview asset={asset} project={project} showBanner />
+          <AdPreview asset={asset} project={project} showBanner onAssetChanged={onChanged} />
         </Modal>
       ) : null}
       {showConfirm ? (

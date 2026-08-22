@@ -85,6 +85,8 @@ export const USAGE_FEATURE_LABEL: Record<string, string> = {
   audit: 'AI診断',
   report: 'レポート',
   copy: '広告文',
+  creative: 'クリエイティブ生成',
+  image: '画像生成 (Imagen)',
   format_detect: 'CSV判定',
 };
 

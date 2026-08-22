@@ -76,7 +76,7 @@ function FeedAdPreview({ asset, advertiser }: { asset: ProjectAssetDto; advertis
  * 制作物の「実際に広告が出る画面」プレビュー。媒体構成に応じて検索/フィードを出し分ける (F-24)。
  * copy=テキスト訴求の見え方、lp/flyer/video=アップロードした素材の見え方。
  */
-export function AdPreview({ asset, project, showBanner = false }: { asset: ProjectAssetDto; project: ProjectDetailDto; showBanner?: boolean }) {
+export function AdPreview({ asset, project, showBanner = false, onAssetChanged }: { asset: ProjectAssetDto; project: ProjectDetailDto; showBanner?: boolean; onAssetChanged?: () => void }) {
   const platforms = project.accounts.map((a) => a.platform);
   const advertiser = project.clientName || '広告主';
   const site = project.brief?.reference?.replace(/^https?:\/\//, '').split('/')[0] || 'example.com';
@@ -104,7 +104,7 @@ export function AdPreview({ asset, project, showBanner = false }: { asset: Proje
       {showBanner ? (
         <details className="adpv-mpp">
           <summary>🎬 画像・動画の生成プロンプト（外部AI用）</summary>
-          <MediaPromptPanel industryCode={project.industryCode} brief={project.brief} headline={asset.title} goal={project.goal} />
+          <MediaPromptPanel industryCode={project.industryCode} brief={project.brief} headline={asset.title} goal={project.goal} assetId={asset.id} onGenerated={onAssetChanged} />
         </details>
       ) : null}
       <p className="adpv-note">※ 実際の表示は各媒体・デバイス・審査により異なります。イメージ確認用です。</p>

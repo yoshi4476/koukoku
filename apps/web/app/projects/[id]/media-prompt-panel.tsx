@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import type { ProjectBrief, ProjectGoal } from '@adgrid/shared';
+import type { ImageGenResultDto, ProjectBrief, ProjectGoal } from '@adgrid/shared';
 import { buildMediaPrompts } from '@adgrid/shared';
+import { apiPost, toApiError, type ApiError } from '@/lib/api';
+import { formatYen } from '@/lib/format';
 
 function CopyRow({ label, value }: { label: string; value: string }) {
   const [copied, setCopied] = useState(false);
@@ -27,13 +29,53 @@ function CopyRow({ label, value }: { label: string; value: string }) {
  * 画像・動画 生成プロンプトの提示 (F-32)。業種・ヒアリング・見出しから外部の
  * 画像/動画AIに貼るだけのプロンプトを生成し、おすすめAPIも案内する。
  */
+const ASPECTS = [
+  { label: '正方形 1:1', ratio: '1:1' },
+  { label: '縦 9:16', ratio: '9:16' },
+  { label: '横 16:9', ratio: '16:9' },
+];
+
 export function MediaPromptPanel({
-  industryCode, brief, headline, goal,
-}: { industryCode: string; brief: ProjectBrief; headline: string; goal: ProjectGoal }) {
+  industryCode, brief, headline, goal, assetId, onGenerated,
+}: {
+  industryCode: string; brief: ProjectBrief; headline: string; goal: ProjectGoal;
+  assetId?: string; onGenerated?: () => void;
+}) {
   const m = buildMediaPrompts(industryCode, brief, headline, goal);
+  const [aspect, setAspect] = useState('1:1');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<ApiError | null>(null);
+  const [done, setDone] = useState<ImageGenResultDto | null>(null);
+
+  const generate = () => {
+    if (!assetId) return;
+    setBusy(true); setErr(null); setDone(null);
+    apiPost<ImageGenResultDto>(`/projects/assets/${assetId}/generate-image`, { prompt: m.imagePrompt, aspectRatio: aspect, model: 'imagen-4.0-ultra-generate-001', count: 1 })
+      .then((r) => { setDone(r); onGenerated?.(); })
+      .catch((e: unknown) => setErr(toApiError(e)))
+      .finally(() => setBusy(false));
+  };
+
   return (
     <div className="mpp">
       <p className="mpp-intro">下のプロンプトを<mark>画像/動画生成AIに貼る</mark>だけ。業種とヒアリングに合わせて最適化済みです。{m.styleNote}</p>
+
+      {assetId ? (
+        <div className="mpp-gen">
+          <div className="mpp-gen-h">
+            <span className="mpp-gen-t">✨ Imagen 4 Ultra で画像生成</span>
+            <div className="mpp-gen-aspect">
+              {ASPECTS.map((a) => (
+                <button key={a.ratio} className={`bstudio-chip${aspect === a.ratio ? ' on' : ''}`} onClick={() => setAspect(a.ratio)}>{a.label}</button>
+              ))}
+            </div>
+            <button className="btn sm pri" onClick={generate} disabled={busy}>{busy ? '生成中…（数十秒）' : '画像を生成'}</button>
+          </div>
+          {done ? <div className="mpp-gen-ok">✓ 生成しました（{done.count}枚・原価 {formatYen(done.costJpy)}）。制作物に添付済み。プレビューを開き直すと反映されます。</div> : null}
+          {err ? <div className="mpp-gen-err">{err.message}<br /><span>{err.resolution}</span></div> : null}
+          <p className="mpp-gen-note">※ 生成画像1枚 約¥9（Ultra）。Google Cloud側の課金で、当システムの「AI利用量」にも合算計上されます。GEMINI_API_KEY 未設定時は案内が出ます。</p>
+        </div>
+      ) : null}
 
       <div className="mpp-sec-h">🖼 画像生成プロンプト</div>
       <CopyRow label="英語（推奨・高品質）" value={m.imagePrompt} />
