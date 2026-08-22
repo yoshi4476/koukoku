@@ -85,6 +85,8 @@ async function main() {
   console.log('Seeding ADGRID demo data...');
   // 子テーブルから順に削除 (FK制約対応)
   await prisma.feedback.deleteMany({});
+  await prisma.shareLink.deleteMany({});
+  await prisma.liftTest.deleteMany({});
   await prisma.projectAsset.deleteMany({});
   await prisma.keywordStat.deleteMany({});
   await prisma.dashboard.deleteMany({});

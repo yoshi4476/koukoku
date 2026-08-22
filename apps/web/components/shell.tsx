@@ -159,6 +159,16 @@ const NAV_MAIN: NavItem[] = [
     ),
   },
   {
+    href: '/experiments',
+    label: '増分効果テスト',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <path d="M5.5 2v3.2L3 10.2a1.3 1.3 0 0 0 1.2 1.9h5.6A1.3 1.3 0 0 0 11 10.2L8.5 5.2V2" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+        <path d="M4.5 2h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: '/portal',
     label: '媒体窓口',
     icon: (

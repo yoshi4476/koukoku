@@ -12,3 +12,4 @@ export * from './asset-fit';
 export * from './kpi-tree';
 export * from './utm';
 export * from './calendar-events';
+export * from './lift-test';

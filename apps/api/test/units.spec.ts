@@ -20,6 +20,7 @@ import {
   normalizeToken,
   campaignName,
   checkUtmConsistency,
+  computeLift,
   DEFAULT_PROJECT_BRIEF,
 } from '@adgrid/shared';
 import { LlmService } from '../src/ai/llm.service';
@@ -361,6 +362,24 @@ describe('LLM原価計算 + プロンプトキャッシュ (F-09/F-31)', () => {
     expect(LlmService.costJpyFor('claude-opus-5', {
       input_tokens: 0, cache_creation_input_tokens: 2000, output_tokens: 0,
     })).toBeCloseTo(1.88, 2);
+  });
+});
+
+describe('増分効果テスト (F-42)', () => {
+  it('露出群と対照群のCVR差から増分CV・増分CPA・リフトを算出', () => {
+    const r = computeLift({ exposedAudience: 100000, exposedConversions: 300, exposedCost: 600000, controlAudience: 20000, controlConversions: 40 });
+    expect(r.exposedCvr).toBeCloseTo(0.3, 3);
+    expect(r.controlCvr).toBeCloseTo(0.2, 3);
+    expect(r.incrementalConversions).toBe(100); // 300 - (0.2% * 100000=200)
+    expect(r.incrementalCpa).toBe(6000); // 600000 / 100
+    expect(r.liftPct).toBe(50); // (0.3-0.2)/0.2
+    expect(r.significant).toBe(true); // 大サンプルで有意
+  });
+  it('差が無ければ増分CVは0・有意でない', () => {
+    const r = computeLift({ exposedAudience: 5000, exposedConversions: 50, exposedCost: 100000, controlAudience: 5000, controlConversions: 50 });
+    expect(r.incrementalConversions).toBe(0);
+    expect(r.incrementalCpa).toBeNull();
+    expect(r.significant).toBe(false);
   });
 });
 

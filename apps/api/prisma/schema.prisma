@@ -111,6 +111,30 @@ model ShareLink {
   @@map("share_links")
 }
 
+// 増分効果テスト (インクリメンタリティ / ホールドアウト) (F-42)。
+// 露出群 vs 対照群のCVRを比べ、広告が生んだ増分CV・増分CPAを検証する。
+model LiftTest {
+  id                 String   @id @default(cuid())
+  tenantId           String   @map("tenant_id")
+  clientId           String?  @map("client_id")
+  name               String
+  method             String   @default("holdback") // geo / audience / holdback
+  holdoutPct         Int      @default(10) @map("holdout_pct")
+  startDate          String?  @map("start_date")
+  endDate            String?  @map("end_date")
+  status             String   @default("planning") // planning / running / done
+  exposedAudience    Int?     @map("exposed_audience")
+  exposedConversions Float?   @map("exposed_conversions")
+  exposedCost        Float?   @map("exposed_cost")
+  controlAudience    Int?     @map("control_audience")
+  controlConversions Float?   @map("control_conversions")
+  note               String   @default("")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@index([tenantId, createdAt])
+  @@map("lift_tests")
+}
+
 // プロジェクト (目的・施策単位)。1クライアントに複数、複数の媒体アカウントを束ねる。
 // クライアントが「掲示・推移・アラート・改善」を1か所で行うためのハブ (F-19)。
 model Project {

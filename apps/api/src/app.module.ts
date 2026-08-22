@@ -59,6 +59,8 @@ import { ResellerService } from './reseller/reseller.service';
 import { ResellerController } from './reseller/reseller.controller';
 import { ShareService } from './share/share.service';
 import { ShareController, PublicShareController } from './share/share.controller';
+import { LiftService } from './lift/lift.service';
+import { LiftController } from './lift/lift.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -86,6 +88,7 @@ import { ShareController, PublicShareController } from './share/share.controller
     ResellerController,
     ShareController,
     PublicShareController,
+    LiftController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -117,6 +120,7 @@ import { ShareController, PublicShareController } from './share/share.controller
     FeedbackService,
     ResellerService,
     ShareService,
+    LiftService,
     MetricsService,
     LlmService,
     ImageGenService,
