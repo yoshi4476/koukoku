@@ -5,3 +5,4 @@ export * from './benchmarks';
 export * from './industry';
 export * from './media-plan';
 export * from './creative';
+export * from './ops-cycle';

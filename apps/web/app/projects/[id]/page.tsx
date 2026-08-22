@@ -39,11 +39,13 @@ import { DeltaText, ErrorCard, Modal, PlatformTag, SkeletonLines } from '@/compo
 import { apiGet, apiPost, apiPut, apiUpload, mediaUrl, toApiError, type ApiError } from '@/lib/api';
 import { AdPreview, PublishConfirm } from './ad-preview';
 import { CreativeGenerator } from './creative-gen';
+import { OpsCycleTab } from './ops-cycle';
 import { CONNECTION_STATUS_META, INDUSTRY_LABEL } from '@/lib/labels';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
 
-type Tab = 'overview' | 'hearing' | 'delivery' | 'settings' | 'assets' | 'alerts' | 'improve';
+type Tab = 'cycle' | 'overview' | 'hearing' | 'delivery' | 'settings' | 'assets' | 'alerts' | 'improve';
 const TABS: { key: Tab; label: string }[] = [
+  { key: 'cycle', label: '🔄 運用サイクル' },
   { key: 'overview', label: '概要（推移）' },
   { key: 'hearing', label: 'ヒアリング' },
   { key: 'delivery', label: '掲示' },
@@ -827,7 +829,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const isAgency = me.edition === 'agency';
   const { setSelectedClientId } = useClients();
   const detail = useApi<ProjectDetailDto>(`/projects/${id}`);
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>('cycle');
   const d = detail.data;
 
   const kpiCards = useMemo(() => {
@@ -879,6 +881,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               </button>
             ))}
           </div>
+
+          {/* --- 運用サイクル --- */}
+          {tab === 'cycle' ? <OpsCycleTab project={d} goTab={(t) => setTab(t as Tab)} /> : null}
 
           {/* --- 概要（推移） --- */}
           {tab === 'overview' ? (

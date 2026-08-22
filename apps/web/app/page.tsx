@@ -8,6 +8,7 @@ import { EDITION_LABEL } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
 import { ErrorCard, HintBar, PlatformTag, Skeleton } from '@/components/ui';
+import { OpsBoard } from '@/components/ops-board';
 import { apiPost, apiPut, ApiError, toApiError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 
@@ -212,6 +213,8 @@ export default function HomePage() {
       </HintBar>
 
       <InsightDigest />
+
+      <OpsBoard />
 
       {error ? <ErrorCard error={error} onRetry={retry} /> : null}
       {ackError ? <ErrorCard error={ackError} /> : null}

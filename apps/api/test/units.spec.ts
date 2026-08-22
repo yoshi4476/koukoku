@@ -11,6 +11,7 @@ import {
   industryModeFor,
   recommendMediaPlan,
   buildCreativeVariants,
+  buildOpsCycle,
   DEFAULT_PROJECT_BRIEF,
 } from '@adgrid/shared';
 import { limitsFor, widthUnits } from '../src/ai/copy-limits';
@@ -297,5 +298,36 @@ describe('業種特化クリエイティブ生成 (F-26)', () => {
     const vs = buildCreativeVariants(profile, DEFAULT_PROJECT_BRIEF, 'store', 99);
     expect(vs.length).toBeLessThanOrEqual(8);
     expect(vs.some((v) => v.cta.includes('予約'))).toBe(true);
+  });
+});
+
+describe('AI自律運用サイクル (F-27)', () => {
+  const base = { projectId: 'p1', projectName: 'テスト', clientName: 'A社', clientId: 'c1' };
+  it('制作物ゼロなら「作成」を促し、5フェーズを返す', () => {
+    const c = buildOpsCycle({ ...base, assetCount: 0, publishedCount: 0 });
+    expect(c.phases).toHaveLength(5);
+    expect(c.nextAction?.phase).toBe('create');
+  });
+  it('レビュー中の制作物があれば承認が最優先アクション', () => {
+    const c = buildOpsCycle({ ...base, assets: [{ status: 'review' }, { status: 'draft' }] });
+    expect(c.nextAction?.phase).toBe('approve');
+    expect(c.phases.find((p) => p.key === 'approve')?.status).toBe('attention');
+  });
+  it('公開済み+予算あり+レポートありで健全度が上がり、未対応が無ければ次アクションなし', () => {
+    const c = buildOpsCycle({
+      ...base,
+      assets: [{ status: 'published' }],
+      hasBudget: true,
+      lastReportAt: '2026-08-01T00:00:00.000Z',
+      openFindings: 0,
+      alertCount: 0,
+    });
+    expect(c.nextAction).toBeNull();
+    expect(c.healthPct).toBeGreaterThanOrEqual(80);
+  });
+  it('未対応の改善があれば改善フェーズが要対応', () => {
+    const c = buildOpsCycle({ ...base, assets: [{ status: 'published' }], hasBudget: true, openFindings: 3 });
+    expect(c.nextAction?.phase).toBe('improve');
+    expect(c.pendingCount).toBeGreaterThanOrEqual(1);
   });
 });
