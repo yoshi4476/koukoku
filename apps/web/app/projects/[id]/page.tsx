@@ -40,6 +40,7 @@ import { apiGet, apiPost, apiPut, apiUpload, mediaUrl, toApiError, type ApiError
 import { AdPreview, PublishConfirm } from './ad-preview';
 import { CreativeGenerator } from './creative-gen';
 import { OpsCycleTab } from './ops-cycle';
+import { FunnelBox } from './funnel-box';
 import { CONNECTION_STATUS_META, INDUSTRY_LABEL } from '@/lib/labels';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
 
@@ -294,6 +295,8 @@ function SettingsTab({ project, onSaved }: { project: ProjectDetailDto; onSaved:
       <div className="c-head"><h2>配信設定（金額・入札・ターゲティング）</h2></div>
       <div className="c-body form-grid">
         {error ? <ErrorCard error={error} /> : null}
+
+        <FunnelBox industryCode={project.industryCode} goal={project.goal} />
 
         {canEdit ? <MediaPlanBox project={project} onApply={applyPlan} /> : null}
 

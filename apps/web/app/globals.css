@@ -1099,3 +1099,29 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .opsb-reason { font-size: 11.5px; color: var(--ink-2); line-height: 1.4; }
 .opsb-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
 .opsb-health { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* ===== 業種別 導線設計 (F-28) ===== */
+.funnel { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: var(--bg-sub); margin-bottom: 4px; }
+.funnel-head { display: flex; align-items: center; gap: 10px; }
+.funnel-title { font-size: 14.5px; font-weight: 700; color: var(--ink); }
+.funnel-ind { font-size: 11.5px; font-weight: 600; color: var(--primary); background: var(--primary-soft); border-radius: 999px; padding: 3px 10px; }
+.funnel-summary { margin: 8px 0 14px; font-size: 12.5px; color: var(--ink-2); line-height: 1.6; }
+.funnel-flow { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding-bottom: 4px; }
+.funnel-step-wrap { display: flex; align-items: center; flex: 1; min-width: 0; }
+.funnel-step { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 7px; padding: 12px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
+.funnel-step-h { display: flex; flex-direction: column; gap: 1px; }
+.funnel-num { font-size: 10px; font-weight: 700; color: var(--primary); letter-spacing: .05em; }
+.funnel-label { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.funnel-goal { font-size: 11.5px; color: var(--ink-2); line-height: 1.45; min-height: 33px; }
+.funnel-plats { display: flex; flex-wrap: wrap; gap: 4px; }
+.funnel-chip { font-size: 10.5px; color: var(--ink-2); background: var(--bg-sub); border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; }
+.funnel-kv { font-size: 11px; color: var(--ink-2); line-height: 1.45; }
+.funnel-k { display: inline-block; min-width: 30px; font-weight: 700; color: var(--muted); margin-right: 4px; }
+.funnel-arrow { flex-shrink: 0; padding: 0 8px; color: var(--primary); font-size: 13px; transform: rotate(-90deg); }
+.funnel-note { margin: 12px 0 0; font-size: 11px; color: var(--muted); line-height: 1.5; }
+@media (max-width: 900px) {
+  .funnel-flow { flex-direction: column; }
+  .funnel-step-wrap { flex-direction: column; width: 100%; }
+  .funnel-step { width: 100%; }
+  .funnel-arrow { transform: none; padding: 4px 0; }
+}

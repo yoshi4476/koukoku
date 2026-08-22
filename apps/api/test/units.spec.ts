@@ -12,6 +12,7 @@ import {
   recommendMediaPlan,
   buildCreativeVariants,
   buildOpsCycle,
+  buildFunnel,
   DEFAULT_PROJECT_BRIEF,
 } from '@adgrid/shared';
 import { limitsFor, widthUnits } from '../src/ai/copy-limits';
@@ -329,5 +330,28 @@ describe('AI自律運用サイクル (F-27)', () => {
     const c = buildOpsCycle({ ...base, assets: [{ status: 'published' }], hasBudget: true, openFindings: 3 });
     expect(c.nextAction?.phase).toBe('improve');
     expect(c.pendingCount).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('業種別 導線設計 (F-28)', () => {
+  it('ECはリピート段階を含む購入導線、CV呼称が反映される', () => {
+    const f = buildFunnel('ec', 'conversion');
+    expect(f.archetype).toBe('ec');
+    expect(f.stages.some((s) => s.key === 'retention')).toBe(true);
+    expect(f.stages.find((s) => s.key === 'convert')?.label).toContain('購入');
+  });
+  it('BtoBは資料DLの育成段階を含む', () => {
+    const f = buildFunnel('saas', 'conversion');
+    expect(f.archetype).toBe('btob');
+    expect(f.stages.some((s) => s.label.includes('情報収集'))).toBe(true);
+  });
+  it('美容は来店予約系のローカル導線', () => {
+    const f = buildFunnel('beauty', 'store');
+    expect(f.archetype).toBe('local');
+    expect(f.stages[f.stages.length - 1].key).toBe('retention');
+  });
+  it('人材は応募導線 (recruit)、未知業種は lead にフォールバック', () => {
+    expect(buildFunnel('hr', 'conversion').archetype).toBe('recruit');
+    expect(buildFunnel('___x___', 'conversion').archetype).toBe('lead');
   });
 });
