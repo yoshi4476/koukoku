@@ -5,6 +5,11 @@ import { BID_STRATEGY_LABEL } from '@adgrid/shared';
 import { mediaUrl } from '@/lib/api';
 import { PLATFORM_SHORT_LABEL } from '@/lib/labels';
 import { formatYen } from '@/lib/format';
+import { BannerStudio } from './banner-studio';
+
+const CTA_BY_GOAL: Record<string, string> = {
+  conversion: '今すぐ申込む', store: 'ご予約はこちら', traffic: '公式サイトへ', awareness: '詳しく見る',
+};
 
 const SEARCH_PLATFORMS: Platform[] = ['google_ads', 'yahoo_search', 'microsoft_ads'];
 const FEED_PLATFORMS: Platform[] = [
@@ -70,18 +75,31 @@ function FeedAdPreview({ asset, advertiser }: { asset: ProjectAssetDto; advertis
  * 制作物の「実際に広告が出る画面」プレビュー。媒体構成に応じて検索/フィードを出し分ける (F-24)。
  * copy=テキスト訴求の見え方、lp/flyer/video=アップロードした素材の見え方。
  */
-export function AdPreview({ asset, project }: { asset: ProjectAssetDto; project: ProjectDetailDto }) {
+export function AdPreview({ asset, project, showBanner = false }: { asset: ProjectAssetDto; project: ProjectDetailDto; showBanner?: boolean }) {
   const platforms = project.accounts.map((a) => a.platform);
   const advertiser = project.clientName || '広告主';
   const site = project.brief?.reference?.replace(/^https?:\/\//, '').split('/')[0] || 'example.com';
   const showSearch = asset.type === 'copy' && platforms.some((p) => SEARCH_PLATFORMS.includes(p));
   const showFeed =
     platforms.some((p) => FEED_PLATFORMS.includes(p)) || !!asset.url || asset.type !== 'copy' || !showSearch;
+  const subLine = (asset.content || '').replace(/\n/g, ' ').split(/[。.!?！？]/)[0].trim();
 
   return (
     <div className="adpv-wrap">
       {showSearch ? <SearchAdPreview asset={asset} site={site} /> : null}
       {showFeed ? <FeedAdPreview asset={asset} advertiser={advertiser} /> : null}
+      {showBanner ? (
+        <div className="adpv">
+          <div className="adpv-cap">自動バナー（ダウンロード可）</div>
+          <BannerStudio
+            headline={asset.title}
+            sub={subLine}
+            cta={CTA_BY_GOAL[project.goal] ?? '詳しくはこちら'}
+            brand={advertiser}
+            seed={project.industryCode}
+          />
+        </div>
+      ) : null}
       <p className="adpv-note">※ 実際の表示は各媒体・デバイス・審査により異なります。イメージ確認用です。</p>
     </div>
   );

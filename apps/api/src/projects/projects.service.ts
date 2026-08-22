@@ -76,21 +76,31 @@ export class ProjectsService {
 
   /** アカウント群の最新診断から未対応指摘数を数える。各アカウントの最新1件のみを対象 */
   private async openFindingsFor(tx: Tx, accountIds: string[]): Promise<number> {
-    if (accountIds.length === 0) return 0;
+    const map = await this.openFindingsByAccount(tx, accountIds);
+    let open = 0;
+    for (const id of accountIds) open += map.get(id) ?? 0;
+    return open;
+  }
+
+  /** アカウント別の未対応指摘数を1クエリで一括取得 (一覧のN+1回避)。Map<adAccountId, number> */
+  private async openFindingsByAccount(tx: Tx, accountIds: string[]): Promise<Map<string, number>> {
+    const map = new Map<string, number>();
+    if (accountIds.length === 0) return map;
     // distinct でアカウントごとに最新の診断だけを取得 (件数上限による取りこぼしを防ぐ)
     const audits = await tx.audit.findMany({
       where: { adAccountId: { in: accountIds } },
       orderBy: [{ adAccountId: 'asc' }, { createdAt: 'desc' }],
       distinct: ['adAccountId'],
     });
-    let open = 0;
     for (const a of audits) {
       const statuses = (a.findingStatuses ?? {}) as Record<string, string>;
+      let open = 0;
       for (const f of (a.result as unknown as AuditResult).findings ?? []) {
         if ((statuses[String(f.priority_rank)] ?? 'open') === 'open') open++;
       }
+      map.set(a.adAccountId, open);
     }
-    return open;
+    return map;
   }
 
   async list(tenantId: string, scope?: string | null): Promise<ProjectDto[]> {
@@ -106,15 +116,27 @@ export class ProjectsService {
         },
         orderBy: { createdAt: 'desc' },
       });
+      // N+1回避: 全プロジェクトのアカウント/クライアントをまとめ、集計・診断・レポートを一括取得
+      const allAccountIds = projects.flatMap((p) => p.adAccounts.map((a) => a.id));
+      const clientIds = [...new Set(projects.map((p) => p.clientId))];
+      const [curByAcc, prevByAcc, findingsByAcc, reports] = await Promise.all([
+        this.metrics.totalsByAccount(tx, allAccountIds, daysAgo(6), daysAgo(0)),
+        this.metrics.totalsByAccount(tx, allAccountIds, daysAgo(13), daysAgo(7)),
+        this.openFindingsByAccount(tx, allAccountIds),
+        clientIds.length
+          ? tx.report.findMany({ where: { clientId: { in: clientIds } }, orderBy: { createdAt: 'desc' } })
+          : Promise.resolve([]),
+      ]);
+      const lastReportByClient = new Map<string, Date>();
+      for (const r of reports) if (!lastReportByClient.has(r.clientId)) lastReportByClient.set(r.clientId, r.createdAt);
+
       const out: ProjectDto[] = [];
       for (const p of projects) {
         const accountIds = p.adAccounts.map((a) => a.id);
-        const [cur, prev, lastReport, openFindings] = await Promise.all([
-          this.metrics.totals(tx, { adAccountIds: accountIds }, daysAgo(6), daysAgo(0)),
-          this.metrics.totals(tx, { adAccountIds: accountIds }, daysAgo(13), daysAgo(7)),
-          tx.report.findFirst({ where: { clientId: p.clientId }, orderBy: { createdAt: 'desc' } }),
-          this.openFindingsFor(tx, accountIds),
-        ]);
+        const cur = MetricsService.sumTotals(curByAcc, accountIds);
+        const prev = MetricsService.sumTotals(prevByAcc, accountIds);
+        const lastReportAt = lastReportByClient.get(p.clientId) ?? null;
+        const openFindings = accountIds.reduce((s, id) => s + (findingsByAcc.get(id) ?? 0), 0);
         const cpa = this.cpa(cur.cost, cur.conversions);
         const prevCpa = prev.conversions > 0 ? prev.cost / prev.conversions : null;
         const acctSet = new Set(accountIds);
@@ -137,7 +159,7 @@ export class ProjectsService {
           openFindings,
           assetCount: p.assets.length,
           publishedCount: p.assets.filter((a) => a.status === 'published').length,
-          lastReportAt: lastReport?.createdAt.toISOString() ?? null,
+          lastReportAt: lastReportAt?.toISOString() ?? null,
           createdAt: p.createdAt.toISOString(),
         });
       }

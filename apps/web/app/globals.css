@@ -1125,3 +1125,14 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
   .funnel-step { width: 100%; }
   .funnel-arrow { transform: none; padding: 4px 0; }
 }
+
+/* ===== 自動バナー生成 (F-30) ===== */
+.bstudio{display:flex;flex-direction:column;gap:10px}
+.bstudio-toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.bstudio-sizes{display:flex;gap:6px}
+.bstudio-size{border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-2);border-radius:7px;padding:5px 10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.bstudio-size.on{background:var(--primary);color:#fff;border-color:transparent}
+.bstudio-toolbar .btn{margin-left:auto}
+.bstudio-stage{display:flex;justify-content:center;background:var(--bg-sub);border-radius:10px;padding:14px}
+.bstudio-svg{width:100%;max-width:340px;height:auto;border-radius:8px;box-shadow:var(--shadow-2)}
+.bstudio-note{margin:0;font-size:11px;color:var(--muted);line-height:1.5}

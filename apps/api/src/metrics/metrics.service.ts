@@ -78,6 +78,39 @@ export class MetricsService {
     };
   }
 
+  /** アカウント別集計を1クエリで一括取得する (プロジェクト一覧のN+1回避)。Map<adAccountId, Totals> */
+  async totalsByAccount(tx: Tx, accountIds: string[], since: Date, until: Date): Promise<Map<string, Totals>> {
+    const map = new Map<string, Totals>();
+    if (accountIds.length === 0) return map;
+    const rows = await tx.factAdPerformance.groupBy({
+      by: ['adAccountId'],
+      where: { adAccountId: { in: accountIds }, date: { gte: since, lte: until } },
+      _sum: { cost: true, impressions: true, clicks: true, conversions: true, conversionValue: true },
+    });
+    for (const r of rows) {
+      map.set(r.adAccountId, {
+        cost: Number(r._sum.cost ?? 0),
+        impressions: Number(r._sum.impressions ?? 0),
+        clicks: Number(r._sum.clicks ?? 0),
+        conversions: Number(r._sum.conversions ?? 0),
+        conversionValue: Number(r._sum.conversionValue ?? 0),
+      });
+    }
+    return map;
+  }
+
+  /** Map<adAccountId, Totals> から指定アカウント群を合算する */
+  static sumTotals(map: Map<string, Totals>, accountIds: string[]): Totals {
+    const t: Totals = { cost: 0, impressions: 0, clicks: 0, conversions: 0, conversionValue: 0 };
+    for (const id of accountIds) {
+      const v = map.get(id);
+      if (!v) continue;
+      t.cost += v.cost; t.impressions += v.impressions; t.clicks += v.clicks;
+      t.conversions += v.conversions; t.conversionValue += v.conversionValue;
+    }
+    return t;
+  }
+
   kpiFromTotals(cur: Totals, prev: Totals): KpiSummaryDto {
     const cpa = cur.conversions > 0 ? Math.round(cur.cost / cur.conversions) : null;
     const prevCpa = prev.conversions > 0 ? prev.cost / prev.conversions : null;
