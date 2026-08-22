@@ -1003,6 +1003,24 @@ export interface PreflightDto {
   undeployable: UndeployableAsset[];
 }
 
+/** クライアント共有リンク (F-41)。閲覧専用ポータルの発行状態 (自社側) */
+export interface ShareLinkDto {
+  token: string | null;
+  enabled: boolean;
+  createdAt: string | null;
+}
+
+/** 公開ポータルの表示データ (ログイン不要・閲覧専用) */
+export interface PublicPortalDto {
+  clientName: string;
+  industryLabel: string;
+  periodLabel: string;
+  kpi: { cost: number; conversions: number; cpa: number | null; roas: number | null };
+  trend: DailyPointDto[];
+  projects: { name: string; cost: number; conversions: number; cpa: number | null }[];
+  generatedAt: string;
+}
+
 export interface CreateAssetInput {
   type: AssetType;
   title: string;

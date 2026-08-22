@@ -97,6 +97,20 @@ model Feedback {
   @@map("feedback")
 }
 
+// クライアント共有ライブポータル (F-41)。閲覧専用の共有リンク。token でログイン不要の
+// 成果ダッシュボードを開ける。RLSは付けず(tokenが秘密), クエリで tenant/client を必ず絞る。
+model ShareLink {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  clientId  String   @map("client_id")
+  token     String   @unique
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([tenantId, clientId])
+  @@map("share_links")
+}
+
 // プロジェクト (目的・施策単位)。1クライアントに複数、複数の媒体アカウントを束ねる。
 // クライアントが「掲示・推移・アラート・改善」を1か所で行うためのハブ (F-19)。
 model Project {

@@ -1287,3 +1287,13 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .fatigue-row.rot-refresh{border-left:3px solid var(--warn)}
 .fatigue-row.rot-scale{border-left:3px solid var(--good)}
 .fatigue-row.rot-keep{border-left:3px solid var(--line-strong)}
+
+/* ===== クライアント共有ポータル (F-41) ===== */
+.share-link-row{display:flex;gap:6px;margin-bottom:8px}
+.share-link-row .input{flex:1;font-size:11.5px;font-family:ui-monospace,Menlo,Consolas,monospace}
+.portal-wrap{min-height:100vh;background:var(--bg-sub);padding:28px 16px 60px}
+.portal-inner{max-width:960px;margin:0 auto}
+.portal-brand{font-family:var(--font-noto),sans-serif;font-weight:800;font-size:20px;color:var(--ink);letter-spacing:.01em;margin-bottom:6px}
+.portal-brand .bx{color:var(--primary)}
+.portal-tag{font-size:12px;font-weight:600;color:var(--muted);margin-left:8px}
+.portal-foot{margin-top:16px;font-size:11.5px;color:var(--muted);text-align:center;line-height:1.6}

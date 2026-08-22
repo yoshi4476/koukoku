@@ -57,6 +57,8 @@ import { FeedbackService } from './feedback/feedback.service';
 import { FeedbackController } from './feedback/feedback.controller';
 import { ResellerService } from './reseller/reseller.service';
 import { ResellerController } from './reseller/reseller.controller';
+import { ShareService } from './share/share.service';
+import { ShareController, PublicShareController } from './share/share.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -82,6 +84,8 @@ import { ResellerController } from './reseller/reseller.controller';
     AccessController,
     FeedbackController,
     ResellerController,
+    ShareController,
+    PublicShareController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -112,6 +116,7 @@ import { ResellerController } from './reseller/reseller.controller';
     AccessService,
     FeedbackService,
     ResellerService,
+    ShareService,
     MetricsService,
     LlmService,
     ImageGenService,

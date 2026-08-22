@@ -11,6 +11,7 @@ import type {
   CreateClientAccessInput,
   Platform,
   SampleDataResultDto,
+  ShareLinkDto,
 } from '@adgrid/shared';
 import { ALL_PLATFORMS, PLATFORM_META, industryModeFor } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
@@ -271,10 +272,44 @@ function ClientAccessPanel({ clientId }: { clientId: string }) {
   );
 }
 
+/* クライアント共有ポータル (閲覧専用リンクの発行・停止) */
+function SharePanel({ clientId }: { clientId: string }) {
+  const { data, loading, error, retry, refresh } = useApi<ShareLinkDto>(`/clients/${clientId}/share`);
+  const [busy, setBusy] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const link = data?.token ? `${typeof window !== 'undefined' ? window.location.origin : ''}/share/${data.token}` : '';
+
+  const act = (fn: () => Promise<unknown>) => { setBusy(true); fn().then(() => refresh()).finally(() => setBusy(false)); };
+
+  return (
+    <div className="access-panel">
+      <div className="ap-head">🔗 共有ポータル（閲覧専用リンク）</div>
+      <p className="ap-desc">ログイン不要で成果ダッシュボードを見せる共有リンクを発行します。数値は常に最新です。停止するといつでも無効化できます。</p>
+      {loading ? <Skeleton w="100%" h={30} /> : null}
+      {error ? <ErrorCard error={error} onRetry={retry} /> : null}
+      {data ? (
+        data.enabled && link ? (
+          <>
+            <div className="share-link-row">
+              <input className="input" readOnly value={link} onFocus={(e) => e.target.select()} />
+              <button className="btn sm sec" onClick={() => navigator.clipboard?.writeText(link).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1200); }, () => undefined)}>{copied ? '✓' : 'コピー'}</button>
+              <a className="btn sm sec" href={link} target="_blank" rel="noopener noreferrer">開く</a>
+            </div>
+            <button className="btn sm sec danger-text" disabled={busy} onClick={() => act(() => apiDelete(`/clients/${clientId}/share`))}>共有を停止</button>
+          </>
+        ) : (
+          <button className="btn sm pri" disabled={busy} onClick={() => act(() => apiPost(`/clients/${clientId}/share`, {}))}>{busy ? '発行中…' : '共有リンクを発行'}</button>
+        )
+      ) : null}
+    </div>
+  );
+}
+
 function ClientCard({ o, onChanged }: { o: ClientOverviewDto; onChanged: () => void }) {
   const [formOpen, setFormOpen] = useState(false);
   const [modeOpen, setModeOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const c = o.client;
   const qs = `clientId=${encodeURIComponent(c.id)}`;
 
@@ -329,6 +364,9 @@ function ClientCard({ o, onChanged }: { o: ClientOverviewDto; onChanged: () => v
         <button type="button" className="btn sm sec" aria-expanded={accessOpen} onClick={() => setAccessOpen((v) => !v)}>
           {accessOpen ? '閉じる' : '🔑 提供先アクセス'}
         </button>
+        <button type="button" className="btn sm sec" aria-expanded={shareOpen} onClick={() => setShareOpen((v) => !v)}>
+          {shareOpen ? '閉じる' : '🔗 共有ポータル'}
+        </button>
         <button
           type="button"
           className="btn sm sec"
@@ -341,6 +379,7 @@ function ClientCard({ o, onChanged }: { o: ClientOverviewDto; onChanged: () => v
       </div>
 
       {accessOpen ? <ClientAccessPanel clientId={c.id} /> : null}
+      {shareOpen ? <SharePanel clientId={c.id} /> : null}
 
       {formOpen ? (
         <AddAccountForm

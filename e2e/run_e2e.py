@@ -93,6 +93,22 @@ def main():
     st, pf3 = api(ag, f"/projects/{pid}/preflight")
     check("削除後は検出されない", not any(u["assetId"] == badAsset["id"] for u in (pf3.get("undeployable") or [])))
 
+    # クライアント共有ポータル (F-41): 発行 → 無認証で閲覧可 → 停止で無効
+    st, clients = api(ag, "/clients")
+    cid = clients[0]["id"]
+    st, sh = api(ag, f"/clients/{cid}/share", "POST", {})
+    token = sh.get("token")
+    check("共有リンク発行 (token取得)", st in (200, 201) and bool(token), f"status={st}")
+    # 無認証(cookieなし)で公開ポータルが開ける
+    st_anon, portal = api("", f"/share/{token}")
+    check("無認証で公開ポータル閲覧可", st_anon == 200 and portal and "clientName" in portal, f"status={st_anon}")
+    check("公開ポータルは1社分のKPIを返す", bool(portal and portal.get("kpi")))
+    st, _ = api("", "/share/invalid_token_xyz")
+    check("不正tokenは404", st == 404, f"status={st}")
+    st, _ = api(ag, f"/clients/{cid}/share", "DELETE")
+    st_off, _ = api("", f"/share/{token}")
+    check("共有停止後は公開ポータル404", st_off == 404, f"status={st_off}")
+
     # ---- 2. 提供先(clientScope) の分離。clienta@ は c_a に限定された提供先アクセス ----
     cl = login("clienta@adgrid.jp", PW)
     check("提供先ログイン", bool(cl))
