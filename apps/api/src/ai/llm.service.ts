@@ -12,6 +12,16 @@ const PRICE_USD_PER_MTOK: Record<string, { input: number; output: number }> = {
   'claude-haiku-4-5': { input: 1, output: 5 },
 };
 const JPY_PER_USD = 150;
+// プロンプトキャッシュの料金倍率: 書き込み(初回)=入力の1.25倍 / 読み込み(ヒット)=入力の0.10倍
+const CACHE_WRITE_MULT = 1.25;
+const CACHE_READ_MULT = 0.1;
+
+export interface LlmUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+}
 
 @Injectable()
 export class LlmService {
@@ -50,16 +60,18 @@ export class LlmService {
     const res = await this.client.messages.create({
       model: opts.model,
       max_tokens: opts.maxTokens ?? 16000,
-      system: opts.system,
+      // システムプロンプトは機能ごとに静的なため、prompt caching で入力課金を圧縮する。
+      // 最小長に満たない場合はAPIがキャッシュを無視するだけで無害 (診断など長いプロンプトで効く)。
+      system: [{ type: 'text', text: opts.system, cache_control: { type: 'ephemeral' } }],
       messages: [{ role: 'user', content: opts.user }],
     });
     const latencyMs = Date.now() - started;
 
-    const price = PRICE_USD_PER_MTOK[opts.model] ?? { input: 5, output: 25 };
-    const inputTokens = res.usage.input_tokens;
-    const outputTokens = res.usage.output_tokens;
-    const costJpy =
-      ((inputTokens * price.input + outputTokens * price.output) / 1_000_000) * JPY_PER_USD;
+    const u = res.usage as LlmUsage;
+    // 使用量表示は「実際に処理した入力トークン合計」(通常+キャッシュ書込+キャッシュ読込)
+    const inputTokens = u.input_tokens + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
+    const outputTokens = u.output_tokens;
+    const costJpy = LlmService.costJpyFor(opts.model, u);
 
     await this.prisma.withTenant(opts.tenantId, (tx) =>
       tx.llmCall.create({
@@ -69,7 +81,7 @@ export class LlmService {
           model: opts.model,
           inputTokens,
           outputTokens,
-          costJpy: +costJpy.toFixed(2),
+          costJpy,
           latencyMs,
           promptVersion: opts.promptVersion,
         },
@@ -88,6 +100,23 @@ export class LlmService {
       );
     }
     return text;
+  }
+
+  /**
+   * 原価(円)を算出する。prompt caching の料金体系を反映:
+   * 通常入力=1.0倍 / キャッシュ書込=1.25倍 / キャッシュ読込=0.10倍 / 出力=出力単価。
+   */
+  static costJpyFor(model: string, usage: LlmUsage): number {
+    const price = PRICE_USD_PER_MTOK[model] ?? { input: 5, output: 25 };
+    const cacheWrite = usage.cache_creation_input_tokens ?? 0;
+    const cacheRead = usage.cache_read_input_tokens ?? 0;
+    const usd =
+      (usage.input_tokens * price.input +
+        cacheWrite * price.input * CACHE_WRITE_MULT +
+        cacheRead * price.input * CACHE_READ_MULT +
+        usage.output_tokens * price.output) /
+      1_000_000;
+    return +(usd * JPY_PER_USD).toFixed(2);
   }
 
   /** LLM出力からJSON部分を抽出してパースする (コードフェンス・前置き対策) */

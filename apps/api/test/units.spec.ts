@@ -15,6 +15,7 @@ import {
   buildFunnel,
   DEFAULT_PROJECT_BRIEF,
 } from '@adgrid/shared';
+import { LlmService } from '../src/ai/llm.service';
 import { limitsFor, widthUnits } from '../src/ai/copy-limits';
 import { scanLawDictionary } from '../src/ai/law-dictionary';
 import { normalizeHeader, parseCsv, parseDate, parseNumber } from '../src/imports/csv.service';
@@ -330,6 +331,29 @@ describe('AI自律運用サイクル (F-27)', () => {
     const c = buildOpsCycle({ ...base, assets: [{ status: 'published' }], hasBudget: true, openFindings: 3 });
     expect(c.nextAction?.phase).toBe('improve');
     expect(c.pendingCount).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('LLM原価計算 + プロンプトキャッシュ (F-09/F-31)', () => {
+  it('キャッシュ無しは 通常入力×単価 + 出力×単価', () => {
+    // opus-5: in $5 out $25 /1M, 150円/USD。in4000/out2000 → (0.02+0.05)USD×150=¥10.5
+    expect(LlmService.costJpyFor('claude-opus-5', { input_tokens: 4000, output_tokens: 2000 })).toBeCloseTo(10.5, 2);
+  });
+  it('キャッシュ読込は入力の0.10倍で課金される (ヒット時に大幅減)', () => {
+    // sonnet-5: in $3。通常入力500 + キャッシュ読込1500(×0.1) + 出力1000
+    const cached = LlmService.costJpyFor('claude-sonnet-5', {
+      input_tokens: 500, cache_read_input_tokens: 1500, output_tokens: 1000,
+    });
+    // 同トークンをキャッシュ無し(全2000が通常入力)で処理した場合より安い
+    const uncached = LlmService.costJpyFor('claude-sonnet-5', { input_tokens: 2000, output_tokens: 1000 });
+    expect(cached).toBeLessThan(uncached);
+    expect(cached).toBeCloseTo(2.54, 2);
+  });
+  it('キャッシュ書込は入力の1.25倍', () => {
+    // opus-5: 書込2000のみ → 2000×5×1.25/1M×150 = ¥1.875 → 1.88
+    expect(LlmService.costJpyFor('claude-opus-5', {
+      input_tokens: 0, cache_creation_input_tokens: 2000, output_tokens: 0,
+    })).toBeCloseTo(1.88, 2);
   });
 });
 
