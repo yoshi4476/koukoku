@@ -54,6 +54,8 @@ import { AccessService } from './access/access.service';
 import { AccessController } from './access/access.controller';
 import { FeedbackService } from './feedback/feedback.service';
 import { FeedbackController } from './feedback/feedback.controller';
+import { ResellerService } from './reseller/reseller.service';
+import { ResellerController } from './reseller/reseller.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -78,6 +80,7 @@ import { FeedbackController } from './feedback/feedback.controller';
     InsightsController,
     AccessController,
     FeedbackController,
+    ResellerController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -107,6 +110,7 @@ import { FeedbackController } from './feedback/feedback.controller';
     InsightsService,
     AccessService,
     FeedbackService,
+    ResellerService,
     MetricsService,
     LlmService,
     AuditService,

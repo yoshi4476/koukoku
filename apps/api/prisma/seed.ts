@@ -84,6 +84,7 @@ async function seedFacts(
 async function main() {
   console.log('Seeding ADGRID demo data...');
   // 子テーブルから順に削除 (FK制約対応)
+  await prisma.feedback.deleteMany({});
   await prisma.projectAsset.deleteMany({});
   await prisma.keywordStat.deleteMany({});
   await prisma.dashboard.deleteMany({});
@@ -400,8 +401,9 @@ async function main() {
   // 他社に下ろした版を実際に確認できるよう、自社データ閲覧中心の別テナントを用意。
   // デモログイン: client@adgrid.jp / demo-pass-2026
   const CLIENT_TENANT = 't_demo_client';
+  // リセラー型デモ: この提供先テナントは自社(t_demo_agency)が発行した子テナント
   await prisma.tenant.create({
-    data: { id: CLIENT_TENANT, name: '自社EC事業部 (提供先版デモ)', plan: 'business', edition: 'client' },
+    data: { id: CLIENT_TENANT, name: '自社EC事業部 (提供先テナント)', plan: 'business', edition: 'client', parentTenantId: TENANT_ID },
   });
   const clientUser = await prisma.user.create({
     data: {
@@ -412,6 +414,10 @@ async function main() {
   });
   await prisma.tenantMember.create({
     data: { userId: clientUser.id, tenantId: CLIENT_TENANT, role: 'owner' },
+  });
+  // 自社(発行者)も子テナントの admin として登録 → demo@ はテナント切替で管理できる
+  await prisma.tenantMember.create({
+    data: { userId: demoUser.id, tenantId: CLIENT_TENANT, role: 'admin' },
   });
   const ecClient = await prisma.client.create({
     data: { id: 'cc_ec', tenantId: CLIENT_TENANT, name: '自社オンラインストア', industryCode: 'ec' },

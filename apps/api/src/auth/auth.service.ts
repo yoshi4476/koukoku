@@ -2,7 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
-import type { Edition, MeDto, MemberRole } from '@adgrid/shared';
+import type { Edition, MeDto, MemberRole, SwitchableTenantDto } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 
@@ -110,6 +110,9 @@ export class AuthService {
         edition: 'agency',
         clientScopeId: null,
         clientScopeName: null,
+        switchableTenants: [
+          { id: tenantId, name: input.tenantName.trim(), edition: 'agency', role: 'owner', isChild: false },
+        ],
       },
       token: signSession(payload),
     };
@@ -163,9 +166,42 @@ export class AuthService {
         edition: scopeId ? 'client' : ((tenant?.edition as Edition) ?? 'agency'),
         clientScopeId: scopeId,
         clientScopeName,
+        switchableTenants: await this.switchableTenantsOf(user.id),
       },
       token: signSession(payload),
     };
+  }
+
+  /** ユーザーが切り替えられるテナント一覧 (所属する全テナント)。各テナント文脈で名前を取得 */
+  private async switchableTenantsOf(userId: string): Promise<SwitchableTenantDto[]> {
+    const memberships = await this.prisma.tenantMember.findMany({ where: { userId } });
+    const out: SwitchableTenantDto[] = [];
+    for (const m of memberships) {
+      const t = await this.prisma.withTenant(m.tenantId, (tx) => tx.tenant.findUnique({ where: { id: m.tenantId } }));
+      if (t) {
+        out.push({
+          id: t.id,
+          name: t.name,
+          edition: (t.edition as Edition) ?? 'agency',
+          role: m.role as MemberRole,
+          isChild: t.parentTenantId != null,
+        });
+      }
+    }
+    // 親(自社)を先頭に、子(提供先)を後ろに
+    out.sort((a, b) => Number(a.isChild) - Number(b.isChild));
+    return out;
+  }
+
+  /** アクティブテナントの切替。ユーザーが所属していれば新テナントでセッション再発行 */
+  async switchTenant(session: SessionPayload, tenantId: string): Promise<{ me: MeDto; token: string }> {
+    const membership = await this.prisma.tenantMember.findFirst({ where: { userId: session.sub, tenantId } });
+    if (!membership) {
+      throw new AppError(HttpStatus.FORBIDDEN, 'このテナントへの権限がありません。', '所属するテナントを選んでください。');
+    }
+    const scopeId = membership.role === 'client' ? membership.clientId ?? null : null;
+    const payload: SessionPayload = { sub: session.sub, tenantId, role: membership.role as MemberRole, clientScopeId: scopeId };
+    return { me: await this.me(payload), token: signSession(payload) };
   }
 
   async me(session: SessionPayload): Promise<MeDto> {
@@ -197,6 +233,7 @@ export class AuthService {
       edition: scopeId ? 'client' : ((tenant?.edition as Edition) ?? 'agency'),
       clientScopeId: scopeId,
       clientScopeName,
+      switchableTenants: await this.switchableTenantsOf(user.id),
     };
   }
 

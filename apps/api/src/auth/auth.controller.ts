@@ -60,6 +60,20 @@ export class AuthController {
     return this.auth.me(this.requireSession(req));
   }
 
+  @Put('tenant')
+  async switchTenant(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() body: { tenantId?: string },
+  ): Promise<MeDto> {
+    if (!body?.tenantId) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'テナントが指定されていません。', '切り替え先を選んでください。');
+    }
+    const { me, token } = await this.auth.switchTenant(this.requireSession(req), body.tenantId);
+    res.cookie(SESSION_COOKIE, token, COOKIE_OPTS);
+    return me;
+  }
+
   @Put('edition')
   async setEdition(@Req() req: Request, @Body() body: { edition?: string }): Promise<MeDto> {
     if (body?.edition !== 'agency' && body?.edition !== 'client') {

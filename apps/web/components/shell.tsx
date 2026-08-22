@@ -22,6 +22,9 @@ const HREF_FEATURE: Record<string, EditionFeature> = {
   '/knowledge': 'knowledge',
 };
 
+// 提供先版テナント(edition=client)では管理系(クライアント管理・テナント発行)も隠す
+const CLIENT_EDITION_HIDE = new Set(['/clients', '/reseller']);
+
 const NAV_MAIN: NavItem[] = [
   {
     href: '/',
@@ -258,6 +261,17 @@ const NAV_SETTINGS: NavItem[] = [
       </svg>
     ),
   },
+  {
+    href: '/reseller',
+    label: '提供先テナント',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <rect x="1.5" y="6" width="4.5" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" />
+        <rect x="8" y="2" width="4.5" height="10" rx="1" fill="none" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M6 9h2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+      </svg>
+    ),
+  },
 ];
 
 // 広告運用の手順どおりにメニューを並べ替える (準備→作る→見る→直す→報告)。
@@ -277,7 +291,7 @@ const NAV_PHASES: NavPhase[] = [
   { label: null, hrefs: ['/', '/projects'] },
   { label: '作る（横断）', hrefs: ['/copy', '/knowledge'] },
   { label: '報告する', hrefs: ['/report'] },
-  { label: '管理・設定', hrefs: ['/clients', '/feedback', '/settings', '/guide'] },
+  { label: '管理・設定', hrefs: ['/clients', '/reseller', '/feedback', '/settings', '/guide'] },
 ];
 
 // 提供先(client)アクセス専用の最小ナビ (自分のクライアントの閲覧+フィードバックのみ)
@@ -349,11 +363,12 @@ function AvatarMenu() {
 
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { me } = useAuth();
+  const { me, switchTenant } = useAuth();
   const { clients, selectedClientId, setSelectedClientId } = useClients();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const clientScoped = me.clientScopeId != null;
   const phases = clientScoped ? CLIENT_NAV_PHASES : NAV_PHASES;
+  const multiTenant = me.switchableTenants.length > 1;
 
   return (
     <div className="app">
@@ -369,6 +384,7 @@ export function Shell({ children }: { children: ReactNode }) {
         {phases.map((phase, i) => {
           const items = phase.hrefs
             .filter((h) => {
+              if (me.edition === 'client' && CLIENT_EDITION_HIDE.has(h)) return false;
               const f = HREF_FEATURE[h];
               return !f || editionAllows(me.edition, f);
             })
@@ -385,6 +401,21 @@ export function Shell({ children }: { children: ReactNode }) {
       </aside>
       <div className="main">
         <div className="topbar">
+          {multiTenant ? (
+            <select
+              className="tenant-sw"
+              value={me.tenantId}
+              onChange={(e) => { if (e.target.value !== me.tenantId) switchTenant(e.target.value); }}
+              aria-label="テナントを切り替える"
+              title="テナント(自社/提供先)を切り替える"
+            >
+              {me.switchableTenants.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.isChild ? '🏷 ' : '🏢 '}{t.name}
+                </option>
+              ))}
+            </select>
+          ) : null}
           {clientScoped ? (
             <span className="client-fixed">{me.clientScopeName ?? 'マイアカウント'}</span>
           ) : (

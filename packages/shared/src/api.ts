@@ -62,6 +62,33 @@ export interface MeDto {
   /** 提供先(client)アクセスの場合、閲覧を許可された唯一のクライアントID (それ以外は null) */
   clientScopeId: string | null;
   clientScopeName: string | null;
+  /** このユーザーが切り替えられるテナント (親+管理する子テナント)。1件ならスイッチャー非表示 */
+  switchableTenants: SwitchableTenantDto[];
+}
+
+export interface SwitchableTenantDto {
+  id: string;
+  name: string;
+  edition: Edition;
+  role: MemberRole;
+  /** リセラーの子テナント(自社が発行した提供先テナント)か */
+  isChild: boolean;
+}
+
+/* ---- リセラー: 提供先テナント発行 (F-23) ---- */
+export interface ChildTenantDto {
+  id: string;
+  name: string;
+  edition: Edition;
+  status: string;
+  adminEmail: string;
+  createdAt: string;
+}
+export interface CreateChildTenantInput {
+  companyName: string;
+  adminEmail: string;
+  adminPassword: string;
+  adminName?: string;
 }
 
 /* ---- 提供先アクセス発行 (F-22) ---- */

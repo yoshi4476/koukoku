@@ -775,6 +775,15 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .asset-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 4px; }
 .proj-assets-line { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted); }
 
+/* ---- リセラー: テナント切替 / 提供先テナント ---- */
+.tenant-sw { font-family: inherit; font-size: 13px; font-weight: 700; color: var(--primary); background: var(--primary-soft); border: 1px solid var(--primary); border-radius: 8px; padding: 6px 10px; cursor: pointer; max-width: 220px; }
+.rt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.rt-card { background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--warn); border-radius: 12px; padding: 15px 17px; box-shadow: var(--shadow-1); }
+.rt-head { display: flex; align-items: center; gap: 8px; }
+.rt-name { font-size: 15.5px; font-weight: 700; }
+.rt-meta { font-size: 12.5px; color: var(--ink-2); margin-top: 6px; word-break: break-all; }
+.rt-actions { margin-top: 12px; }
+
 /* ---- 提供先アクセス発行 / フィードバック ---- */
 .client-fixed { font-size: 13px; font-weight: 700; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; }
 .cl-access { margin-top: 8px; border: 1px dashed var(--line-strong); border-radius: 10px; padding: 12px 14px; background: var(--bg-sub); }

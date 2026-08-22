@@ -48,6 +48,8 @@ model Tenant {
   status    String   @default("active")
   // 版 (要件書 §②)。agency=自社運用版(全機能) / client=提供先版(自社データ閲覧のみ・承認/自動適用は非表示)
   edition   String   @default("agency")
+  // リセラー型 (F-23)。親テナント(自社)が発行した子テナント(他社)は parentTenantId を持つ
+  parentTenantId String? @map("parent_tenant_id")
   // 通知設定等のテナント設定 (slackWebhookUrl など)
   settings  Json     @default("{}")
   createdAt DateTime @default(now()) @map("created_at")
