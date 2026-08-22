@@ -1281,3 +1281,9 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .tl-bar.ended{background:var(--muted)}
 .tl-pace{text-align:right}
 .tl-nobudget{font-size:11px;color:var(--muted)}
+
+/* クリエイティブ・ローテーション行 (F-40) */
+.fatigue-row.rot-pause{border-left:3px solid var(--bad)}
+.fatigue-row.rot-refresh{border-left:3px solid var(--warn)}
+.fatigue-row.rot-scale{border-left:3px solid var(--good)}
+.fatigue-row.rot-keep{border-left:3px solid var(--line-strong)}

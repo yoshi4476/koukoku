@@ -32,6 +32,7 @@ import {
   isApprover,
   recommendMediaPlan,
   relevantAssetTypes,
+  ROTATION_META,
 } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
@@ -755,11 +756,6 @@ function KpiProgressCard({ project }: { project: ProjectDetailDto }) {
   );
 }
 
-const FATIGUE_META: Record<string, { label: string; cls: string }> = {
-  fatigued: { label: '疲弊', cls: 'down' },
-  watch: { label: '注意', cls: 'warn' },
-  ok: { label: '安定', cls: 'flat' },
-};
 
 function ImproveTab({ project, goFiltered }: { project: ProjectDetailDto; goFiltered: (href: string) => void }) {
   const { me } = useAuth();
@@ -808,10 +804,10 @@ function ImproveTab({ project, goFiltered }: { project: ProjectDetailDto; goFilt
         </div>
       </div>
 
-      {/* クリエイティブ疲弊検知 */}
+      {/* クリエイティブ・ローテーション (疲弊×勝ち筋) */}
       <div className="card" style={{ marginBottom: 14 }}>
-        <div className="c-head"><h2>🎨 クリエイティブ疲弊検知</h2>
-          {fatigue.data && fatigue.data.fatiguedCount > 0 ? <span className="pill down" style={{ marginLeft: 'auto' }}>要差し替え {fatigue.data.fatiguedCount}</span> : null}
+        <div className="c-head"><h2>🎨 クリエイティブ・ローテーション</h2>
+          <span className="c-sub" style={{ marginLeft: 8, fontSize: 12, color: 'var(--muted)' }}>疲弊×勝ち筋で「止める/差し替え/増やす」を判定</span>
         </div>
         <div className="c-body">
           {fatigue.loading ? <SkeletonLines count={2} /> : fatigue.error ? <ErrorCard error={fatigue.error} onRetry={fatigue.retry} /> : fatigue.data ? (
@@ -820,19 +816,20 @@ function ImproveTab({ project, goFiltered }: { project: ProjectDetailDto; goFilt
             ) : (
               <div className="fatigue-list">
                 {fatigue.data.items.map((it) => {
-                  const m = FATIGUE_META[it.level];
+                  const rm = ROTATION_META[it.rotation];
                   return (
-                    <div key={it.campaignId} className={`fatigue-row ${it.level}`}>
+                    <div key={it.campaignId} className={`fatigue-row rot-${it.rotation}`}>
                       <div className="fat-head">
                         <PlatformTag platform={it.platform} />
                         <span className="fat-name">{it.campaignName}</span>
-                        <span className={`pill ${m.cls}`} style={{ marginLeft: 'auto' }}>{m.label}</span>
+                        <span className={`pill ${rm.cls}`} style={{ marginLeft: 'auto' }}>{rm.icon} {rm.label}</span>
                       </div>
                       <div className="fat-metrics">
                         CTR {it.ctrPrior ?? '—'}% → <b>{it.ctrRecent ?? '—'}%</b>
                         {it.ctrDeltaPct !== null ? <span className={it.ctrDeltaPct < 0 ? 'fat-down' : 'fat-up'}> ({it.ctrDeltaPct > 0 ? '+' : ''}{it.ctrDeltaPct}%)</span> : null}
+                        {it.cpaRecent !== null ? <span style={{ marginLeft: 10, color: 'var(--muted)' }}>CPA {formatYen(it.cpaRecent)}</span> : null}
                       </div>
-                      <div className="fat-rec">{it.recommendation}</div>
+                      <div className="fat-rec">{it.rotationReason}</div>
                     </div>
                   );
                 })}

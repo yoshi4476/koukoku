@@ -21,6 +21,7 @@ import type {
   ReviewIssueDto,
   ReviewSimDto,
   ReviewVerdict,
+  RotationAction,
   UndeployableAsset,
   ProjectAccountDto,
   ProjectAssetDto,
@@ -844,16 +845,23 @@ export class ProjectsService {
         tx.factAdPerformance.groupBy({
           by: ['campaignId', 'campaignName', 'platform'],
           where: { adAccountId: { in: accountIds }, date: { gte: since, lte: until } },
-          _sum: { impressions: true, clicks: true, conversions: true },
+          _sum: { impressions: true, clicks: true, conversions: true, cost: true },
         });
       const [recent, prior] = await Promise.all([agg(daysAgo(6), daysAgo(0)), agg(daysAgo(13), daysAgo(7))]);
       const priorMap = new Map(prior.map((p) => [p.campaignId, p]));
 
-      const items: FatigueItemDto[] = [];
+      // 1パス目: 指標を計算
+      type Raw = {
+        campaignId: string; campaignName: string; platform: Platform; impr: number; cost: number; conv: number;
+        ctrR: number | null; ctrP: number | null; ctrDelta: number | null; cvrR: number | null; cvrP: number | null;
+        cpa: number | null; level: FatigueLevel;
+      };
+      const raws: Raw[] = [];
       for (const r of recent) {
         const impr = Number(r._sum.impressions ?? 0);
         const clk = Number(r._sum.clicks ?? 0);
         const conv = Number(r._sum.conversions ?? 0);
+        const cost = Number(r._sum.cost ?? 0);
         if (impr < 1000) continue; // 露出が小さいものは判定しない
         const p = priorMap.get(r.campaignId);
         const pImpr = Number(p?._sum.impressions ?? 0);
@@ -864,32 +872,59 @@ export class ProjectsService {
         const cvrR = clk > 0 ? (conv / clk) * 100 : null;
         const cvrP = pClk > 0 ? (pConv / pClk) * 100 : null;
         const ctrDelta = ctrR !== null && ctrP ? +(((ctrR - ctrP) / ctrP) * 100).toFixed(1) : null;
+        const cpa = conv > 0 ? Math.round(cost / conv) : null;
 
         let level: FatigueLevel = 'ok';
         if (ctrDelta !== null && ctrDelta <= -20) level = 'fatigued';
         else if (ctrDelta !== null && ctrDelta <= -10) level = 'watch';
-        // CVRも大きく落ちていれば一段引き上げ
         if (cvrR !== null && cvrP && cvrR < cvrP * 0.8 && level === 'watch') level = 'fatigued';
 
-        const recommendation =
-          level === 'fatigued'
-            ? 'クリエイティブが疲弊しています。新しい訴求・ビジュアルに差し替えましょう。'
-            : level === 'watch'
-              ? '反応が下がり始めています。次の差し替え候補を準備しておきましょう。'
-              : '反応は安定しています。';
-        items.push({
-          campaignId: r.campaignId, campaignName: r.campaignName || r.campaignId, platform: r.platform as Platform,
-          impressionsRecent: impr,
-          ctrRecent: ctrR !== null ? +ctrR.toFixed(2) : null,
-          ctrPrior: ctrP !== null ? +ctrP.toFixed(2) : null,
-          ctrDeltaPct: ctrDelta,
-          cvrRecent: cvrR !== null ? +cvrR.toFixed(2) : null,
-          cvrPrior: cvrP !== null ? +cvrP.toFixed(2) : null,
-          level, recommendation,
-        });
+        raws.push({ campaignId: r.campaignId, campaignName: r.campaignName || r.campaignId, platform: r.platform as Platform, impr, cost, conv, ctrR, ctrP, ctrDelta, cvrR, cvrP, cpa, level });
       }
-      const order = { fatigued: 0, watch: 1, ok: 2 };
-      items.sort((a, b) => order[a.level] - order[b.level]);
+      // 平均CPA (勝ち筋・非効率の基準)
+      const withConv = raws.filter((r) => r.cpa !== null);
+      const totalCost = withConv.reduce((s, r) => s + r.cost, 0);
+      const totalConv = withConv.reduce((s, r) => s + r.conv, 0);
+      const avgCpa = totalConv > 0 ? totalCost / totalConv : null;
+
+      const items: FatigueItemDto[] = raws.map((r) => {
+        // 疲弊×勝ち筋の総合ローテーション判定
+        let rotation: RotationAction = 'keep';
+        let rotationReason = '反応は安定。現状維持でOK。';
+        if (r.level === 'fatigued') {
+          rotation = 'refresh';
+          rotationReason = 'CTRが大きく低下し疲弊。新しい訴求・ビジュアルに差し替えを。';
+        } else if (r.cpa === null && r.cost >= 30000) {
+          rotation = 'pause';
+          rotationReason = `CV0で月${Math.round((r.cost / 7) * 30).toLocaleString()}円ペースを消化。一旦止めて予算を効率先へ。`;
+        } else if (avgCpa && r.cpa !== null && r.cpa > avgCpa * 1.5) {
+          rotation = 'pause';
+          rotationReason = `CPA ${r.cpa.toLocaleString()}円が平均(${Math.round(avgCpa).toLocaleString()}円)の1.5倍超。止めるか大幅見直しを。`;
+        } else if (avgCpa && r.cpa !== null && r.cpa <= avgCpa * 0.85 && r.conv >= 1 && (r.ctrDelta === null || r.ctrDelta > -10)) {
+          rotation = 'scale';
+          rotationReason = `CPA ${r.cpa.toLocaleString()}円と効率が良く反応も安定。予算を増やして勝ち筋を伸ばす。`;
+        } else if (r.level === 'watch') {
+          rotationReason = '反応が下がり始め。次の差し替え候補を準備。';
+        }
+        const recommendation =
+          r.level === 'fatigued' ? 'クリエイティブが疲弊しています。新しい訴求・ビジュアルに差し替えましょう。'
+            : r.level === 'watch' ? '反応が下がり始めています。次の差し替え候補を準備しておきましょう。'
+              : '反応は安定しています。';
+        return {
+          campaignId: r.campaignId, campaignName: r.campaignName, platform: r.platform,
+          impressionsRecent: r.impr,
+          ctrRecent: r.ctrR !== null ? +r.ctrR.toFixed(2) : null,
+          ctrPrior: r.ctrP !== null ? +r.ctrP.toFixed(2) : null,
+          ctrDeltaPct: r.ctrDelta,
+          cvrRecent: r.cvrR !== null ? +r.cvrR.toFixed(2) : null,
+          cvrPrior: r.cvrP !== null ? +r.cvrP.toFixed(2) : null,
+          cpaRecent: r.cpa,
+          level: r.level, recommendation, rotation, rotationReason,
+        };
+      });
+      // 並び: 止める→差し替え→増やす→維持
+      const rOrder: Record<RotationAction, number> = { pause: 0, refresh: 1, scale: 2, keep: 3 };
+      items.sort((a, b) => rOrder[a.rotation] - rOrder[b.rotation]);
       return {
         items,
         fatiguedCount: items.filter((i) => i.level === 'fatigued').length,

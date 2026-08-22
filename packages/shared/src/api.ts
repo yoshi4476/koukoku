@@ -1054,9 +1054,23 @@ export interface FatigueItemDto {
   ctrDeltaPct: number | null;
   cvrRecent: number | null;
   cvrPrior: number | null;
+  cpaRecent: number | null;
   level: FatigueLevel;
   recommendation: string;
+  /** 疲弊×勝ち筋の総合ローテーション判定 (F-40) */
+  rotation: RotationAction;
+  rotationReason: string;
 }
+
+/** scale=増やす / keep=維持 / refresh=差し替え / pause=止める */
+export type RotationAction = 'scale' | 'keep' | 'refresh' | 'pause';
+
+export const ROTATION_META: Record<RotationAction, { label: string; cls: string; icon: string }> = {
+  scale: { label: '増やす', cls: 'up', icon: '▲' },
+  keep: { label: '維持', cls: 'flat', icon: '＝' },
+  refresh: { label: '差し替え', cls: 'warn', icon: '↻' },
+  pause: { label: '止める', cls: 'down', icon: '■' },
+};
 export interface FatigueReportDto {
   items: FatigueItemDto[];
   fatiguedCount: number;
