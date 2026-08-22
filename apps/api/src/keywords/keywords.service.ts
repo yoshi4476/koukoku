@@ -172,7 +172,8 @@ export class KeywordsService {
         if (existing.has(kw) || suggestions.some((s) => s.keyword === kw)) continue;
         suggestions.push({
           keyword: kw,
-          matchType: m.kind === 'longtail' ? 'phrase' : 'phrase',
+          // 獲得意図が明確な語は絞って(phrase)、幅を取りたい語は広め(broad)
+          matchType: m.kind === 'longtail' || m.kind === 'purchase' ? 'phrase' : 'broad',
           kind: m.kind,
           estimatedVolume: m.volume,
           estimatedCpc: Math.max(30, Math.round(avgCpc * m.cpcFactor)),

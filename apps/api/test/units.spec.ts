@@ -230,13 +230,16 @@ describe('キーワード最適化スコアリング (F-18)', () => {
 });
 
 describe('打ち出し方の提案 (media plan)', () => {
-  it('予算配分は合計ほぼ100%・目標CPAは業種相場・想定CVは予算÷CPA', () => {
-    const p = recommendMediaPlan('saas', 'conversion', 1000000);
-    const total = p.media.reduce((s, m) => s + m.sharePct, 0);
-    expect(Math.abs(total - 100)).toBeLessThanOrEqual(2);
-    expect(p.targetCpa).toBe(15000);
-    expect(p.expectedCv).toBe(Math.round(1000000 / 15000));
-    expect(p.media.every((m) => m.monthlyBudget >= 0)).toBe(true);
+  it('シェア合計はちょうど100%・予算合計は入力と一致・目標CPAは業種相場', () => {
+    for (const [ind, goal, budget] of [['saas', 'conversion', 1000000], ['app', 'awareness', 100000], ['beauty', 'store', 800000]] as const) {
+      const p = recommendMediaPlan(ind, goal, budget);
+      expect(p.media.reduce((s, m) => s + m.sharePct, 0)).toBe(100);
+      expect(p.media.reduce((s, m) => s + m.monthlyBudget, 0)).toBe(budget);
+      expect(p.media.every((m) => m.monthlyBudget >= 0)).toBe(true);
+    }
+    const saas = recommendMediaPlan('saas', 'conversion', 1000000);
+    expect(saas.targetCpa).toBe(15000);
+    expect(saas.expectedCv).toBe(Math.round(1000000 / 15000));
   });
   it('目的で媒体の主役が変わる (アプリ認知はSNS動画が上位)', () => {
     const app = recommendMediaPlan('app', 'awareness', 500000);

@@ -180,16 +180,36 @@ export function recommendMediaPlan(
   else if (goal === 'conversion') shift(DISPLAY_SNS, SEARCH, 6);
   else if (goal === 'store') {
     const line = base.find((m) => m.platform === 'line_ads');
-    if (line) line.share += 6;
-    const g = base.find((m) => m.platform === 'google_ads');
-    if (g) g.share = Math.max(5, g.share - 6);
+    if (line) {
+      // LINEがある構成: 来店/予約に強いLINEへ寄せ、検索を少し抑える
+      line.share += 6;
+      const g = base.find((m) => m.platform === 'google_ads');
+      if (g) g.share = Math.max(5, g.share - 6);
+    } else {
+      // LINEが無い構成: 検索は削らず、来店/予約に効く視覚系(SNS/DSP)へ寄せる
+      shift(SEARCH, DISPLAY_SNS, 6);
+    }
   }
 
-  // 正規化して合計100に
+  // 正規化: 端数は最大剰余法で配分し、シェア合計を必ず100%にする
   const total = base.reduce((s, m) => s + m.share, 0);
+  const exactPct = base.map((m) => (m.share / total) * 100);
+  const shares = exactPct.map((x) => Math.floor(x));
+  const remainder = 100 - shares.reduce((a, b) => a + b, 0);
+  const byFrac = exactPct
+    .map((x, i) => ({ i, frac: x - Math.floor(x) }))
+    .sort((a, b) => b.frac - a.frac);
+  for (let k = 0; k < remainder && k < byFrac.length; k++) shares[byFrac[k].i] += 1;
+
+  // 予算も合計が monthlyBudget に一致するよう配分 (端数は最大シェアの媒体で吸収)
+  const budgets = shares.map((sp) => Math.round((monthlyBudget * sp) / 100));
+  if (budgets.length > 0) {
+    const diff = monthlyBudget - budgets.reduce((a, b) => a + b, 0);
+    budgets[shares.indexOf(Math.max(...shares))] += diff;
+  }
+
   const topAppeal = profile.appealAxes[0] ?? '便益';
-  const media: MediaPlanItem[] = base.map((m) => {
-    const sharePct = Math.round((m.share / total) * 100);
+  const media: MediaPlanItem[] = base.map((m, i) => {
     const pp = PLATFORM_PROFILE[m.platform];
     // 業種×媒体の専用プレイブックを生成 (素人がそのまま実行できる粒度)
     const ngHint = profile.ngWords.length ? `${profile.label}のNG表現(${profile.ngWords.slice(0, 2).join('・')}等)は避ける。` : '';
@@ -197,8 +217,8 @@ export function recommendMediaPlan(
     return {
       platform: m.platform,
       label: PLATFORM_META[m.platform].label,
-      sharePct,
-      monthlyBudget: Math.round((monthlyBudget * sharePct) / 100),
+      sharePct: shares[i],
+      monthlyBudget: budgets[i],
       reason: m.reason,
       format: pp.format,
       playbook,

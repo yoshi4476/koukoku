@@ -233,7 +233,7 @@ function MediaPlanBox({ project, onApply }: { project: ProjectDetailDto; onApply
         <div className="plan-body">
           <div className="plan-budget">
             <label>月予算</label>
-            <input className="input" inputMode="numeric" value={budget}
+            <input className="input" inputMode="numeric" value={budget || ''}
               onChange={(e) => setBudget(Number(e.target.value.replace(/[^0-9]/g, '')) || 0)} style={{ maxWidth: 160 }} />
             <span className="plan-est">→ 目標CPA <b>{formatYen(plan.targetCpa)}</b> ・ 想定CV <b>{formatNumber(plan.expectedCv)}件/月</b></span>
           </div>
@@ -515,13 +515,15 @@ function AssetCard({ asset, canPublish, onChanged }: { asset: ProjectAssetDto; c
     setBusy(true); setError(null);
     apiPut<ProjectAssetDto>(`/projects/assets/${asset.id}`, { status })
       .then(() => onChanged())
-      .catch((e: unknown) => { setError(toApiError(e)); setBusy(false); });
+      .catch((e: unknown) => setError(toApiError(e)))
+      .finally(() => setBusy(false));
   };
   const publish = () => {
     setBusy(true); setError(null);
     apiPost<ProjectAssetDto>(`/projects/assets/${asset.id}/publish`, {})
       .then(() => onChanged())
-      .catch((e: unknown) => { setError(toApiError(e)); setBusy(false); });
+      .catch((e: unknown) => setError(toApiError(e)))
+      .finally(() => setBusy(false));
   };
   const next = NEXT_STATUS[asset.status];
 
@@ -621,7 +623,7 @@ function KpiProgressCard({ project }: { project: ProjectDetailDto }) {
               <span className={`pill ${paceCls[k.cv.status]}`}>{PACE_STATUS_LABEL[k.cv.status]}</span></div>
             <div className="kp-v">{formatNumber(k.cv.actual)}<span className="kp-sub"> → 着地 {formatNumber(k.cv.projected)}件</span></div>
             <div className="kp-bar"><div className={`kp-fill ${paceCls[k.cv.status]}`} style={{ width: `${Math.min(100, k.cv.pct ?? 0)}%` }} /></div>
-            <div className="kp-pct">着地予測 {k.cv.pct}%</div>
+            <div className="kp-pct">着地予測 {k.cv.pct !== null ? `${k.cv.pct}%` : '—'}</div>
           </div>
         ) : null}
         {k.cpa.target !== null ? (
@@ -635,7 +637,7 @@ function KpiProgressCard({ project }: { project: ProjectDetailDto }) {
         {k.spend.budget !== null ? (
           <div className="kpi-prog">
             <div className="kp-top"><span className="kp-l">予算消化 (月予算 {formatYen(k.spend.budget)})</span>
-              <span className={`pill ${(k.spend.pct ?? 0) > 105 ? 'down' : 'flat'}`}>{k.spend.pct}%着地</span></div>
+              <span className={`pill ${(k.spend.pct ?? 0) > 105 ? 'down' : 'flat'}`}>{k.spend.pct !== null ? `${k.spend.pct}%着地` : '—'}</span></div>
             <div className="kp-v">{formatYen(k.spend.actual)}<span className="kp-sub"> → 着地 {formatYen(k.spend.projected)}</span></div>
             <div className="kp-bar"><div className="kp-fill flat" style={{ width: `${Math.min(100, ((k.spend.actual) / k.spend.budget) * 100)}%` }} /></div>
           </div>
@@ -859,13 +861,13 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           ) : null}
 
           {/* --- ヒアリング --- */}
-          {tab === 'hearing' ? <HearingTab project={d} onSaved={detail.retry} /> : null}
+          {tab === 'hearing' ? <HearingTab project={d} onSaved={detail.refresh} /> : null}
 
           {/* --- 配信設定 --- */}
-          {tab === 'settings' ? <SettingsTab project={d} onSaved={detail.retry} /> : null}
+          {tab === 'settings' ? <SettingsTab project={d} onSaved={detail.refresh} /> : null}
 
           {/* --- 制作物 --- */}
-          {tab === 'assets' ? <AssetsTab project={d} onChanged={detail.retry} /> : null}
+          {tab === 'assets' ? <AssetsTab project={d} onChanged={detail.refresh} /> : null}
 
           {/* --- アラート --- */}
           {tab === 'alerts' ? (

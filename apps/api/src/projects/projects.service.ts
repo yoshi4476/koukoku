@@ -67,19 +67,17 @@ export class ProjectsService {
     return conv > 0 ? Math.round(cost / conv) : null;
   }
 
-  /** アカウント群の最新診断から未対応指摘数を数える */
+  /** アカウント群の最新診断から未対応指摘数を数える。各アカウントの最新1件のみを対象 */
   private async openFindingsFor(tx: Tx, accountIds: string[]): Promise<number> {
     if (accountIds.length === 0) return 0;
+    // distinct でアカウントごとに最新の診断だけを取得 (件数上限による取りこぼしを防ぐ)
     const audits = await tx.audit.findMany({
       where: { adAccountId: { in: accountIds } },
-      orderBy: { createdAt: 'desc' },
-      take: accountIds.length * 3,
+      orderBy: [{ adAccountId: 'asc' }, { createdAt: 'desc' }],
+      distinct: ['adAccountId'],
     });
-    const seen = new Set<string>();
     let open = 0;
     for (const a of audits) {
-      if (seen.has(a.adAccountId)) continue;
-      seen.add(a.adAccountId);
       const statuses = (a.findingStatuses ?? {}) as Record<string, string>;
       for (const f of (a.result as unknown as AuditResult).findings ?? []) {
         if ((statuses[String(f.priority_rank)] ?? 'open') === 'open') open++;
@@ -217,8 +215,17 @@ export class ProjectsService {
     const t = accountIds.length
       ? await this.metrics.totals(tx, { adAccountIds: accountIds }, monthStart, daysAgo(0))
       : { cost: 0, impressions: 0, clicks: 0, conversions: 0, conversionValue: 0 };
-    const project = (v: number) => (daysElapsed > 0 ? Math.round((v / daysElapsed) * daysInMonth) : 0);
-    const projectedCv = daysElapsed > 0 ? +((t.conversions / daysElapsed) * daysInMonth).toFixed(1) : 0;
+    // 実データのある最終日を基準に線形予測する (当日ぶんは同期遅延で未反映のことが多く、
+    // 経過日数で割ると過小予測になるため、実績が乗っている日数で割る)
+    const maxDate = accountIds.length
+      ? (await tx.factAdPerformance.aggregate({
+          where: { adAccountId: { in: accountIds }, date: { gte: monthStart, lte: daysAgo(0) } },
+          _max: { date: true },
+        }))._max.date
+      : null;
+    const dataDays = maxDate ? Math.max(1, maxDate.getUTCDate()) : daysElapsed;
+    const project = (v: number) => (dataDays > 0 ? Math.round((v / dataDays) * daysInMonth) : 0);
+    const projectedCv = dataDays > 0 ? +((t.conversions / dataDays) * daysInMonth).toFixed(1) : 0;
     const actualCv = +t.conversions.toFixed(1);
     const actualCpa = t.conversions > 0 ? Math.round(t.cost / t.conversions) : null;
 
@@ -486,13 +493,14 @@ export class ProjectsService {
       });
       const camps = grouped
         .map((g) => {
-          const cost = Number(g._sum.cost ?? 0);
+          const cost = Number(g._sum.cost ?? 0); // 直近28日の実消化
           const conv = Number(g._sum.conversions ?? 0);
           const monthly = Math.round((cost / 28) * 30);
           return {
             campaignId: g.campaignId,
             campaignName: g.campaignName || g.campaignId,
             platform: g.platform as Platform,
+            cost,
             monthly,
             conversions: +conv.toFixed(1),
             cpa: conv > 0 ? Math.round(cost / conv) : null,
@@ -501,8 +509,9 @@ export class ProjectsService {
         .filter((c) => c.monthly >= 10000); // 極小は対象外
 
       const totalMonthly = camps.reduce((s, c) => s + c.monthly, 0);
-      const withConv = camps.filter((c) => c.cpa !== null);
-      const totalCost = withConv.reduce((s, c) => s + c.monthly, 0);
+      // 平均CPAは同一基準(28日実績)で算出する — cpaは28日costから出しているのでcostを使う
+      const withConv = camps.filter((c) => c.cpa !== null && c.cpa > 0);
+      const totalCost = withConv.reduce((s, c) => s + c.cost, 0);
       const totalConv = withConv.reduce((s, c) => s + c.conversions, 0);
       const avgCpa = totalConv > 0 ? totalCost / totalConv : null;
 
@@ -514,7 +523,7 @@ export class ProjectsService {
           if (c.monthly >= 30000) sources.push({ c, cut: Math.round(c.monthly * 0.4) });
         } else if (avgCpa && c.cpa > avgCpa * 1.3) {
           sources.push({ c, cut: Math.round(c.monthly * 0.3) });
-        } else if (avgCpa && c.cpa <= avgCpa * 0.85 && c.conversions >= 1) {
+        } else if (avgCpa && c.cpa > 0 && c.cpa <= avgCpa * 0.85 && c.conversions >= 1) {
           targets.push(c);
         }
       }
