@@ -930,21 +930,21 @@ export interface AssetAdviceDto {
 }
 
 /* ---- プロジェクトの制作物 (広告文/LP/チラシ/動画) ---- */
-export type AssetType = 'copy' | 'lp' | 'flyer' | 'video';
+// 制作物タイプは広告文・LP・チラシの3種。動画は独立タイプにせず、動画が最適な広告では
+// 制作物への「画像/動画アップロード」で展開する (F-36)。
+export type AssetType = 'copy' | 'lp' | 'flyer';
 export type AssetStatus = 'draft' | 'review' | 'approved' | 'published';
 
 export const ASSET_TYPE_LABEL: Record<AssetType, string> = {
   copy: '広告文',
   lp: 'LP (ランディングページ)',
   flyer: 'チラシ',
-  video: '動画',
 };
 
 export const ASSET_TYPE_ICON: Record<AssetType, string> = {
   copy: '📝',
   lp: '🖥️',
   flyer: '🖼️',
-  video: '🎬',
 };
 
 export const ASSET_STATUS_LABEL: Record<AssetStatus, string> = {

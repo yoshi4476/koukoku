@@ -31,6 +31,7 @@ import {
   industryProfileFor,
   isApprover,
   recommendMediaPlan,
+  relevantAssetTypes,
 } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
@@ -75,7 +76,6 @@ const BRIEF_FIELDS: { key: keyof ProjectBrief; label: string; ph: string; long?:
 const BID_STRATEGIES: BidStrategy[] = ['maximize_conversions', 'target_cpa', 'target_roas', 'maximize_clicks', 'manual'];
 const ADVICE_ICON: Record<string, string> = { good: '✅', tip: '💡', warn: '⚠️' };
 
-const ASSET_TYPES: AssetType[] = ['copy', 'lp', 'flyer', 'video'];
 const ASSET_STATUS_CLS: Record<AssetStatus, string> = { draft: 'flat', review: 'warn', approved: 'ai', published: 'up' };
 /* 次に進める状態 (公開は専用ボタン) */
 const NEXT_STATUS: Partial<Record<AssetStatus, AssetStatus>> = { draft: 'review', review: 'approved' };
@@ -451,8 +451,8 @@ function ReviewSim({ assetId }: { assetId: string }) {
   );
 }
 
-function AddAssetForm({ projectId, onDone, onCancel }: { projectId: string; onDone: () => void; onCancel: () => void }) {
-  const [type, setType] = useState<AssetType>('copy');
+function AddAssetForm({ projectId, types, onDone, onCancel }: { projectId: string; types: AssetType[]; onDone: () => void; onCancel: () => void }) {
+  const [type, setType] = useState<AssetType>(types[0] ?? 'copy');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [url, setUrl] = useState('');
@@ -475,7 +475,7 @@ function AddAssetForm({ projectId, onDone, onCancel }: { projectId: string; onDo
       <div className="c-body form-grid">
         {error ? <ErrorCard error={error} /> : null}
         <div className="asset-type-pick">
-          {ASSET_TYPES.map((t) => (
+          {types.map((t) => (
             <button type="button" key={t} className={`asset-type-opt${type === t ? ' on' : ''}`} onClick={() => setType(t)}>
               {ASSET_TYPE_ICON[t]} {ASSET_TYPE_LABEL[t]}
             </button>
@@ -495,7 +495,7 @@ function AddAssetForm({ projectId, onDone, onCancel }: { projectId: string; onDo
         ) : (
           <>
             <div className="field">
-              <label htmlFor="as-url">{type === 'video' ? '動画のURL' : type === 'lp' ? 'LPのURL' : 'チラシ画像のURL'}</label>
+              <label htmlFor="as-url">{type === 'lp' ? 'LPのURL' : 'チラシ画像のURL'}</label>
               <input id="as-url" className="input" value={url} onChange={(e) => setUrl(e.target.value)}
                 placeholder="https://…" />
             </div>
@@ -650,11 +650,14 @@ function AssetsTab({ project, onChanged }: { project: ProjectDetailDto; onChange
   const canPublish = me.edition === 'agency' && isApprover(me.role);
   const canEdit = me.edition === 'agency';
   const assets = project.assets;
+  // この広告(媒体構成・目的)に必要な制作物カテゴリだけを見出し/追加フォームに出す
+  const fitTypes = relevantAssetTypes(project.accounts.map((a) => a.platform), project.goal);
+  const fitLabel = fitTypes.map((t) => ASSET_TYPE_LABEL[t].replace(' (ランディングページ)', '')).join('・');
 
   return (
     <div className="card">
       <div className="c-head">
-        <h2>制作物（広告文・LP・チラシ・動画）</h2>
+        <h2>制作物（{fitLabel}）</h2>
         {canEdit ? (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
             <button className="btn sm sec" onClick={() => setShowPreflight(true)}>🔍 公開前チェック</button>
@@ -676,7 +679,7 @@ function AssetsTab({ project, onChanged }: { project: ProjectDetailDto; onChange
             <CreativeGenerator projectId={project.id} onAdopted={onChanged} onClose={() => setShowGen(false)} />
           </Modal>
         ) : null}
-        {showForm ? <AddAssetForm projectId={project.id} onDone={() => { setShowForm(false); onChanged(); }} onCancel={() => setShowForm(false)} /> : null}
+        {showForm ? <AddAssetForm projectId={project.id} types={fitTypes} onDone={() => { setShowForm(false); onChanged(); }} onCancel={() => setShowForm(false)} /> : null}
         {assets.length === 0 && !showForm ? (
           <p style={{ margin: 0, color: 'var(--muted)' }}>
             まだ制作物がありません。「＋ 制作物を追加」から広告文・LP・チラシ・動画を登録し、<mark>下書き → レビュー → 承認 → 公開</mark>まで進められます。

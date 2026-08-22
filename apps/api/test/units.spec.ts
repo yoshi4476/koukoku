@@ -13,6 +13,8 @@ import {
   buildCreativeVariants,
   buildOpsCycle,
   buildFunnel,
+  relevantAssetTypes,
+  assetTypeFitReason,
   DEFAULT_PROJECT_BRIEF,
 } from '@adgrid/shared';
 import { LlmService } from '../src/ai/llm.service';
@@ -354,6 +356,29 @@ describe('LLM原価計算 + プロンプトキャッシュ (F-09/F-31)', () => {
     expect(LlmService.costJpyFor('claude-opus-5', {
       input_tokens: 0, cache_creation_input_tokens: 2000, output_tokens: 0,
     })).toBeCloseTo(1.88, 2);
+  });
+});
+
+describe('制作物タイプの適合フィルタ (F-36 / 動画は独立タイプにしない)', () => {
+  it('広告文・LPは常に対象、動画はタイプに含まれない', () => {
+    const t = relevantAssetTypes(['google_ads', 'meta'], 'conversion');
+    expect(t).toContain('copy');
+    expect(t).toContain('lp');
+    expect(t).not.toContain('video' as never);
+  });
+  it('チラシは来店(store)目的のときだけ対象', () => {
+    expect(relevantAssetTypes(['meta'], 'store')).toContain('flyer');
+    expect(relevantAssetTypes(['meta'], 'conversion')).not.toContain('flyer');
+  });
+  it('媒体未設定なら判定不能=全種(3種)を返す', () => {
+    expect(relevantAssetTypes([], 'conversion')).toEqual(['copy', 'lp', 'flyer']);
+  });
+  it('反映されない制作物の理由: チラシ×非店舗は反映されない、廃止タイプ(動画)も反映されない', () => {
+    expect(assetTypeFitReason('flyer', ['meta'], 'conversion')).toContain('反映されません');
+    expect(assetTypeFitReason('flyer', ['meta'], 'store')).toBeNull();
+    expect(assetTypeFitReason('copy', ['meta'], 'conversion')).toBeNull();
+    // 旧「動画」タイプのデータは配信構成に反映されない=削除候補
+    expect(assetTypeFitReason('video' as never, ['meta'], 'conversion')).not.toBeNull();
   });
 });
 

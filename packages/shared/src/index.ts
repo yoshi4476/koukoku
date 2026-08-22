@@ -8,3 +8,4 @@ export * from './creative';
 export * from './ops-cycle';
 export * from './funnel';
 export * from './media-prompt';
+export * from './asset-fit';

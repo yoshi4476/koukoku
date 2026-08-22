@@ -313,8 +313,6 @@ async function main() {
     data: [
       { tenantId: TENANT_ID, projectId: 'p_a_spring', type: 'copy', title: '検索広告 見出しA', content: '今だけ送料無料｜人気スキンケアをまとめ買い', status: 'published', publishedAt: daysAgo(3) },
       { tenantId: TENANT_ID, projectId: 'p_a_spring', type: 'lp', title: '春キャンペーン特設LP', url: 'https://example.com/lp/spring', content: '季節訴求のランディングページ', status: 'review' },
-      { tenantId: TENANT_ID, projectId: 'p_a_spring', type: 'video', title: '紹介動画 (15秒)', url: 'https://example.com/video/spring15.mp4', content: 'Meta/リール用の縦型動画', status: 'draft' },
-      { tenantId: TENANT_ID, projectId: 'p_a_spring', type: 'flyer', title: '店頭チラシ A4', url: 'https://example.com/flyer/spring_a4.png', content: '店頭配布用', status: 'approved' },
       { tenantId: TENANT_ID, projectId: 'p_b_repeat', type: 'copy', title: 'LINE配信 メッセージ', content: '【会員限定】ご来店で使える20%OFFクーポン配布中', status: 'published', publishedAt: daysAgo(1) },
       { tenantId: TENANT_ID, projectId: 'p_b_repeat', type: 'flyer', title: '再来店DMハガキ', url: 'https://example.com/flyer/dm.png', status: 'draft' },
       { tenantId: TENANT_ID, projectId: 'p_c_lead', type: 'copy', title: 'ホワイトペーパー訴求 見出し', content: '勤怠管理の「隠れコスト」を可視化｜無料DL', status: 'review' },

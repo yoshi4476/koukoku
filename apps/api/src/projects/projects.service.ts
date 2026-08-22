@@ -34,7 +34,7 @@ import type {
   UpdateProjectInput,
 } from '@adgrid/shared';
 import type { AdoptCreativeInput, CreativeGenDto, CreativeVariant } from '@adgrid/shared';
-import { CreativeGenResultSchema, DEFAULT_PROJECT_BRIEF, DEFAULT_PROJECT_SETTINGS, buildCreativeVariants, creativeVariantFromLlm, industryProfileFor } from '@adgrid/shared';
+import { CreativeGenResultSchema, DEFAULT_PROJECT_BRIEF, DEFAULT_PROJECT_SETTINGS, assetTypeFitReason, buildCreativeVariants, creativeVariantFromLlm, industryProfileFor } from '@adgrid/shared';
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 import { MetricsService, daysAgo } from '../metrics/metrics.service';
@@ -49,7 +49,7 @@ import { join } from 'path';
 import { ALLOWED_UPLOAD, MAX_UPLOAD_BYTES, UPLOAD_DIR } from './upload.constants';
 
 const GOALS: ProjectGoal[] = ['conversion', 'awareness', 'traffic', 'store'];
-const ASSET_TYPES: AssetType[] = ['copy', 'lp', 'flyer', 'video'];
+const ASSET_TYPES: AssetType[] = ['copy', 'lp', 'flyer'];
 const ASSET_STATUSES: AssetStatus[] = ['draft', 'review', 'approved', 'published'];
 
 type AssetRow = {
@@ -513,16 +513,19 @@ export class ProjectsService {
     const assets = p.assets as AssetRow[];
     let deployable = 0;
 
+    const platformList = p.adAccounts.map((x) => x.platform as Platform);
     for (const a of assets) {
       const type = a.type as AssetType;
       const text = `${a.title} ${a.content}`.trim();
       let bad: string | null = null;
-      // 展開できない条件: 広告文は本文なし / LP・チラシ・動画は素材(URL/アップロード)なし
+      // 展開できない条件: 広告文は本文なし / LP・チラシは素材(URL/アップロード)なし
       if (type === 'copy') {
         if (!a.content.trim() && !a.title.trim()) bad = '本文が空です';
       } else if (!a.url.trim()) {
-        bad = type === 'video' ? '動画ファイル/URLがありません' : type === 'lp' ? 'LPのURLがありません' : '画像/URLがありません';
+        bad = type === 'lp' ? 'LPのURLがありません' : '画像/URLがありません';
       }
+      // この広告構成で反映されない制作物か (媒体・目的に不適合 or 廃止タイプ=旧動画)
+      const fitReason = assetTypeFitReason(type, platformList, p.goal as ProjectGoal);
       // 審査で却下されうる表現 (block)
       const blockWords = scanLawDictionary(text).filter((w) => w.severity === 'block');
       const ngHit = profile.ngWords.filter((w) => w && text.includes(w));
@@ -533,6 +536,14 @@ export class ProjectsService {
           level: 'block', scope: 'asset', assetId: a.id, assetTitle: a.title,
           title: `配信できない制作物: ${a.title}`, detail: bad,
           suggestion: '素材を追加するか、この制作物を削除してください。',
+        });
+      } else if (fitReason) {
+        // 広告に反映されない項目 → 削除候補 (公開自体は妨げない=warn)
+        undeployable.push({ assetId: a.id, title: a.title, type, reason: fitReason });
+        issues.push({
+          level: 'warn', scope: 'asset', assetId: a.id, assetTitle: a.title,
+          title: `この広告に反映されません: ${a.title}`, detail: fitReason,
+          suggestion: 'この配信構成では使われません。不要なら削除してください。',
         });
       } else {
         deployable++;
@@ -703,12 +714,6 @@ export class ProjectsService {
       items.push({ title: '入力フォームは最小限', detail: '項目数を減らすほどCVは上がります。不要な項目は削除・任意化を。', severity: 'tip' });
       items.push({ title: 'CV計測タグの設置確認', detail: '申込完了ページに計測タグが入っているか必ず確認。計測欠落は改善の致命傷です。', severity: 'warn' });
       items.push({ title: '信頼要素を追加', detail: '実績数・導入事例・口コミ・保証を載せると安心感が増します。', severity: 'good' });
-    } else if (type === 'video') {
-      items.push({ title: '冒頭2秒で掴む', detail: '最初の2秒で結論・驚き・ベネフィットを出すと離脱を防げます。', severity: 'tip' });
-      items.push({ title: '字幕・テロップを入れる', detail: '多くの人が音声オフで見ます。字幕で内容が伝わるようにしましょう。', severity: 'warn' });
-      items.push({ title: '縦型 (9:16) を用意', detail: 'リール/TikTok/ストーリーズ向けに縦型が有利です。', severity: 'tip' });
-      items.push({ title: '15秒以内に短縮', detail: '短い動画ほど最後まで見られます。要点を絞りましょう。', severity: 'tip' });
-      items.push({ title: '最後にロゴとCTA', detail: 'ブランドと次の行動（サイトへ/購入）を最後に明示しましょう。', severity: 'good' });
     } else {
       // flyer
       items.push({ title: '特典・オファーを大きく', detail: '割引や特典を一番目立たせると反応が上がります。', severity: 'tip' });
@@ -719,7 +724,7 @@ export class ProjectsService {
 
     const summary =
       data.status === 'published'
-        ? `公開中の${type === 'copy' ? '広告文' : type === 'lp' ? 'LP' : type === 'video' ? '動画' : 'チラシ'}です。次の改善で成果をさらに伸ばせます。`
+        ? `公開中の${type === 'copy' ? '広告文' : type === 'lp' ? 'LP' : 'チラシ'}です。次の改善で成果をさらに伸ばせます。`
         : '公開前にこのポイントを押さえておくと成果が出やすくなります。';
 
     return { assetId, type, summary, items };
