@@ -65,7 +65,11 @@ export function CreativeGenerator({
           </select>
         </label>
         <button className="btn sm sec" onClick={() => load(count)} disabled={loading || busy}>↻ 作り直す</button>
-        {data?.mocked ? <span className="pill warn" title="ANTHROPIC_API_KEY 未設定のためテンプレート生成">テンプレ生成</span> : null}
+        {data ? (
+          data.mocked
+            ? <span className="pill warn" title="ANTHROPIC_API_KEY 未設定のためテンプレート生成">テンプレ生成</span>
+            : <span className="pill ai" title="Claudeによる生成">✨ AI生成</span>
+        ) : null}
       </div>
 
       {error ? <ErrorCard error={error} onRetry={() => load(count)} /> : null}

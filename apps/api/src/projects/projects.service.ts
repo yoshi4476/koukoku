@@ -31,11 +31,13 @@ import type {
   UpdateProjectInput,
 } from '@adgrid/shared';
 import type { AdoptCreativeInput, CreativeGenDto, CreativeVariant } from '@adgrid/shared';
-import { DEFAULT_PROJECT_BRIEF, DEFAULT_PROJECT_SETTINGS, buildCreativeVariants, industryProfileFor } from '@adgrid/shared';
+import { CreativeGenResultSchema, DEFAULT_PROJECT_BRIEF, DEFAULT_PROJECT_SETTINGS, buildCreativeVariants, creativeVariantFromLlm, industryProfileFor } from '@adgrid/shared';
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 import { MetricsService, daysAgo } from '../metrics/metrics.service';
 import { AlertsService } from '../alerts/alerts.service';
+import { LlmService } from '../ai/llm.service';
+import { PROMPTS, OUTPUT_SCHEMAS } from '../ai/prompt-registry';
 import { scanLawDictionary } from '../ai/law-dictionary';
 import { widthUnits } from '../ai/copy-limits';
 import type { SessionInfoValue } from '../common/tenant';
@@ -65,6 +67,7 @@ export class ProjectsService {
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
     private readonly alerts: AlertsService,
+    private readonly llm: LlmService,
   ) {}
 
   private cpa(cost: number, conv: number): number | null {
@@ -376,7 +379,7 @@ export class ProjectsService {
   }
 
   /** 業種+ヒアリングから最適なクリエイティブ案を生成する (F-26)。
-   *  ANTHROPIC_API_KEY 無しでも動く決定的生成。訴求軸は業種の推奨順を使う */
+   *  ANTHROPIC_API_KEY 設定時は実Claude、未設定時は業種×ヒアリングの決定的生成にフォールバック */
   async generateCreatives(tenantId: string, projectId: string, count: number, scope?: string | null): Promise<CreativeGenDto> {
     const project = await this.prisma.withTenant(tenantId, (tx) =>
       tx.project.findUnique({ where: { id: projectId }, include: { client: true } }),
@@ -386,8 +389,56 @@ export class ProjectsService {
     }
     const profile = industryProfileFor(project.client.industryCode);
     const brief = this.mergeBrief(project.brief);
-    const variants = buildCreativeVariants(profile, brief, project.goal as ProjectGoal, count || 4);
-    return { mocked: true, industryLabel: profile.label, variants };
+    const goal = project.goal as ProjectGoal;
+    const n = Math.min(Math.max(count || 4, 1), 8);
+    const fallback = () => buildCreativeVariants(profile, brief, goal, n);
+
+    if (this.llm.available) {
+      try {
+        const variants = await this.generateCreativesLlm(tenantId, profile.code, profile.label, brief, goal, n);
+        // 空・件数不足時は決定的生成で補完
+        return { mocked: false, industryLabel: profile.label, variants: variants.length ? variants : fallback() };
+      } catch {
+        // LLM失敗時は決定的生成にフォールバック (可用性優先)
+        return { mocked: true, industryLabel: profile.label, variants: fallback() };
+      }
+    }
+    return { mocked: true, industryLabel: profile.label, variants: fallback() };
+  }
+
+  /** 実Claudeで業種特化クリエイティブを生成する。ヒアリング・業種ガイダンスを注入 */
+  private async generateCreativesLlm(
+    tenantId: string,
+    industryCode: string,
+    industryLabel: string,
+    brief: ProjectBrief,
+    goal: ProjectGoal,
+    count: number,
+  ): Promise<CreativeVariant[]> {
+    const profile = industryProfileFor(industryCode);
+    const briefLines = (Object.entries(brief) as [keyof ProjectBrief, string][])
+      .filter(([, v]) => (v ?? '').trim())
+      .map(([k, v]) => `- ${k}: ${v}`)
+      .join('\n') || '(ヒアリング未記入)';
+    const user = [
+      `以下のスキーマのJSONのみを出力してください:\n${OUTPUT_SCHEMAS.creative}`,
+      `<request>業種: ${industryLabel} / 目的: ${goal} / 案数: ${count} / 訴求軸(この順で優先): ${profile.appealAxes.join('、')}</request>`,
+      `<brief>\n${briefLines}\n</brief>`,
+      `<industry_guidance>\n推奨訴求軸: ${profile.appealAxes.join('、')} / 要注意表現(避ける): ${profile.ngWords.join('、')} / CV呼称: ${profile.cvLabel} / 勘所: ${profile.tip}\n</industry_guidance>`,
+    ].join('\n\n');
+    const text = await this.llm.completeText({
+      tenantId,
+      feature: 'creative',
+      model: PROMPTS.creative.model,
+      system: PROMPTS.creative.system,
+      user,
+      promptVersion: PROMPTS.creative.version,
+    });
+    const parsed = CreativeGenResultSchema.safeParse(LlmService.parseJson(text));
+    if (!parsed.success) {
+      throw new AppError(HttpStatus.UNPROCESSABLE_ENTITY, 'クリエイティブ生成の出力検証に失敗しました。', 'もう一度生成してください。');
+    }
+    return parsed.data.variants.slice(0, count).map(creativeVariantFromLlm);
   }
 
   /** 生成したクリエイティブ案を制作物(広告文)として登録する (F-26) */

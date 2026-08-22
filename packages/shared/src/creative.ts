@@ -1,6 +1,38 @@
+import { z } from 'zod';
 import type { AppealAxis } from './ai';
 import type { IndustryProfile } from './industry';
 import type { ProjectBrief, ProjectGoal } from './api';
+
+/** LLMが返すクリエイティブ生成の出力スキーマ (実AI接続時に検証) */
+export const CreativeGenResultSchema = z.object({
+  variants: z
+    .array(
+      z.object({
+        appeal_axis: z.string(),
+        headline: z.string().min(1),
+        description: z.string(),
+        primary_text: z.string(),
+        cta: z.string(),
+        banner_concept: z.string(),
+        rationale: z.string(),
+      }),
+    )
+    .min(1),
+});
+export type CreativeGenResult = z.infer<typeof CreativeGenResultSchema>;
+
+/** LLM出力(snake_case)を CreativeVariant に写像する */
+export function creativeVariantFromLlm(v: CreativeGenResult['variants'][number]): CreativeVariant {
+  return {
+    appealAxis: v.appeal_axis as AppealAxis,
+    headline: v.headline,
+    description: v.description,
+    primaryText: v.primary_text,
+    cta: v.cta,
+    bannerConcept: v.banner_concept,
+    rationale: v.rationale,
+  };
+}
 
 /** 業種+ヒアリングから生成した1案のクリエイティブ (1案=1訴求軸を厳守) */
 export interface CreativeVariant {

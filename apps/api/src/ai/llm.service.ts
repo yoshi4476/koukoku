@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 
-export type LlmFeature = 'audit' | 'report' | 'copy' | 'format_detect';
+export type LlmFeature = 'audit' | 'report' | 'copy' | 'creative' | 'format_detect';
 
 // Claude API 料金 (USD/100万トークン, 2026-08時点)。変更時はここを更新
 const PRICE_USD_PER_MTOK: Record<string, { input: number; output: number }> = {
