@@ -6,6 +6,7 @@ import { mediaUrl } from '@/lib/api';
 import { PLATFORM_SHORT_LABEL } from '@/lib/labels';
 import { formatYen } from '@/lib/format';
 import { BannerStudio } from './banner-studio';
+import { MediaPromptPanel } from './media-prompt-panel';
 
 const CTA_BY_GOAL: Record<string, string> = {
   conversion: '今すぐ申込む', store: 'ご予約はこちら', traffic: '公式サイトへ', awareness: '詳しく見る',
@@ -99,6 +100,12 @@ export function AdPreview({ asset, project, showBanner = false }: { asset: Proje
             seed={project.industryCode}
           />
         </div>
+      ) : null}
+      {showBanner ? (
+        <details className="adpv-mpp">
+          <summary>🎬 画像・動画の生成プロンプト（外部AI用）</summary>
+          <MediaPromptPanel industryCode={project.industryCode} brief={project.brief} headline={asset.title} goal={project.goal} />
+        </details>
       ) : null}
       <p className="adpv-note">※ 実際の表示は各媒体・デバイス・審査により異なります。イメージ確認用です。</p>
     </div>
