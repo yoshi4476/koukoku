@@ -162,7 +162,9 @@ export function PublishConfirm({
           <Row label="月予算（設定）" value={s.monthlyBudgetTotal ? formatYen(s.monthlyBudgetTotal) : '未設定'} warn={!s.monthlyBudgetTotal} />
           <Row label="媒体別 月予算 合計" value={totalBudget > 0 ? formatYen(totalBudget) : '未設定'} warn={totalBudget === 0} />
           <Row label="日予算の目安" value={s.dailyBudget ? formatYen(s.dailyBudget) : '未設定'} />
+          <Row label="予算の主軸 / ペース" value={`${s.budgetType === 'daily' ? '日予算' : '月予算'}・${s.pacing === 'accelerated' ? '前倒し' : '標準'}`} />
           <Row label="入札戦略" value={BID_STRATEGY_LABEL[s.bidStrategy]} />
+          {s.bidCap ? <Row label="入札上限 (上限CPC)" value={formatYen(s.bidCap)} /> : null}
           <Row label="目標CPA" value={s.targetCpa ? formatYen(s.targetCpa) : '—'} />
           <Row label="目標ROAS" value={s.targetRoas ? `${s.targetRoas}%` : '—'} />
           <Row label="目標CV" value={s.targetCv ? `${s.targetCv}件/月` : '—'} />
@@ -171,10 +173,12 @@ export function PublishConfirm({
           <div className="pcf-sec-h">🎯 ターゲティング・期間</div>
           <Row label="配信期間" value={period} />
           <Row label="地域" value={s.regions || '未設定'} />
-          <Row label="年齢" value={s.ageRange || '指定なし'} />
-          <Row label="性別" value={gender} />
-          <Row label="デバイス" value={device} />
-          <Row label="配信時間帯" value={s.dayparting || '終日'} />
+          <Row label="年齢 / 性別" value={`${s.ageRange || '指定なし'} / ${gender}`} />
+          <Row label="デバイス / 言語" value={`${device} / ${s.language || '日本語'}`} />
+          <Row label="オーディエンス" value={[s.retargeting ? 'リタゲ' : '', s.lookalike ? '類似' : '', s.audience].filter(Boolean).join('・') || '指定なし'} />
+          {s.exclusions ? <Row label="除外設定" value={s.exclusions} /> : null}
+          <Row label="配信面" value={s.placements || '自動'} />
+          <Row label="配信時間帯 / 頻度上限" value={`${s.dayparting || '終日'}${s.frequencyCap ? ' / ' + s.frequencyCap : ''}`} />
           <Row label="計測するCV地点" value={s.conversionPoint || '未設定'} warn={!s.conversionPoint} />
         </div>
       </div>

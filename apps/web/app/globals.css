@@ -1354,3 +1354,7 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .agent-next{display:flex;align-items:center;gap:12px;margin-top:14px;padding:12px 14px;background:var(--good-soft);border-radius:10px;font-size:13px;color:var(--ink)}
 .agent-next .btn{margin-left:auto}
 @media(max-width:760px){.agent-grid{grid-template-columns:1fr}}
+
+/* 配信設定 チェックボックス項目 (F-44) */
+.set-check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);flex:1;min-width:200px;cursor:pointer}
+.set-check input{width:15px;height:15px;accent-color:var(--primary)}

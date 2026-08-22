@@ -819,50 +819,95 @@ export const BID_STRATEGY_LABEL: Record<BidStrategy, string> = {
 };
 
 export interface ProjectSettings {
+  /* ── 金額 ── */
+  /** 予算の主軸: 月予算 / 日予算 */
+  budgetType: 'monthly' | 'daily';
   /** 月予算の合計 (円) */
   monthlyBudgetTotal: number | null;
   /** 日予算の目安 (円) */
   dailyBudget: number | null;
+  /** 消化ペース: 標準 / 前倒し */
+  pacing: 'standard' | 'accelerated';
+
+  /* ── 入札 ── */
+  bidStrategy: BidStrategy;
   /** 目標CPA (円) */
   targetCpa: number | null;
   /** 目標ROAS (%) */
   targetRoas: number | null;
   /** 目標CV数 (件/月) */
   targetCv: number | null;
-  bidStrategy: BidStrategy;
+  /** 入札上限 (上限CPC・円)。手動/クリック最大化で使う */
+  bidCap: number | null;
+
+  /* ── 期間 ── */
   /** 配信開始日 YYYY-MM-DD */
   startDate: string | null;
   /** 配信終了日 YYYY-MM-DD (無期限は null) */
   endDate: string | null;
+  /** 配信時間帯 (例: 終日 / 平日9-18時) */
+  dayparting: string;
+
+  /* ── ターゲティング ── */
   /** 対象地域 (例: 全国 / 東京・神奈川) */
   regions: string;
   /** 年齢層 (例: 25-44) */
   ageRange: string;
   gender: 'all' | 'male' | 'female';
   devices: 'all' | 'mobile' | 'desktop';
+  /** 言語 (例: 日本語) */
+  language: string;
+  /** 興味関心・オーディエンス (自由記述) */
+  audience: string;
+  /** リターゲティング (再訪ユーザーへの再配信) */
+  retargeting: boolean;
+  /** 類似オーディエンス */
+  lookalike: boolean;
+  /** 除外設定 (既存顧客/地域/キーワード等) */
+  exclusions: string;
+  /** 配信面・プレースメント (例: 検索/ディスプレイ/フィード/リール) */
+  placements: string;
+  /** フリークエンシー上限 (例: 3回/週) */
+  frequencyCap: string;
+
+  /* ── 計測 ── */
   /** 計測するCV地点 (例: 購入完了 / 資料請求) */
   conversionPoint: string;
-  /** 配信時間帯 (例: 終日 / 平日9-18時) */
-  dayparting: string;
+
   note: string;
 }
 
 export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
+  budgetType: 'monthly',
   monthlyBudgetTotal: null,
   dailyBudget: null,
+  pacing: 'standard',
+  bidStrategy: 'maximize_conversions',
   targetCpa: null,
   targetRoas: null,
   targetCv: null,
-  bidStrategy: 'maximize_conversions',
+  bidCap: null,
   startDate: null,
   endDate: null,
+  dayparting: '終日',
   regions: '全国',
   ageRange: '指定なし',
   gender: 'all',
   devices: 'all',
+  language: '日本語',
+  audience: '',
+  retargeting: false,
+  lookalike: false,
+  exclusions: '',
+  placements: '自動（推奨）',
+  frequencyCap: '',
   conversionPoint: '',
-  dayparting: '終日',
   note: '',
+};
+
+export const PACING_LABEL: Record<ProjectSettings['pacing'], string> = {
+  standard: '標準（均等配信）',
+  accelerated: '前倒し（早期消化）',
 };
 
 /* ヒアリングシート (成果の土台。しっかり記入するほど広告文・打ち出し方の精度が上がる) */

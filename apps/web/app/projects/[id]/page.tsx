@@ -23,6 +23,7 @@ import {
   ASSET_TYPE_ICON,
   ASSET_TYPE_LABEL,
   BID_STRATEGY_LABEL,
+  PACING_LABEL,
   PACE_STATUS_LABEL,
   PROJECT_GOAL_LABEL,
   PROJECT_STATUS_LABEL,
@@ -310,7 +311,17 @@ function SettingsTab({ project, onSaved }: { project: ProjectDetailDto; onSaved:
 
         <UtmTool clientName={project.clientName} projectName={project.name} platforms={project.accounts.map((a) => a.platform)} />
 
-        <div className="set-group">💴 予算・目標</div>
+        <div className="set-group">💴 金額（予算）</div>
+        <div className="set-row">
+          <div className="field"><label>予算の主軸</label>
+            <select className="select" value={s.budgetType} disabled={!canEdit} onChange={(e) => set('budgetType', e.target.value as ProjectSettings['budgetType'])}>
+              <option value="monthly">月予算で管理</option><option value="daily">日予算で管理</option>
+            </select></div>
+          <div className="field"><label>消化ペース</label>
+            <select className="select" value={s.pacing} disabled={!canEdit} onChange={(e) => set('pacing', e.target.value as ProjectSettings['pacing'])}>
+              {(['standard', 'accelerated'] as const).map((p) => <option key={p} value={p}>{PACING_LABEL[p]}</option>)}
+            </select></div>
+        </div>
         <div className="set-row">
           <div className="field"><label>月予算 合計 (円)</label>
             <input className="input" inputMode="numeric" value={s.monthlyBudgetTotal ?? ''} disabled={!canEdit}
@@ -318,6 +329,17 @@ function SettingsTab({ project, onSaved }: { project: ProjectDetailDto; onSaved:
           <div className="field"><label>日予算の目安 (円)</label>
             <input className="input" inputMode="numeric" value={s.dailyBudget ?? ''} disabled={!canEdit}
               onChange={(e) => set('dailyBudget', numOrNull(e.target.value))} placeholder="例: 53000" /></div>
+        </div>
+
+        <div className="set-group">📊 入札・目標</div>
+        <div className="set-row">
+          <div className="field"><label>入札戦略</label>
+            <select className="select" value={s.bidStrategy} disabled={!canEdit} onChange={(e) => set('bidStrategy', e.target.value as BidStrategy)}>
+              {BID_STRATEGIES.map((b) => <option key={b} value={b}>{BID_STRATEGY_LABEL[b]}</option>)}
+            </select></div>
+          <div className="field"><label>入札上限 (上限CPC・円)</label>
+            <input className="input" inputMode="numeric" value={s.bidCap ?? ''} disabled={!canEdit}
+              onChange={(e) => set('bidCap', numOrNull(e.target.value))} placeholder="手動/クリック最大化で使用" /></div>
         </div>
         <div className="set-row">
           <div className="field"><label>目標CPA (円)</label>
@@ -330,10 +352,6 @@ function SettingsTab({ project, onSaved }: { project: ProjectDetailDto; onSaved:
         <div className="field"><label>目標CV数 (件/月)</label>
           <input className="input" inputMode="numeric" value={s.targetCv ?? ''} disabled={!canEdit}
             onChange={(e) => set('targetCv', numOrNull(e.target.value))} placeholder="例: 260 — 概要タブで達成ペースを表示" /></div>
-        <div className="field"><label>入札戦略</label>
-          <select className="select" value={s.bidStrategy} disabled={!canEdit} onChange={(e) => set('bidStrategy', e.target.value as BidStrategy)}>
-            {BID_STRATEGIES.map((b) => <option key={b} value={b}>{BID_STRATEGY_LABEL[b]}</option>)}
-          </select></div>
 
         <div className="set-group">🎯 ターゲティング</div>
         <div className="set-row">
@@ -351,6 +369,24 @@ function SettingsTab({ project, onSaved }: { project: ProjectDetailDto; onSaved:
             <select className="select" value={s.devices} disabled={!canEdit} onChange={(e) => set('devices', e.target.value as ProjectSettings['devices'])}>
               <option value="all">すべて</option><option value="mobile">スマホ中心</option><option value="desktop">PC中心</option>
             </select></div>
+        </div>
+        <div className="set-row">
+          <div className="field"><label>言語</label>
+            <input className="input" value={s.language} disabled={!canEdit} onChange={(e) => set('language', e.target.value)} placeholder="例: 日本語" /></div>
+          <div className="field"><label>配信面・プレースメント</label>
+            <input className="input" value={s.placements} disabled={!canEdit} onChange={(e) => set('placements', e.target.value)} placeholder="例: 検索・ディスプレイ・フィード・リール" /></div>
+        </div>
+        <div className="field"><label>興味関心・オーディエンス</label>
+          <input className="input" value={s.audience} disabled={!canEdit} onChange={(e) => set('audience', e.target.value)} placeholder="例: 美容・スキンケアに関心 / 購入意向の高い層" /></div>
+        <div className="set-row">
+          <label className="set-check"><input type="checkbox" checked={s.retargeting} disabled={!canEdit} onChange={(e) => set('retargeting', e.target.checked)} /> リターゲティング（再訪者に再配信）</label>
+          <label className="set-check"><input type="checkbox" checked={s.lookalike} disabled={!canEdit} onChange={(e) => set('lookalike', e.target.checked)} /> 類似オーディエンス</label>
+        </div>
+        <div className="set-row">
+          <div className="field"><label>除外設定</label>
+            <input className="input" value={s.exclusions} disabled={!canEdit} onChange={(e) => set('exclusions', e.target.value)} placeholder="例: 既存顧客を除外 / 特定地域を除外" /></div>
+          <div className="field"><label>フリークエンシー上限</label>
+            <input className="input" value={s.frequencyCap} disabled={!canEdit} onChange={(e) => set('frequencyCap', e.target.value)} placeholder="例: 3回/週" /></div>
         </div>
 
         <div className="set-group">📅 期間・計測</div>

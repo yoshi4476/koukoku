@@ -54,25 +54,36 @@ export class AgentService {
     });
 
     // ステップ3: 配信設定(金額・入札・ターゲティング)を反映
+    const acquisition = goal === 'conversion' || goal === 'store';
     const patch: Partial<ProjectSettings> = {
+      budgetType: 'monthly',
       monthlyBudgetTotal: budget,
       dailyBudget: Math.round(budget / 30),
+      pacing: 'standard',
+      bidStrategy: plan.bidStrategy,
       targetCpa: hints.targetCpa ?? plan.targetCpa,
       targetCv: hints.targetCv ?? plan.expectedCv,
       targetRoas: plan.targetRoas,
-      bidStrategy: plan.bidStrategy,
       regions: hints.regions ?? plan.targeting.regions,
       ageRange: hints.ageRange ?? plan.targeting.ageRange,
       gender: hints.gender ?? plan.targeting.gender,
       devices: plan.targeting.devices,
+      language: '日本語',
+      // 獲得系は再訪への再配信が効く。認知は類似で新規リーチを広げる
+      retargeting: acquisition,
+      lookalike: goal === 'awareness' || goal === 'conversion',
+      exclusions: acquisition ? '既存顧客（購入済み）を除外' : '',
+      placements: '自動（推奨）',
+      frequencyCap: goal === 'awareness' ? '3回/週' : '',
       conversionPoint: plan.conversionPoint,
     };
     await this.projects.update(tenantId, projectId, { settings: patch });
     const appliedSettings: ProjectSettings = { ...current, ...patch };
     const genderLabel = patch.gender === 'female' ? '女性' : patch.gender === 'male' ? '男性' : '指定なし';
+    const audienceNote = [patch.retargeting ? 'リタゲ' : '', patch.lookalike ? '類似' : '', patch.exclusions ? `除外:${patch.exclusions}` : ''].filter(Boolean).join('・');
     steps.push({
-      key: 'settings', title: '③ 配信設定を反映',
-      detail: `入札=${BID_STRATEGY_LABEL[appliedSettings.bidStrategy]} / 目標CPA ${appliedSettings.targetCpa?.toLocaleString() ?? '—'}円 / ${patch.regions}・${patch.ageRange}・${genderLabel} / CV地点=${patch.conversionPoint}`,
+      key: 'settings', title: '③ 配信設定を反映（金額・入札・ターゲティング）',
+      detail: `月予算${budget.toLocaleString()}円 / 入札=${BID_STRATEGY_LABEL[appliedSettings.bidStrategy]}(目標CPA${appliedSettings.targetCpa?.toLocaleString() ?? '—'}円) / ${patch.regions}・${patch.ageRange}・${genderLabel}${audienceNote ? ' / ' + audienceNote : ''} / CV地点=${patch.conversionPoint}`,
       status: 'done',
     });
 
