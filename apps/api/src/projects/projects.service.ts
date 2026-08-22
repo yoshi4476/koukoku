@@ -16,9 +16,12 @@ import type {
   KpiProgressDto,
   PaceStatus,
   Platform,
+  PreflightDto,
+  PreflightIssue,
   ReviewIssueDto,
   ReviewSimDto,
   ReviewVerdict,
+  UndeployableAsset,
   ProjectAccountDto,
   ProjectAssetDto,
   ProjectBrief,
@@ -41,7 +44,7 @@ import { PROMPTS, OUTPUT_SCHEMAS } from '../ai/prompt-registry';
 import { scanLawDictionary } from '../ai/law-dictionary';
 import { widthUnits } from '../ai/copy-limits';
 import type { SessionInfoValue } from '../common/tenant';
-import { mkdir, writeFile } from 'fs/promises';
+import { mkdir, unlink, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { ALLOWED_UPLOAD, MAX_UPLOAD_BYTES, UPLOAD_DIR } from './upload.constants';
 
@@ -493,6 +496,95 @@ export class ProjectsService {
       }
       return out;
     });
+  }
+
+  /** 公開前の徹底チェック (F-35)。配信できない制作物・審査リスク・設定不足を洗い出す */
+  async preflight(tenantId: string, projectId: string, scope?: string | null): Promise<PreflightDto> {
+    const p = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.project.findUnique({ where: { id: projectId }, include: { client: true, adAccounts: true, assets: true } }),
+    );
+    if (!p || (scope && p.clientId !== scope)) {
+      throw new AppError(HttpStatus.NOT_FOUND, 'プロジェクトが見つかりません。', '一覧から選び直してください。');
+    }
+    const profile = industryProfileFor(p.client.industryCode);
+    const settings = this.mergeSettings(p.settings);
+    const issues: PreflightIssue[] = [];
+    const undeployable: UndeployableAsset[] = [];
+    const assets = p.assets as AssetRow[];
+    let deployable = 0;
+
+    for (const a of assets) {
+      const type = a.type as AssetType;
+      const text = `${a.title} ${a.content}`.trim();
+      let bad: string | null = null;
+      // 展開できない条件: 広告文は本文なし / LP・チラシ・動画は素材(URL/アップロード)なし
+      if (type === 'copy') {
+        if (!a.content.trim() && !a.title.trim()) bad = '本文が空です';
+      } else if (!a.url.trim()) {
+        bad = type === 'video' ? '動画ファイル/URLがありません' : type === 'lp' ? 'LPのURLがありません' : '画像/URLがありません';
+      }
+      // 審査で却下されうる表現 (block)
+      const blockWords = scanLawDictionary(text).filter((w) => w.severity === 'block');
+      const ngHit = profile.ngWords.filter((w) => w && text.includes(w));
+
+      if (bad) {
+        undeployable.push({ assetId: a.id, title: a.title, type, reason: bad });
+        issues.push({
+          level: 'block', scope: 'asset', assetId: a.id, assetTitle: a.title,
+          title: `配信できない制作物: ${a.title}`, detail: bad,
+          suggestion: '素材を追加するか、この制作物を削除してください。',
+        });
+      } else {
+        deployable++;
+      }
+      if (blockWords.length > 0) {
+        issues.push({
+          level: 'block', scope: 'asset', assetId: a.id, assetTitle: a.title,
+          title: `審査で却下リスク: ${a.title}`, detail: `「${blockWords[0].expression}」など (${blockWords[0].law})`,
+          suggestion: blockWords[0].suggestion,
+        });
+      } else if (ngHit.length > 0) {
+        issues.push({
+          level: 'warn', scope: 'asset', assetId: a.id, assetTitle: a.title,
+          title: `要注意表現: ${a.title}`, detail: `${profile.label}で止まりやすい「${ngHit[0]}」`,
+          suggestion: '根拠の明示か表現の緩和を検討してください。',
+        });
+      }
+    }
+
+    // プロジェクト全体
+    const budgetSet = (settings.monthlyBudgetTotal ?? 0) > 0 || p.adAccounts.some((x) => x.monthlyBudget != null && Number(x.monthlyBudget) > 0);
+    if (assets.length === 0) {
+      issues.push({ level: 'block', scope: 'project', title: '制作物がありません', detail: '配信する広告がありません。', suggestion: '制作物を追加してください。' });
+    }
+    if (!budgetSet) {
+      issues.push({ level: 'warn', scope: 'project', title: '予算が未設定', detail: '月予算・媒体別予算が未入力です。', suggestion: '「配信設定」で予算を入力してください。' });
+    }
+    if (!settings.conversionPoint?.trim()) {
+      issues.push({ level: 'warn', scope: 'project', title: 'CV計測地点が未設定', detail: '成果計測が不正確になります。', suggestion: '「配信設定」でCV地点を指定してください。' });
+    }
+    if (p.adAccounts.length === 0) {
+      issues.push({ level: 'warn', scope: 'project', title: '配信先の媒体がありません', detail: '媒体アカウントが紐づいていません。', suggestion: '「掲示」タブで媒体を接続してください。' });
+    }
+
+    const order = { block: 0, warn: 1, info: 2 } as const;
+    issues.sort((x, y) => order[x.level] - order[y.level]);
+    return { ready: !issues.some((i) => i.level === 'block'), totalAssets: assets.length, deployableAssets: deployable, issues, undeployable };
+  }
+
+  /** 制作物を削除する (F-35)。展開できない/不要な制作物の削除。アップロード実体も消す */
+  async deleteAsset(tenantId: string, assetId: string): Promise<{ ok: true }> {
+    const asset = await this.prisma.withTenant(tenantId, (tx) => tx.projectAsset.findUnique({ where: { id: assetId } }));
+    if (!asset) {
+      throw new AppError(HttpStatus.NOT_FOUND, '制作物が見つかりません。', '再読み込みしてください。');
+    }
+    // アップロード実体があれば削除 (/uploads/<tenant>/... のみ対象)
+    if (asset.url.startsWith(`/uploads/${tenantId}/`)) {
+      const rel = asset.url.replace(`/uploads/${tenantId}/`, '');
+      await unlink(join(UPLOAD_DIR, tenantId, rel)).catch(() => undefined);
+    }
+    await this.prisma.withTenant(tenantId, (tx) => tx.projectAsset.delete({ where: { id: assetId } }));
+    return { ok: true };
   }
 
   /** 制作物に画像・動画ファイルを添付する。実体を uploads/ に保存し url を差し替える (F-24) */

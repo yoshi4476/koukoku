@@ -81,6 +81,18 @@ def main():
     st, after = api(ag, f"/projects/{pid}")
     check("採用で制作物が1件増加", len(after.get("assets", [])) == n_before + 1)
 
+    # 公開前チェック + 展開できない制作物の削除 (F-35)
+    st, pf = api(ag, f"/projects/{pid}/preflight")
+    check("公開前チェック取得", st == 200 and pf and "ready" in pf and "undeployable" in pf, f"status={st}")
+    st, badAsset = api(ag, f"/projects/{pid}/assets", "POST", {"type": "lp", "title": "E2E未展開LP"})
+    st, pf2 = api(ag, f"/projects/{pid}/preflight")
+    flagged = any(u["assetId"] == badAsset["id"] for u in (pf2.get("undeployable") or []))
+    check("URL無しLPが配信不可として検出される", flagged)
+    st, _ = api(ag, f"/projects/assets/{badAsset['id']}", "DELETE")
+    check("配信できない制作物を削除できる", st in (200, 204))
+    st, pf3 = api(ag, f"/projects/{pid}/preflight")
+    check("削除後は検出されない", not any(u["assetId"] == badAsset["id"] for u in (pf3.get("undeployable") or [])))
+
     # ---- 2. 提供先(clientScope) の分離。clienta@ は c_a に限定された提供先アクセス ----
     cl = login("clienta@adgrid.jp", PW)
     check("提供先ログイン", bool(cl))

@@ -36,11 +36,12 @@ import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
 import { useClients } from '@/components/client-context';
 import { DeltaText, ErrorCard, Modal, PlatformTag, SkeletonLines } from '@/components/ui';
-import { apiGet, apiPost, apiPut, apiUpload, mediaUrl, toApiError, type ApiError } from '@/lib/api';
+import { apiDelete, apiGet, apiPost, apiPut, apiUpload, mediaUrl, toApiError, type ApiError } from '@/lib/api';
 import { AdPreview, PublishConfirm } from './ad-preview';
 import { CreativeGenerator } from './creative-gen';
 import { OpsCycleTab } from './ops-cycle';
 import { FunnelBox } from './funnel-box';
+import { PreflightPanel } from './preflight-panel';
 import { CONNECTION_STATUS_META, INDUSTRY_LABEL } from '@/lib/labels';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
 
@@ -523,8 +524,16 @@ function AssetCard({ asset, project, canPublish, canEdit, onChanged }: {
   const [error, setError] = useState<ApiError | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [pubError, setPubError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const remove = () => {
+    setBusy(true); setError(null);
+    apiDelete(`/projects/assets/${asset.id}`)
+      .then(() => onChanged())
+      .catch((e: unknown) => { setError(toApiError(e)); setBusy(false); });
+  };
 
   const advance = (status: AssetStatus) => {
     setBusy(true); setError(null);
@@ -597,6 +606,17 @@ function AssetCard({ asset, project, canPublish, canEdit, onChanged }: {
         {asset.status === 'published' && canPublish ? (
           <button className="btn sm sec" disabled={busy} onClick={() => advance('approved')}>公開を停止</button>
         ) : null}
+        {canEdit && asset.status !== 'published' ? (
+          confirmDelete ? (
+            <span className="asset-del-confirm">
+              削除しますか?
+              <button className="btn sm danger" disabled={busy} onClick={remove}>削除</button>
+              <button className="btn sm sec" disabled={busy} onClick={() => setConfirmDelete(false)}>やめる</button>
+            </span>
+          ) : (
+            <button className="btn sm sec danger-text" disabled={busy} onClick={() => setConfirmDelete(true)}>🗑 削除</button>
+          )
+        ) : null}
       </div>
       <AssetAdvice assetId={asset.id} />
       <ReviewSim assetId={asset.id} />
@@ -626,6 +646,7 @@ function AssetsTab({ project, onChanged }: { project: ProjectDetailDto; onChange
   const { me } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [showGen, setShowGen] = useState(false);
+  const [showPreflight, setShowPreflight] = useState(false);
   const canPublish = me.edition === 'agency' && isApprover(me.role);
   const canEdit = me.edition === 'agency';
   const assets = project.assets;
@@ -636,6 +657,7 @@ function AssetsTab({ project, onChanged }: { project: ProjectDetailDto; onChange
         <h2>制作物（広告文・LP・チラシ・動画）</h2>
         {canEdit ? (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <button className="btn sm sec" onClick={() => setShowPreflight(true)}>🔍 公開前チェック</button>
             <button className="btn sm ai" onClick={() => setShowGen(true)}>🎨 業種に合わせてAIで作成</button>
             <button className="btn sm pri" onClick={() => setShowForm((v) => !v)}>
               {showForm ? '閉じる' : '＋ 制作物を追加'}
@@ -644,6 +666,11 @@ function AssetsTab({ project, onChanged }: { project: ProjectDetailDto; onChange
         ) : null}
       </div>
       <div className="c-body">
+        {showPreflight ? (
+          <Modal title="🔍 公開前チェック" onClose={() => setShowPreflight(false)} wide>
+            <PreflightPanel projectId={project.id} onChanged={onChanged} />
+          </Modal>
+        ) : null}
         {showGen ? (
           <Modal title="🎨 業種に合わせてAIでクリエイティブ作成" onClose={() => setShowGen(false)} wide>
             <CreativeGenerator projectId={project.id} onAdopted={onChanged} onClose={() => setShowGen(false)} />

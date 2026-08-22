@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MAX_UPLOAD_BYTES } from './upload.constants';
 import type {
@@ -10,6 +10,7 @@ import type {
   CreativeGenDto,
   FatigueReportDto,
   ImageGenResultDto,
+  PreflightDto,
   ProjectAssetDto,
   ProjectDetailDto,
   ProjectDto,
@@ -72,6 +73,21 @@ export class ProjectsController {
   ): Promise<ProjectAssetDto> {
     assertEditor(user);
     return this.projects.createAsset(tenantId, id, body);
+  }
+
+  @Get(':id/preflight')
+  preflight(@TenantId() tenantId: string, @ClientScope() scope: string | null, @Param('id') id: string): Promise<PreflightDto> {
+    return this.projects.preflight(tenantId, id, scope);
+  }
+
+  @Delete('assets/:assetId')
+  deleteAsset(
+    @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
+    @Param('assetId') assetId: string,
+  ): Promise<{ ok: true }> {
+    assertEditor(user);
+    return this.projects.deleteAsset(tenantId, assetId);
   }
 
   @Put('assets/:assetId')

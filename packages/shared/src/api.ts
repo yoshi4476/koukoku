@@ -969,6 +969,36 @@ export interface ProjectAssetDto {
   publishedAt: string | null;
 }
 
+/** 公開前チェック (プリフライト) の1指摘 */
+export interface PreflightIssue {
+  level: 'block' | 'warn' | 'info';
+  scope: 'project' | 'asset';
+  assetId?: string;
+  assetTitle?: string;
+  title: string;
+  detail: string;
+  suggestion: string;
+}
+
+/** 展開できない (配信できない) 制作物 */
+export interface UndeployableAsset {
+  assetId: string;
+  title: string;
+  type: AssetType;
+  reason: string;
+}
+
+/** 公開前チェックの結果 (F-35) */
+export interface PreflightDto {
+  /** 致命的(block)な問題が無ければ true */
+  ready: boolean;
+  totalAssets: number;
+  deployableAssets: number;
+  issues: PreflightIssue[];
+  /** 配信できない制作物 (削除候補) */
+  undeployable: UndeployableAsset[];
+}
+
 export interface CreateAssetInput {
   type: AssetType;
   title: string;
