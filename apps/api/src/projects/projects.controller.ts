@@ -8,6 +8,7 @@ import type {
   ProjectAssetDto,
   ProjectDetailDto,
   ProjectDto,
+  ReviewSimDto,
   UpdateAssetInput,
   UpdateProjectInput,
 } from '@adgrid/shared';
@@ -79,6 +80,11 @@ export class ProjectsController {
   @Get('assets/:assetId/advice')
   advice(@TenantId() tenantId: string, @Param('assetId') assetId: string): Promise<AssetAdviceDto> {
     return this.projects.adviceForAsset(tenantId, assetId);
+  }
+
+  @Get('assets/:assetId/review')
+  review(@TenantId() tenantId: string, @Param('assetId') assetId: string): Promise<ReviewSimDto> {
+    return this.projects.reviewAsset(tenantId, assetId);
   }
 
   @Get(':id/budget-plan')

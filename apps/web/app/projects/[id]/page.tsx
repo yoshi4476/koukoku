@@ -16,14 +16,17 @@ import type {
   ProjectBrief,
   ProjectDetailDto,
   ProjectSettings,
+  ReviewSimDto,
 } from '@adgrid/shared';
 import {
   ASSET_STATUS_LABEL,
   ASSET_TYPE_ICON,
   ASSET_TYPE_LABEL,
   BID_STRATEGY_LABEL,
+  PACE_STATUS_LABEL,
   PROJECT_GOAL_LABEL,
   PROJECT_STATUS_LABEL,
+  REVIEW_VERDICT_META,
   briefCompleteness,
   industryProfileFor,
   isApprover,
@@ -307,6 +310,9 @@ function SettingsTab({ project, onSaved }: { project: ProjectDetailDto; onSaved:
             <input className="input" inputMode="numeric" value={s.targetRoas ?? ''} disabled={!canEdit}
               onChange={(e) => set('targetRoas', numOrNull(e.target.value))} placeholder="例: 400" /></div>
         </div>
+        <div className="field"><label>目標CV数 (件/月)</label>
+          <input className="input" inputMode="numeric" value={s.targetCv ?? ''} disabled={!canEdit}
+            onChange={(e) => set('targetCv', numOrNull(e.target.value))} placeholder="例: 260 — 概要タブで達成ペースを表示" /></div>
         <div className="field"><label>入札戦略</label>
           <select className="select" value={s.bidStrategy} disabled={!canEdit} onChange={(e) => set('bidStrategy', e.target.value as BidStrategy)}>
             {BID_STRATEGIES.map((b) => <option key={b} value={b}>{BID_STRATEGY_LABEL[b]}</option>)}
@@ -393,6 +399,44 @@ function AssetAdvice({ assetId }: { assetId: string }) {
               </ul>
             </>
           ) : <p style={{ color: 'var(--muted)', fontSize: 12.5 }}>改善ポイントを取得できませんでした。</p>}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ReviewSim({ assetId }: { assetId: string }) {
+  const [open, setOpen] = useState(false);
+  const [rev, setRev] = useState<ReviewSimDto | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = () => {
+    if (open) { setOpen(false); return; }
+    setOpen(true);
+    if (rev) return;
+    setBusy(true);
+    apiGet<ReviewSimDto>(`/projects/assets/${assetId}/review`).then(setRev).catch(() => setRev(null)).finally(() => setBusy(false));
+  };
+  const m = rev ? REVIEW_VERDICT_META[rev.verdict] : null;
+  return (
+    <div className="asset-advice-wrap">
+      <button className="btn sm sec" onClick={load}>{open ? '審査チェックを閉じる' : '🛡️ 審査シミュレーション'}</button>
+      {open ? (
+        <div className="asset-advice">
+          {busy ? <SkeletonLines count={1} /> : rev ? (
+            <>
+              <p className="aa-summary"><span className={`pill ${m!.cls}`}>{m!.label}</span> {rev.note}</p>
+              {rev.issues.length > 0 ? (
+                <ul className="aa-list">
+                  {rev.issues.map((it, i) => (
+                    <li key={i} className={`aa-item ${it.severity === 'block' ? 'warn' : ''}`}>
+                      <span className="aa-ico">{it.severity === 'block' ? '⛔' : '⚠️'}</span>
+                      <span><b>{it.scope}: 「{it.expression}」</b><br /><span className="aa-detail">{it.reason} → {it.suggestion}</span></span>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+            </>
+          ) : <p style={{ color: 'var(--muted)', fontSize: 12.5 }}>審査チェックを取得できませんでした。</p>}
         </div>
       ) : null}
     </div>
@@ -511,6 +555,7 @@ function AssetCard({ asset, canPublish, onChanged }: { asset: ProjectAssetDto; c
         ) : null}
       </div>
       <AssetAdvice assetId={asset.id} />
+      <ReviewSim assetId={asset.id} />
     </div>
   );
 }
@@ -545,6 +590,55 @@ function AssetsTab({ project, onChanged }: { project: ProjectDetailDto; onChange
           <p style={{ marginTop: 12, fontSize: 12, color: 'var(--muted)' }}>
             ※ 公開は自社運用版のオーナー / 管理者のみ行えます。
           </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function KpiProgressCard({ project }: { project: ProjectDetailDto }) {
+  const k = project.kpiProgress;
+  const paceCls: Record<string, string> = { ahead: 'up', ontrack: 'up', behind: 'down', none: 'flat' };
+  const cpaCls: Record<string, string> = { good: 'up', warn: 'warn', bad: 'down', none: 'flat' };
+  const hasTargets = k.cv.target !== null || k.cpa.target !== null || k.spend.budget !== null;
+  if (!hasTargets) {
+    return (
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div className="c-head"><h2>🎯 今月の目標と進捗</h2></div>
+        <div className="c-body"><p style={{ margin: 0, color: 'var(--muted)', fontSize: 13 }}>「配信設定」タブで目標CV・目標CPA・月予算を設定すると、達成ペースがここに表示されます。</p></div>
+      </div>
+    );
+  }
+  return (
+    <div className="card" style={{ marginBottom: 14 }}>
+      <div className="c-head"><h2>🎯 今月の目標と進捗</h2>
+        <span className="kpi-days">{k.daysElapsed}/{k.daysInMonth}日経過</span>
+      </div>
+      <div className="c-body kpi-prog-grid">
+        {k.cv.target !== null ? (
+          <div className="kpi-prog">
+            <div className="kp-top"><span className="kp-l">CV (目標 {formatNumber(k.cv.target)}件)</span>
+              <span className={`pill ${paceCls[k.cv.status]}`}>{PACE_STATUS_LABEL[k.cv.status]}</span></div>
+            <div className="kp-v">{formatNumber(k.cv.actual)}<span className="kp-sub"> → 着地 {formatNumber(k.cv.projected)}件</span></div>
+            <div className="kp-bar"><div className={`kp-fill ${paceCls[k.cv.status]}`} style={{ width: `${Math.min(100, k.cv.pct ?? 0)}%` }} /></div>
+            <div className="kp-pct">着地予測 {k.cv.pct}%</div>
+          </div>
+        ) : null}
+        {k.cpa.target !== null ? (
+          <div className="kpi-prog">
+            <div className="kp-top"><span className="kp-l">CPA (目標 {formatYen(k.cpa.target)})</span>
+              <span className={`pill ${cpaCls[k.cpa.status]}`}>{k.cpa.status === 'good' ? '目標内' : k.cpa.status === 'warn' ? 'やや超過' : k.cpa.status === 'bad' ? '超過' : '—'}</span></div>
+            <div className="kp-v">{formatYen(k.cpa.actual)}</div>
+            <div className="kp-note">目標 {formatYen(k.cpa.target)} に対する当月実績</div>
+          </div>
+        ) : null}
+        {k.spend.budget !== null ? (
+          <div className="kpi-prog">
+            <div className="kp-top"><span className="kp-l">予算消化 (月予算 {formatYen(k.spend.budget)})</span>
+              <span className={`pill ${(k.spend.pct ?? 0) > 105 ? 'down' : 'flat'}`}>{k.spend.pct}%着地</span></div>
+            <div className="kp-v">{formatYen(k.spend.actual)}<span className="kp-sub"> → 着地 {formatYen(k.spend.projected)}</span></div>
+            <div className="kp-bar"><div className="kp-fill flat" style={{ width: `${Math.min(100, ((k.spend.actual) / k.spend.budget) * 100)}%` }} /></div>
+          </div>
         ) : null}
       </div>
     </div>
@@ -716,6 +810,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           {/* --- 概要（推移） --- */}
           {tab === 'overview' ? (
             <>
+              <KpiProgressCard project={d} />
               <div className="kpis">
                 {kpiCards.map((c) => (
                   <div className="kpi" key={c.label}>

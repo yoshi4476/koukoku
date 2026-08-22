@@ -13,7 +13,12 @@ import type {
   FatigueItemDto,
   FatigueLevel,
   FatigueReportDto,
+  KpiProgressDto,
+  PaceStatus,
   Platform,
+  ReviewIssueDto,
+  ReviewSimDto,
+  ReviewVerdict,
   ProjectAccountDto,
   ProjectAssetDto,
   ProjectBrief,
@@ -177,6 +182,7 @@ export class ProjectsService {
         });
       }
       const acctSet = new Set(accountIds);
+      const settings = this.mergeSettings(p.settings);
 
       return {
         id: p.id,
@@ -193,12 +199,97 @@ export class ProjectsService {
         alerts: events.filter((e) => acctSet.has(e.adAccountId)),
         openFindings,
         assets: (p.assets as AssetRow[]).map(toAssetDto),
-        settings: this.mergeSettings(p.settings),
+        settings,
         brief: this.mergeBrief(p.brief),
+        kpiProgress: await this.computeKpi(tx, accountIds, settings),
         lastReportAt: lastReport?.createdAt.toISOString() ?? null,
         createdAt: p.createdAt.toISOString(),
       };
     });
+  }
+
+  /** 当月の目標(KPI)進捗。当月消化・CVを月末へ線形予測し目標と比較 (F-21) */
+  private async computeKpi(tx: Tx, accountIds: string[], settings: ProjectSettings): Promise<KpiProgressDto> {
+    const now = new Date();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const daysElapsed = now.getDate();
+    const monthStart = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1));
+    const t = accountIds.length
+      ? await this.metrics.totals(tx, { adAccountIds: accountIds }, monthStart, daysAgo(0))
+      : { cost: 0, impressions: 0, clicks: 0, conversions: 0, conversionValue: 0 };
+    const project = (v: number) => (daysElapsed > 0 ? Math.round((v / daysElapsed) * daysInMonth) : 0);
+    const projectedCv = daysElapsed > 0 ? +((t.conversions / daysElapsed) * daysInMonth).toFixed(1) : 0;
+    const actualCv = +t.conversions.toFixed(1);
+    const actualCpa = t.conversions > 0 ? Math.round(t.cost / t.conversions) : null;
+
+    let cvStatus: PaceStatus = 'none';
+    if (settings.targetCv && settings.targetCv > 0) {
+      cvStatus = projectedCv >= settings.targetCv * 1.05 ? 'ahead' : projectedCv >= settings.targetCv * 0.9 ? 'ontrack' : 'behind';
+    }
+    let cpaStatus: KpiProgressDto['cpa']['status'] = 'none';
+    if (settings.targetCpa && actualCpa !== null) {
+      cpaStatus = actualCpa <= settings.targetCpa ? 'good' : actualCpa <= settings.targetCpa * 1.2 ? 'warn' : 'bad';
+    }
+    return {
+      daysElapsed,
+      daysInMonth,
+      cv: {
+        target: settings.targetCv,
+        actual: actualCv,
+        projected: projectedCv,
+        pct: settings.targetCv ? Math.round((projectedCv / settings.targetCv) * 100) : null,
+        status: cvStatus,
+      },
+      cpa: { target: settings.targetCpa, actual: actualCpa, status: cpaStatus },
+      spend: {
+        budget: settings.monthlyBudgetTotal,
+        actual: Math.round(t.cost),
+        projected: project(t.cost),
+        pct: settings.monthlyBudgetTotal ? Math.round((project(t.cost) / settings.monthlyBudgetTotal) * 100) : null,
+      },
+    };
+  }
+
+  /** 媒体審査シミュレーション。公開前に審査で落ちやすい表現を検知 (F-21) */
+  async reviewAsset(tenantId: string, assetId: string): Promise<ReviewSimDto> {
+    const asset = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.projectAsset.findUnique({ where: { id: assetId }, include: { project: { include: { client: true } } } }),
+    );
+    if (!asset) throw new AppError(HttpStatus.NOT_FOUND, '制作物が見つかりません。', '再読み込みしてください。');
+    const profile = industryProfileFor(asset.project.client.industryCode);
+    const text = `${asset.title} ${asset.content}`.trim();
+    const issues: ReviewIssueDto[] = [];
+
+    for (const w of scanLawDictionary(text)) {
+      issues.push({ severity: w.severity, scope: w.law, expression: w.expression, reason: w.reason, suggestion: w.suggestion });
+    }
+    for (const ng of profile.ngWords) {
+      if (text.includes(ng) && !issues.some((i) => i.expression === ng)) {
+        issues.push({ severity: 'warn', scope: `${profile.label}の規制`, expression: ng, reason: '業種の審査基準で問題になりやすい表現です。', suggestion: '根拠を明示するか、表現を緩和してください。' });
+      }
+    }
+    // 媒体共通ポリシー (最上級・断定・個人属性の名指し・誇大)
+    const MEDIA: { re: RegExp; expr: string; reason: string; suggestion: string; severity: 'block' | 'warn' }[] = [
+      { re: /(No\.?1|ナンバーワン|日本一|世界一|業界一|最高|最安|最強)/, expr: '最上級表現', reason: '客観的な調査根拠がないと不当表示・媒体審査でNGになりやすい。', suggestion: '「(自社調べ)」等の根拠併記か、表現を外す。', severity: 'warn' },
+      { re: /(絶対|必ず|確実に|100%|誰でも)/, expr: '断定・保証表現', reason: '効果や結果の保証は多くの媒体で禁止。', suggestion: '「〜の場合があります」等に緩和。', severity: 'warn' },
+      { re: /(あなた|お前|太っている|貧乏|独身).{0,6}(ですか|あなた)/, expr: '個人属性の名指し', reason: 'Meta等では個人属性を断定・示唆する表現は不承認。', suggestion: '悩みは一般化して表現する。', severity: 'warn' },
+      { re: /(簡単に|楽して|寝るだけで).{0,6}(稼|痩|治)/, expr: '誇大表現', reason: '容易な成果の断定は誇大広告とみなされやすい。', suggestion: '条件や個人差を明記。', severity: 'warn' },
+    ];
+    for (const m of MEDIA) {
+      if (m.re.test(text) && !issues.some((i) => i.expression === m.expr)) {
+        issues.push({ severity: m.severity, scope: '媒体共通ポリシー', expression: m.expr, reason: m.reason, suggestion: m.suggestion });
+      }
+    }
+
+    const hasBlock = issues.some((i) => i.severity === 'block');
+    const verdict: ReviewVerdict = hasBlock ? 'risk' : issues.length > 0 ? 'caution' : 'pass';
+    const note =
+      verdict === 'pass'
+        ? '主要な審査観点で問題は見つかりませんでした。ただし最終判断は各媒体の審査に依存します。'
+        : verdict === 'risk'
+          ? '却下リスクの高い表現があります。公開前に必ず修正してください。'
+          : '修正推奨の表現があります。根拠明示か緩和で通過率が上がります。';
+    return { assetId, verdict, issues, note };
   }
 
   /** 保存済みJSONを既定値とマージし、欠損なしの ProjectSettings にする */

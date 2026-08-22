@@ -46,6 +46,8 @@ import { KeywordsService } from './keywords/keywords.service';
 import { KeywordsController } from './keywords/keywords.controller';
 import { ProjectsService } from './projects/projects.service';
 import { ProjectsController } from './projects/projects.controller';
+import { InsightsService } from './insights/insights.service';
+import { InsightsController } from './insights/insights.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -67,6 +69,7 @@ import { ProjectsController } from './projects/projects.controller';
     DashboardsController,
     KeywordsController,
     ProjectsController,
+    InsightsController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -92,6 +95,7 @@ import { ProjectsController } from './projects/projects.controller';
     DashboardsService,
     KeywordsService,
     ProjectsService,
+    InsightsService,
     MetricsService,
     LlmService,
     AuditService,

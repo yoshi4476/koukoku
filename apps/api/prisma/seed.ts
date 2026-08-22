@@ -258,17 +258,17 @@ async function main() {
     await prisma.adAccount.updateMany({ where: { id: { in: accountIds } }, data: { projectId: id } });
   };
   await mkProject('p_a_spring', clientA.id, '春の新規獲得キャンペーン', 'conversion', [accAGoogle.id, accAMeta.id], 'Google検索とMetaで新規顧客を獲得する主力施策', {
-    monthlyBudgetTotal: 1600000, dailyBudget: 53000, targetCpa: 4000, targetRoas: 400, bidStrategy: 'target_cpa',
+    monthlyBudgetTotal: 1600000, dailyBudget: 53000, targetCpa: 4000, targetRoas: 400, targetCv: 260, bidStrategy: 'target_cpa',
     startDate: '2026-03-01', endDate: '2026-05-31', regions: '全国', ageRange: '25-44', gender: 'female',
     devices: 'all', conversionPoint: '購入完了', dayparting: '終日', note: '母の日商戦に向けて5月は予算増額予定',
   });
   await mkProject('p_b_repeat', clientB.id, 'リピート促進 (LINE/Meta)', 'store', [accBMeta.id, accBLine.id], '既存顧客の再来店・再購入を狙う', {
-    monthlyBudgetTotal: 700000, dailyBudget: 23000, targetCpa: 6000, targetRoas: null, bidStrategy: 'maximize_conversions',
+    monthlyBudgetTotal: 700000, dailyBudget: 23000, targetCpa: 6000, targetRoas: null, targetCv: 60, bidStrategy: 'maximize_conversions',
     startDate: '2026-01-01', endDate: null, regions: '東京・神奈川・千葉・埼玉', ageRange: '20-49', gender: 'female',
     devices: 'mobile', conversionPoint: '来店予約', dayparting: '平日10-20時', note: '',
   });
   await mkProject('p_c_lead', clientC.id, 'BtoBリード獲得', 'conversion', [accCGoogle.id, accCYahoo.id], '検索広告で問い合わせ・資料請求を獲得', {
-    monthlyBudgetTotal: 1700000, dailyBudget: 56000, targetCpa: 15000, targetRoas: null, bidStrategy: 'maximize_conversions',
+    monthlyBudgetTotal: 1700000, dailyBudget: 56000, targetCpa: 15000, targetRoas: null, targetCv: 340, bidStrategy: 'maximize_conversions',
     startDate: '2026-01-01', endDate: null, regions: '全国', ageRange: '指定なし', gender: 'all',
     devices: 'desktop', conversionPoint: '資料請求・問い合わせ', dayparting: '平日9-18時', note: 'PC・法人向けにデスクトップ重視',
   });

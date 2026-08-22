@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import type { Edition, HomeDto, HomeTaskDto, MeDto, OnboardingStatusDto, TaskKind } from '@adgrid/shared';
+import type { Edition, HomeDto, HomeTaskDto, InsightDigestDto, MeDto, OnboardingStatusDto, TaskKind } from '@adgrid/shared';
 import { EDITION_LABEL } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
@@ -131,6 +131,37 @@ function HomeSkeleton() {
   );
 }
 
+const INSIGHT_META: Record<string, { icon: string; cls: string }> = {
+  critical: { icon: '🚨', cls: 'down' },
+  opportunity: { icon: '📈', cls: 'warn' },
+  info: { icon: 'ℹ️', cls: 'flat' },
+};
+
+function InsightDigest() {
+  const dg = useApi<InsightDigestDto>('/insights');
+  if (dg.loading || dg.error || !dg.data) return null;
+  return (
+    <div className="insight-card">
+      <div className="insight-head">🧭 今週のインサイト（次の一手）</div>
+      <p className="insight-headline">{dg.data.headline}</p>
+      {dg.data.items.length > 0 ? (
+        <div className="insight-list">
+          {dg.data.items.map((it, i) => {
+            const m = INSIGHT_META[it.severity];
+            return (
+              <Link key={i} href={it.href} className={`insight-item ${m.cls}`}>
+                <span className="ins-ico">{m.icon}</span>
+                <span className="ins-body"><span className="ins-title">{it.title}</span><span className="ins-detail">{it.detail}</span></span>
+                <span className="ins-go">→</span>
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function HomePage() {
   const { data, loading, error, retry } = useApi<HomeDto>('/home');
   const onboarding = useApi<OnboardingStatusDto>('/onboarding/status');
@@ -168,6 +199,8 @@ export default function HomePage() {
       <HintBar id="home" title="今日の司令室の使い方">
         この画面は<mark>今日やるべきこと</mark>だけを優先度順 (アラート→AI提案→レポート予定) に表示します。運用者の1日はここから始めましょう。各行のボタンから該当画面に直行できます。
       </HintBar>
+
+      <InsightDigest />
 
       {error ? <ErrorCard error={error} onRetry={retry} /> : null}
       {ackError ? <ErrorCard error={ackError} /> : null}

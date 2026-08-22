@@ -665,9 +665,63 @@ export interface ProjectDetailDto {
   assets: ProjectAssetDto[];
   settings: ProjectSettings;
   brief: ProjectBrief;
+  kpiProgress: KpiProgressDto;
   lastReportAt: string | null;
   createdAt: string;
 }
+
+/* ---- 目標(KPI)と進捗 (F-21) ---- */
+export type PaceStatus = 'ahead' | 'ontrack' | 'behind' | 'none';
+export interface KpiProgressDto {
+  daysElapsed: number;
+  daysInMonth: number;
+  cv: { target: number | null; actual: number; projected: number; pct: number | null; status: PaceStatus };
+  cpa: { target: number | null; actual: number | null; status: 'good' | 'warn' | 'bad' | 'none' };
+  spend: { budget: number | null; actual: number; projected: number; pct: number | null };
+}
+
+export const PACE_STATUS_LABEL: Record<PaceStatus, string> = {
+  ahead: '目標超過ペース',
+  ontrack: '順調',
+  behind: '未達ペース',
+  none: '目標未設定',
+};
+
+/* ---- 週次AIインサイト (F-21) ---- */
+export type InsightSeverity = 'critical' | 'opportunity' | 'info';
+export interface InsightItemDto {
+  severity: InsightSeverity;
+  title: string;
+  detail: string;
+  projectId: string | null;
+  projectName: string | null;
+  href: string;
+}
+export interface InsightDigestDto {
+  headline: string;
+  items: InsightItemDto[];
+}
+
+/* ---- 媒体審査シミュレーション (F-21) ---- */
+export type ReviewVerdict = 'pass' | 'caution' | 'risk';
+export interface ReviewIssueDto {
+  severity: 'block' | 'warn';
+  scope: string; // 景表法 / 薬機法 / 媒体共通 / 業種規制 等
+  expression: string;
+  reason: string;
+  suggestion: string;
+}
+export interface ReviewSimDto {
+  assetId: string;
+  verdict: ReviewVerdict;
+  issues: ReviewIssueDto[];
+  note: string;
+}
+export const REVIEW_VERDICT_META: Record<ReviewVerdict, { label: string; cls: string }> = {
+  pass: { label: '通過見込み', cls: 'up' },
+  caution: { label: '要修正', cls: 'warn' },
+  risk: { label: '却下リスク高', cls: 'down' },
+};
 
 export interface CreateProjectInput {
   clientId: string;
@@ -702,6 +756,8 @@ export interface ProjectSettings {
   targetCpa: number | null;
   /** 目標ROAS (%) */
   targetRoas: number | null;
+  /** 目標CV数 (件/月) */
+  targetCv: number | null;
   bidStrategy: BidStrategy;
   /** 配信開始日 YYYY-MM-DD */
   startDate: string | null;
@@ -725,6 +781,7 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   dailyBudget: null,
   targetCpa: null,
   targetRoas: null,
+  targetCv: null,
   bidStrategy: 'maximize_conversions',
   startDate: null,
   endDate: null,
