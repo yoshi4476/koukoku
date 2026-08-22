@@ -9,7 +9,8 @@ import type {
 } from '@adgrid/shared';
 import { ALL_PLATFORMS } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import { ClientScope, TenantId } from '../common/tenant';
+import { ClientScope, SessionInfo, SessionInfoValue, TenantId } from '../common/tenant';
+import { assertEditor } from '../common/authz';
 import { AppError } from '../common/errors';
 import { MetricsService, daysAgo } from '../metrics/metrics.service';
 import { BillingService } from '../billing/billing.service';
@@ -80,8 +81,10 @@ export class ClientsController {
   @Post()
   async create(
     @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
     @Body() body: { name?: string; industryCode?: string },
   ): Promise<ClientDto> {
+    assertEditor(user);
     if (!body?.name?.trim()) {
       throw new AppError(
         HttpStatus.BAD_REQUEST,
@@ -106,9 +109,11 @@ export class ClientsController {
   @Post(':clientId/accounts')
   async createAccount(
     @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
     @Param('clientId') clientId: string,
     @Body() body: { platform?: Platform; name?: string; monthlyBudget?: number },
   ): Promise<AdAccountDto> {
+    assertEditor(user);
     if (!body?.platform || !ALL_PLATFORMS.includes(body.platform)) {
       throw new AppError(
         HttpStatus.BAD_REQUEST,

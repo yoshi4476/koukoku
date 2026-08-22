@@ -1,7 +1,8 @@
 import { Body, Controller, Get, HttpStatus, Param, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import type { ReportRunDto } from '@adgrid/shared';
-import { ClientScope, TenantId } from '../common/tenant';
+import { isApprover } from '@adgrid/shared';
+import { ClientScope, SessionInfo, SessionInfoValue, TenantId } from '../common/tenant';
 import { AppError } from '../common/errors';
 import { SchedulerService } from '../scheduler/scheduler.service';
 import { ReportExportService } from '../exports/report-export.service';
@@ -60,9 +61,13 @@ export class ReportController {
     res.end(buf);
   }
 
-  /** スケジューラの手動実行 (開発・検証用)。本番は週次cronで自動実行 */
+  /** スケジューラの手動実行 (開発・検証用)。本番は週次cronで自動実行。
+   *  全テナントを処理する重い操作のため owner/admin 限定 (監査対応) */
   @Post('run-weekly-all')
-  runWeeklyAll(@TenantId() _tenantId: string) {
+  runWeeklyAll(@TenantId() _tenantId: string, @SessionInfo() user: SessionInfoValue) {
+    if (!isApprover(user.role)) {
+      throw new AppError(HttpStatus.FORBIDDEN, '実行権限がありません。', 'オーナーまたは管理者で操作してください。');
+    }
     return this.scheduler.runWeeklyForAllTenants();
   }
 

@@ -1,9 +1,13 @@
-import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Put, Query, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { MAX_UPLOAD_BYTES } from './upload.constants';
 import type {
+  AdoptCreativeInput,
   AssetAdviceDto,
   BudgetPlanDto,
   CreateAssetInput,
   CreateProjectInput,
+  CreativeGenDto,
   FatigueReportDto,
   ProjectAssetDto,
   ProjectDetailDto,
@@ -13,6 +17,7 @@ import type {
   UpdateProjectInput,
 } from '@adgrid/shared';
 import { ClientScope, SessionInfo, SessionInfoValue, TenantId } from '../common/tenant';
+import { assertEditor } from '../common/authz';
 import { ProjectsService } from './projects.service';
 
 @Controller('projects')
@@ -30,16 +35,19 @@ export class ProjectsController {
   }
 
   @Post()
-  create(@TenantId() tenantId: string, @Body() body: CreateProjectInput): Promise<ProjectDto> {
+  create(@TenantId() tenantId: string, @SessionInfo() user: SessionInfoValue, @Body() body: CreateProjectInput): Promise<ProjectDto> {
+    assertEditor(user);
     return this.projects.create(tenantId, body);
   }
 
   @Put(':id')
   update(
     @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
     @Param('id') id: string,
     @Body() body: UpdateProjectInput,
   ): Promise<ProjectDto> {
+    assertEditor(user);
     return this.projects.update(tenantId, id, body);
   }
 
@@ -53,18 +61,22 @@ export class ProjectsController {
   @Post(':id/assets')
   createAsset(
     @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
     @Param('id') id: string,
     @Body() body: CreateAssetInput,
   ): Promise<ProjectAssetDto> {
+    assertEditor(user);
     return this.projects.createAsset(tenantId, id, body);
   }
 
   @Put('assets/:assetId')
   updateAsset(
     @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
     @Param('assetId') assetId: string,
     @Body() body: UpdateAssetInput,
   ): Promise<ProjectAssetDto> {
+    assertEditor(user);
     return this.projects.updateAsset(tenantId, assetId, body);
   }
 
@@ -75,6 +87,41 @@ export class ProjectsController {
     @Param('assetId') assetId: string,
   ): Promise<ProjectAssetDto> {
     return this.projects.publishAsset(tenantId, assetId, user);
+  }
+
+  @Post('assets/:assetId/upload')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_UPLOAD_BYTES } }))
+  uploadAsset(
+    @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
+    @Param('assetId') assetId: string,
+    @UploadedFile() file: { buffer: Buffer; mimetype: string; size: number } | undefined,
+  ): Promise<ProjectAssetDto> {
+    assertEditor(user);
+    return this.projects.attachUpload(tenantId, assetId, file);
+  }
+
+  /* ---- 業種特化クリエイティブ生成 (F-26) ---- */
+
+  @Get(':id/creatives')
+  creatives(
+    @TenantId() tenantId: string,
+    @ClientScope() scope: string | null,
+    @Param('id') id: string,
+    @Query('count') count?: string,
+  ): Promise<CreativeGenDto> {
+    return this.projects.generateCreatives(tenantId, id, Number(count) || 4, scope);
+  }
+
+  @Post(':id/creatives/adopt')
+  adoptCreatives(
+    @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
+    @Param('id') id: string,
+    @Body() body: AdoptCreativeInput,
+  ): Promise<ProjectAssetDto[]> {
+    assertEditor(user);
+    return this.projects.adoptCreatives(tenantId, id, body);
   }
 
   @Get('assets/:assetId/advice')

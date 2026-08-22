@@ -1,6 +1,13 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:4000';
 const TENANT_ID = 't_demo_agency';
 
+/** APIが配信するアップロード物 (/uploads/...) を表示用の絶対URLに解決する。外部URLはそのまま */
+export function mediaUrl(path: string): string {
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path) || path.startsWith('data:')) return path;
+  return `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+}
+
 export class ApiError extends Error {
   readonly resolution: string;
   readonly status: number | null;

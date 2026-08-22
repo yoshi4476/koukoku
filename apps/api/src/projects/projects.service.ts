@@ -30,7 +30,8 @@ import type {
   UpdateAssetInput,
   UpdateProjectInput,
 } from '@adgrid/shared';
-import { DEFAULT_PROJECT_BRIEF, DEFAULT_PROJECT_SETTINGS, industryProfileFor } from '@adgrid/shared';
+import type { AdoptCreativeInput, CreativeGenDto, CreativeVariant } from '@adgrid/shared';
+import { DEFAULT_PROJECT_BRIEF, DEFAULT_PROJECT_SETTINGS, buildCreativeVariants, industryProfileFor } from '@adgrid/shared';
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 import { MetricsService, daysAgo } from '../metrics/metrics.service';
@@ -38,6 +39,9 @@ import { AlertsService } from '../alerts/alerts.service';
 import { scanLawDictionary } from '../ai/law-dictionary';
 import { widthUnits } from '../ai/copy-limits';
 import type { SessionInfoValue } from '../common/tenant';
+import { mkdir, writeFile } from 'fs/promises';
+import { join } from 'path';
+import { ALLOWED_UPLOAD, MAX_UPLOAD_BYTES, UPLOAD_DIR } from './upload.constants';
 
 const GOALS: ProjectGoal[] = ['conversion', 'awareness', 'traffic', 'store'];
 const ASSET_TYPES: AssetType[] = ['copy', 'lp', 'flyer', 'video'];
@@ -368,6 +372,86 @@ export class ProjectsService {
       }
       return tx.projectAsset.update({ where: { id: assetId }, data });
     });
+    return toAssetDto(row as AssetRow);
+  }
+
+  /** 業種+ヒアリングから最適なクリエイティブ案を生成する (F-26)。
+   *  ANTHROPIC_API_KEY 無しでも動く決定的生成。訴求軸は業種の推奨順を使う */
+  async generateCreatives(tenantId: string, projectId: string, count: number, scope?: string | null): Promise<CreativeGenDto> {
+    const project = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.project.findUnique({ where: { id: projectId }, include: { client: true } }),
+    );
+    if (!project || (scope && project.clientId !== scope)) {
+      throw new AppError(HttpStatus.NOT_FOUND, 'プロジェクトが見つかりません。', '一覧から選び直してください。');
+    }
+    const profile = industryProfileFor(project.client.industryCode);
+    const brief = this.mergeBrief(project.brief);
+    const variants = buildCreativeVariants(profile, brief, project.goal as ProjectGoal, count || 4);
+    return { mocked: true, industryLabel: profile.label, variants };
+  }
+
+  /** 生成したクリエイティブ案を制作物(広告文)として登録する (F-26) */
+  async adoptCreatives(tenantId: string, projectId: string, input: AdoptCreativeInput): Promise<ProjectAssetDto[]> {
+    const variants = (input?.variants ?? []).filter((v) => v?.headline?.trim());
+    if (variants.length === 0) {
+      throw new AppError(HttpStatus.BAD_REQUEST, '採用する案が選ばれていません。', '1件以上選択してください。');
+    }
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const project = await tx.project.findUnique({ where: { id: projectId } });
+      if (!project) {
+        throw new AppError(HttpStatus.NOT_FOUND, 'プロジェクトが見つかりません。', '一覧から選び直してください。');
+      }
+      const out: ProjectAssetDto[] = [];
+      for (const v of variants as CreativeVariant[]) {
+        const note = [v.bannerConcept ? `バナー構成案: ${v.bannerConcept}` : '', v.rationale ? `狙い: ${v.rationale}` : '']
+          .filter(Boolean)
+          .join(' / ');
+        const row = await tx.projectAsset.create({
+          data: {
+            tenantId,
+            projectId,
+            type: 'copy',
+            title: v.headline.trim().slice(0, 80),
+            content: [v.description, v.primaryText].filter(Boolean).join('\n').trim(),
+            note: `[${v.appealAxis}] ${note}`.slice(0, 500),
+          },
+        });
+        out.push(toAssetDto(row as AssetRow));
+      }
+      return out;
+    });
+  }
+
+  /** 制作物に画像・動画ファイルを添付する。実体を uploads/ に保存し url を差し替える (F-24) */
+  async attachUpload(
+    tenantId: string,
+    assetId: string,
+    file: { buffer: Buffer; mimetype: string; size: number } | undefined,
+  ): Promise<ProjectAssetDto> {
+    if (!file) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'ファイルが選択されていません。', '画像または動画を選んでください。');
+    }
+    const spec = ALLOWED_UPLOAD[file.mimetype];
+    if (!spec) {
+      throw new AppError(HttpStatus.BAD_REQUEST, '対応していない形式です。', 'PNG / JPG / GIF / WebP / MP4 / MOV / WebM を選んでください。');
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      throw new AppError(HttpStatus.BAD_REQUEST, 'ファイルが大きすぎます。', '50MB以下のファイルを選んでください。');
+    }
+    // 添付先が自テナントの制作物か確認 (RLS)
+    const asset = await this.prisma.withTenant(tenantId, (tx) => tx.projectAsset.findUnique({ where: { id: assetId } }));
+    if (!asset) {
+      throw new AppError(HttpStatus.NOT_FOUND, '制作物が見つかりません。', '再読み込みしてください。');
+    }
+    // uploads/<tenantId>/<assetId>.<ext> に保存 (テナントごとにディレクトリ分離)
+    const dir = join(UPLOAD_DIR, tenantId);
+    await mkdir(dir, { recursive: true });
+    const filename = `${assetId}.${spec.ext}`;
+    await writeFile(join(dir, filename), file.buffer);
+    const url = `/uploads/${tenantId}/${filename}`;
+    const row = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.projectAsset.update({ where: { id: assetId }, data: { url } }),
+    );
     return toAssetDto(row as AssetRow);
   }
 

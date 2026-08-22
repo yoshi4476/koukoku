@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isApprover,
+  isEditor,
   twoProportionPValue,
   verdictHigherBetter,
   verdictLowerBetter,
@@ -9,6 +10,8 @@ import {
   industryProfileFor,
   industryModeFor,
   recommendMediaPlan,
+  buildCreativeVariants,
+  DEFAULT_PROJECT_BRIEF,
 } from '@adgrid/shared';
 import { limitsFor, widthUnits } from '../src/ai/copy-limits';
 import { scanLawDictionary } from '../src/ai/law-dictionary';
@@ -251,5 +254,48 @@ describe('打ち出し方の提案 (media plan)', () => {
     const p = recommendMediaPlan('beauty', 'store', 800000);
     expect(p.targeting.gender).toBe('female');
     expect(p.targeting.devices).toBe('mobile');
+  });
+});
+
+describe('編集権限 (isEditor / 監査対応 F-25)', () => {
+  it('owner/admin/operator は編集可、viewer/client は不可', () => {
+    expect(isEditor('owner')).toBe(true);
+    expect(isEditor('admin')).toBe(true);
+    expect(isEditor('operator')).toBe(true);
+    expect(isEditor('viewer')).toBe(false);
+    expect(isEditor('client')).toBe(false);
+  });
+  it('承認(isApprover)は編集(isEditor)より狭い (operatorは編集可だが承認不可)', () => {
+    expect(isApprover('operator')).toBe(false);
+    expect(isEditor('operator')).toBe(true);
+  });
+});
+
+describe('業種特化クリエイティブ生成 (F-26)', () => {
+  const profile = industryProfileFor('beauty');
+  it('業種の推奨訴求軸の順で、指定数の案を1軸1案で返す', () => {
+    const vs = buildCreativeVariants(profile, DEFAULT_PROJECT_BRIEF, 'store', 4);
+    expect(vs).toHaveLength(4);
+    expect(vs[0].appealAxis).toBe(profile.appealAxes[0]);
+    // 各案は見出し・本文・CTA・バナー構成案・狙いを持つ
+    for (const v of vs) {
+      expect(v.headline.length).toBeGreaterThan(0);
+      expect(v.primaryText.length).toBeGreaterThan(0);
+      expect(v.cta.length).toBeGreaterThan(0);
+      expect(v.bannerConcept.length).toBeGreaterThan(0);
+    }
+  });
+  it('ヒアリングの具体情報 (オファー・USP) が生成文に反映される', () => {
+    const ec = industryProfileFor('ec');
+    const brief = { ...DEFAULT_PROJECT_BRIEF, offer: '送料無料', usp: '国産素材で安心', area: '全国' };
+    const vs = buildCreativeVariants(ec, brief, 'conversion', 6);
+    const joined = vs.map((v) => `${v.headline}${v.description}${v.primaryText}`).join('');
+    expect(joined).toContain('送料無料');
+    expect(joined).toContain('国産素材で安心');
+  });
+  it('目標がstoreならCTAは予約系、countは1..8にクランプ', () => {
+    const vs = buildCreativeVariants(profile, DEFAULT_PROJECT_BRIEF, 'store', 99);
+    expect(vs.length).toBeLessThanOrEqual(8);
+    expect(vs.some((v) => v.cta.includes('予約'))).toBe(true);
   });
 });

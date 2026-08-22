@@ -39,10 +39,16 @@ export class FeedbackService {
       ? (await this.prisma.user.findUnique({ where: { id: user.userId } }))?.name ?? ''
       : '';
     return this.prisma.withTenant(tenantId, async (tx) => {
+      // projectId は自分(scope)のクライアントのプロジェクトに限定する (他クライアント混入を防止)
+      let projectId: string | null = null;
+      if (input.projectId) {
+        const p = await tx.project.findUnique({ where: { id: input.projectId }, select: { clientId: true } });
+        projectId = p && p.clientId === scope ? input.projectId : null;
+      }
       const row = await tx.feedback.create({
         data: {
           tenantId, clientId: scope, userId: user.userId, authorName: author,
-          projectId: input.projectId ?? null, message: input.message.trim(),
+          projectId, message: input.message.trim(),
         },
       });
       const names = await this.clientNames(tx, [scope]);

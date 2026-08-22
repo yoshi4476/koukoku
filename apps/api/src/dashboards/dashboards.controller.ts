@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
 import type { DashboardDef, DashboardListDto, WidgetDataDto, WidgetDef } from '@adgrid/shared';
 import { SessionInfo, SessionInfoValue, TenantId } from '../common/tenant';
+import { assertEditor } from '../common/authz';
 import { DashboardsService } from './dashboards.service';
 
 @Controller('dashboards')
@@ -18,6 +19,7 @@ export class DashboardsController {
     @SessionInfo() user: SessionInfoValue,
     @Body() body: { name?: string },
   ): Promise<DashboardDef> {
+    assertEditor(user);
     return this.dashboards.create(tenantId, user.userId, body?.name ?? '');
   }
 
@@ -29,14 +31,21 @@ export class DashboardsController {
   @Put(':id')
   save(
     @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
     @Param('id') id: string,
     @Body() body: { name?: string; layout?: WidgetDef[] },
   ): Promise<DashboardDef> {
+    assertEditor(user);
     return this.dashboards.saveLayout(tenantId, id, body?.name ?? '', body?.layout ?? []);
   }
 
   @Delete(':id')
-  async remove(@TenantId() tenantId: string, @Param('id') id: string): Promise<{ ok: true }> {
+  async remove(
+    @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
+    @Param('id') id: string,
+  ): Promise<{ ok: true }> {
+    assertEditor(user);
     await this.dashboards.remove(tenantId, id);
     return { ok: true };
   }

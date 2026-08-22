@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { Platform } from '@adgrid/shared';
 import { PLATFORM_META } from '@adgrid/shared';
 import { ApiError } from '@/lib/api';
@@ -23,6 +24,54 @@ export function ErrorCard({ error, onRetry }: { error: ApiError; onRetry?: () =>
         </span>
       ) : null}
     </div>
+  );
+}
+
+/* ---- モーダル (中央表示・背景クリック/Escで閉じる) ---- */
+export function Modal({
+  title,
+  onClose,
+  children,
+  wide = false,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  wide?: boolean;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = '';
+    };
+  }, [onClose]);
+  if (!mounted) return null;
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        className={`modal${wide ? ' wide' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="modal-head">
+          <h2>{title}</h2>
+          <button type="button" className="modal-x" aria-label="閉じる" onClick={onClose}>
+            ✕
+          </button>
+        </div>
+        <div className="modal-body">{children}</div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

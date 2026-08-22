@@ -15,6 +15,12 @@ export function isApprover(role: MemberRole): boolean {
   return role === 'owner' || role === 'admin';
 }
 
+/** データの作成・更新 (クライアント/プロジェクト/制作物/ダッシュボード等) ができるロール。
+ *  viewer は閲覧のみ、client (提供先) は自社データ閲覧のみで書込不可 */
+export function isEditor(role: MemberRole): boolean {
+  return role === 'owner' || role === 'admin' || role === 'operator';
+}
+
 /* ---- 版 (edition) ---- */
 // agency=自社運用版(全機能) / client=提供先版(自社データ閲覧中心・運用操作は非表示)
 export type Edition = 'agency' | 'client';

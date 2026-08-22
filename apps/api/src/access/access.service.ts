@@ -20,7 +20,8 @@ export class AccessService {
     }
   }
 
-  async list(tenantId: string, clientId: string): Promise<ClientAccessDto[]> {
+  async list(tenantId: string, clientId: string, actor: SessionInfoValue): Promise<ClientAccessDto[]> {
+    this.assertManager(actor);
     const members = await this.prisma.tenantMember.findMany({
       where: { tenantId, role: 'client', clientId },
       include: { user: true },

@@ -18,10 +18,21 @@ export const ClientScope = createParamDecorator((_: unknown, ctx: ExecutionConte
 );
 
 /**
+ * `x-tenant-id` ヘッダ / DEV_TENANT_ID フォールバックを許可するか。
+ * これは無認証でテナントを指定できてしまう開発専用の抜け道のため、
+ * 本番 (NODE_ENV=production) では ALLOW_TENANT_HEADER=true を明示しない限り無効。
+ * 開発環境では従来どおり既定で有効 (ALLOW_TENANT_HEADER=false で明示無効化も可)。
+ */
+function tenantHeaderAllowed(): boolean {
+  if (process.env.ALLOW_TENANT_HEADER === 'true') return true;
+  if (process.env.ALLOW_TENANT_HEADER === 'false') return false;
+  return process.env.NODE_ENV !== 'production';
+}
+
+/**
  * テナント解決の優先順位:
  * 1. セッションクッキー (JWT) — 通常のログインユーザー
- * 2. `x-tenant-id` ヘッダ / DEV_TENANT_ID — 開発ツール・cURL用フォールバック
- * 本番デプロイ時は 2 を無効化する (ALLOW_TENANT_HEADER=false)。
+ * 2. `x-tenant-id` ヘッダ / DEV_TENANT_ID — 開発ツール・cURL用フォールバック (本番は既定で無効)
  */
 export function resolveTenantId(req: Request): string | null {
   const token = (req.cookies ?? {})[SESSION_COOKIE] as string | undefined;
@@ -29,7 +40,7 @@ export function resolveTenantId(req: Request): string | null {
     const session = verifySession(token);
     if (session) return session.tenantId;
   }
-  if (process.env.ALLOW_TENANT_HEADER !== 'false') {
+  if (tenantHeaderAllowed()) {
     const header = req.headers['x-tenant-id'];
     if (typeof header === 'string' && header) return header;
     if (process.env.DEV_TENANT_ID) return process.env.DEV_TENANT_ID;
@@ -56,7 +67,10 @@ export const SessionInfo = createParamDecorator((_: unknown, ctx: ExecutionConte
     const session = verifySession(token);
     if (session) return { userId: session.sub, role: session.role, clientScopeId: session.clientScopeId ?? null };
   }
-  if (process.env.ALLOW_DEV_OWNER === 'true') return { userId: null, role: 'owner', clientScopeId: null };
+  // 本番では dev owner 昇格を無効化 (誤設定による特権付与を防ぐ)
+  if (process.env.ALLOW_DEV_OWNER === 'true' && process.env.NODE_ENV !== 'production') {
+    return { userId: null, role: 'owner', clientScopeId: null };
+  }
   return { userId: null, role: 'viewer', clientScopeId: null };
 });
 

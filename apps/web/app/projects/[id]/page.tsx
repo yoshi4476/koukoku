@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useMemo, useState, type FormEvent } from 'react';
+import { use, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type {
@@ -35,8 +35,10 @@ import {
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
 import { useClients } from '@/components/client-context';
-import { DeltaText, ErrorCard, PlatformTag, SkeletonLines } from '@/components/ui';
-import { apiGet, apiPost, apiPut, toApiError, type ApiError } from '@/lib/api';
+import { DeltaText, ErrorCard, Modal, PlatformTag, SkeletonLines } from '@/components/ui';
+import { apiGet, apiPost, apiPut, apiUpload, mediaUrl, toApiError, type ApiError } from '@/lib/api';
+import { AdPreview, PublishConfirm } from './ad-preview';
+import { CreativeGenerator } from './creative-gen';
 import { CONNECTION_STATUS_META, INDUSTRY_LABEL } from '@/lib/labels';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
 
@@ -507,9 +509,17 @@ function AddAssetForm({ projectId, onDone, onCancel }: { projectId: string; onDo
   );
 }
 
-function AssetCard({ asset, canPublish, onChanged }: { asset: ProjectAssetDto; canPublish: boolean; onChanged: () => void }) {
+const isVideoUrl = (url: string) => /\.(mp4|mov|webm)$/i.test(url);
+
+function AssetCard({ asset, project, canPublish, canEdit, onChanged }: {
+  asset: ProjectAssetDto; project: ProjectDetailDto; canPublish: boolean; canEdit: boolean; onChanged: () => void;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [pubError, setPubError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const advance = (status: AssetStatus) => {
     setBusy(true); setError(null);
@@ -518,14 +528,27 @@ function AssetCard({ asset, canPublish, onChanged }: { asset: ProjectAssetDto; c
       .catch((e: unknown) => setError(toApiError(e)))
       .finally(() => setBusy(false));
   };
-  const publish = () => {
-    setBusy(true); setError(null);
+  const doPublish = () => {
+    setBusy(true); setPubError(null);
     apiPost<ProjectAssetDto>(`/projects/assets/${asset.id}/publish`, {})
-      .then(() => onChanged())
-      .catch((e: unknown) => setError(toApiError(e)))
+      .then(() => { setShowConfirm(false); onChanged(); })
+      .catch((e: unknown) => setPubError(toApiError(e).message))
       .finally(() => setBusy(false));
   };
+  const onFile = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const form = new FormData();
+    form.append('file', file);
+    setBusy(true); setError(null);
+    apiUpload<ProjectAssetDto>(`/projects/assets/${asset.id}/upload`, form)
+      .then(() => onChanged())
+      .catch((err: unknown) => setError(toApiError(err)))
+      .finally(() => { setBusy(false); if (fileRef.current) fileRef.current.value = ''; });
+  };
   const next = NEXT_STATUS[asset.status];
+  const media = asset.url ? mediaUrl(asset.url) : '';
+  const uploaded = asset.url.startsWith('/uploads/');
 
   return (
     <div className={`asset-card${asset.status === 'published' ? ' pub' : ''}`}>
@@ -538,19 +561,33 @@ function AssetCard({ asset, canPublish, onChanged }: { asset: ProjectAssetDto; c
       </div>
       <div className="asset-title">{asset.title}</div>
       {asset.content ? <div className="asset-content">{asset.content}</div> : null}
-      {asset.url ? (
+      {media ? (
+        isVideoUrl(asset.url)
+          ? <video className="asset-thumb" src={media} controls preload="metadata" />
+          : <img className="asset-thumb" src={media} alt={asset.title} />
+      ) : null}
+      {asset.url && !uploaded ? (
         <a className="asset-url" href={asset.url} target="_blank" rel="noopener noreferrer">{asset.url} ↗</a>
       ) : null}
       {asset.publishedAt ? <div className="asset-pubdate">公開日: {formatDate(asset.publishedAt)}</div> : null}
       {error ? <div style={{ fontSize: 11.5, color: 'var(--bad)' }}>{error.message}</div> : null}
       <div className="asset-actions">
-        {next ? (
+        <button className="btn sm sec" disabled={busy} onClick={() => setShowPreview(true)}>👁 プレビュー</button>
+        {canEdit ? (
+          <>
+            <button className="btn sm sec" disabled={busy} onClick={() => fileRef.current?.click()}>
+              🖼 {uploaded ? '差し替え' : '画像/動画'}
+            </button>
+            <input ref={fileRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={onFile} />
+          </>
+        ) : null}
+        {next && canEdit ? (
           <button className="btn sm sec" disabled={busy} onClick={() => advance(next)}>
             {next === 'review' ? 'レビューへ' : '承認する'}
           </button>
         ) : null}
         {asset.status !== 'published' && canPublish ? (
-          <button className="btn sm pri" disabled={busy} onClick={publish}>🚀 公開する</button>
+          <button className="btn sm pri" disabled={busy} onClick={() => { setPubError(null); setShowConfirm(true); }}>🚀 公開する</button>
         ) : null}
         {asset.status === 'published' && canPublish ? (
           <button className="btn sm sec" disabled={busy} onClick={() => advance('approved')}>公開を停止</button>
@@ -558,6 +595,24 @@ function AssetCard({ asset, canPublish, onChanged }: { asset: ProjectAssetDto; c
       </div>
       <AssetAdvice assetId={asset.id} />
       <ReviewSim assetId={asset.id} />
+
+      {showPreview ? (
+        <Modal title={`広告プレビュー — ${asset.title}`} onClose={() => setShowPreview(false)}>
+          <AdPreview asset={asset} project={project} />
+        </Modal>
+      ) : null}
+      {showConfirm ? (
+        <Modal title="公開前の最終確認" onClose={() => (busy ? undefined : setShowConfirm(false))} wide>
+          <PublishConfirm
+            project={project}
+            asset={asset}
+            busy={busy}
+            error={pubError}
+            onConfirm={doPublish}
+            onCancel={() => setShowConfirm(false)}
+          />
+        </Modal>
+      ) : null}
     </div>
   );
 }
@@ -565,20 +620,30 @@ function AssetCard({ asset, canPublish, onChanged }: { asset: ProjectAssetDto; c
 function AssetsTab({ project, onChanged }: { project: ProjectDetailDto; onChanged: () => void }) {
   const { me } = useAuth();
   const [showForm, setShowForm] = useState(false);
+  const [showGen, setShowGen] = useState(false);
   const canPublish = me.edition === 'agency' && isApprover(me.role);
+  const canEdit = me.edition === 'agency';
   const assets = project.assets;
 
   return (
     <div className="card">
       <div className="c-head">
         <h2>制作物（広告文・LP・チラシ・動画）</h2>
-        {me.edition === 'agency' ? (
-          <button className="btn sm pri" style={{ marginLeft: 'auto' }} onClick={() => setShowForm((v) => !v)}>
-            {showForm ? '閉じる' : '＋ 制作物を追加'}
-          </button>
+        {canEdit ? (
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+            <button className="btn sm ai" onClick={() => setShowGen(true)}>🎨 業種に合わせてAIで作成</button>
+            <button className="btn sm pri" onClick={() => setShowForm((v) => !v)}>
+              {showForm ? '閉じる' : '＋ 制作物を追加'}
+            </button>
+          </div>
         ) : null}
       </div>
       <div className="c-body">
+        {showGen ? (
+          <Modal title="🎨 業種に合わせてAIでクリエイティブ作成" onClose={() => setShowGen(false)} wide>
+            <CreativeGenerator projectId={project.id} onAdopted={onChanged} onClose={() => setShowGen(false)} />
+          </Modal>
+        ) : null}
         {showForm ? <AddAssetForm projectId={project.id} onDone={() => { setShowForm(false); onChanged(); }} onCancel={() => setShowForm(false)} /> : null}
         {assets.length === 0 && !showForm ? (
           <p style={{ margin: 0, color: 'var(--muted)' }}>
@@ -587,7 +652,7 @@ function AssetsTab({ project, onChanged }: { project: ProjectDetailDto; onChange
         ) : null}
         {assets.length > 0 ? (
           <div className="asset-grid">
-            {assets.map((a) => <AssetCard key={a.id} asset={a} canPublish={canPublish} onChanged={onChanged} />)}
+            {assets.map((a) => <AssetCard key={a.id} asset={a} project={project} canPublish={canPublish} canEdit={canEdit} onChanged={onChanged} />)}
           </div>
         ) : null}
         {!canPublish && assets.length > 0 ? (

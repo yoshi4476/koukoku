@@ -4,6 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { AppExceptionFilter } from './common/errors';
+import { UPLOAD_DIR } from './projects/upload.constants';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -11,6 +12,8 @@ async function bootstrap() {
     rawBody: true,
   });
   app.use(cookieParser());
+  // アップロードした画像・動画を /uploads/ で配信 (表示のみ。URLはcuidで推測困難)
+  app.useStaticAssets(UPLOAD_DIR, { prefix: '/uploads/' });
   app.enableCors({
     origin: process.env.WEB_ORIGIN ?? 'http://localhost:3000',
     credentials: true,

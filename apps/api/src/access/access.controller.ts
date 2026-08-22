@@ -8,8 +8,12 @@ export class AccessController {
   constructor(private readonly access: AccessService) {}
 
   @Get(':clientId/access')
-  list(@TenantId() tenantId: string, @Param('clientId') clientId: string): Promise<ClientAccessDto[]> {
-    return this.access.list(tenantId, clientId);
+  list(
+    @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
+    @Param('clientId') clientId: string,
+  ): Promise<ClientAccessDto[]> {
+    return this.access.list(tenantId, clientId, user);
   }
 
   @Post(':clientId/access')
