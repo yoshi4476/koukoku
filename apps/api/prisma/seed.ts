@@ -30,6 +30,8 @@ interface CampaignSpec {
   avgOrderValue: number;
   /** 直近7日のCV係数 (悪化・改善パターンの再現) */
   recentConvFactor?: number;
+  /** 直近7日のCTR係数 (クリエイティブ疲弊の再現) */
+  recentCtrFactor?: number;
   /** 計測欠落の再現: CVを常にゼロにする */
   zeroConversions?: boolean;
 }
@@ -50,7 +52,9 @@ async function seedFacts(
       const cost = Math.round(c.baseCost * weekendFactor * jitter);
       const cpc = 80 + wave(day, 2) * 60;
       const clicks = Math.max(1, Math.round(cost / cpc));
-      const impressions = Math.round(clicks / c.baseCtr);
+      // 直近7日はCTRを落として疲弊を再現 (同じクリックでも表示回数が増える=CTR低下)
+      const ctrEff = day < 7 && c.recentCtrFactor !== undefined ? c.baseCtr * c.recentCtrFactor : c.baseCtr;
+      const impressions = Math.round(clicks / ctrEff);
       let cvr = c.baseCvr;
       if (day < 7 && c.recentConvFactor !== undefined) cvr *= c.recentConvFactor;
       let conversions = c.zeroConversions ? 0 : +(clicks * cvr).toFixed(1);
@@ -186,7 +190,7 @@ async function main() {
   ]);
   // B社 Meta: 直近7日でCPA悪化 (リタゲ疲弊パターン) → /audit が検出すべき
   await seedFacts(accBMeta.id, 'meta', [
-    { campaignId: 'm-b-pros', campaignName: '新規獲得 (動画)', baseCost: 12000, baseCtr: 0.008, baseCvr: 0.01, avgOrderValue: 12000, recentConvFactor: 0.55 },
+    { campaignId: 'm-b-pros', campaignName: '新規獲得 (動画)', baseCost: 12000, baseCtr: 0.008, baseCvr: 0.01, avgOrderValue: 12000, recentConvFactor: 0.55, recentCtrFactor: 0.62 },
     { campaignId: 'm-b-ret', campaignName: 'リターゲティング', baseCost: 7000, baseCtr: 0.014, baseCvr: 0.025, avgOrderValue: 12000, recentConvFactor: 0.6 },
   ]);
   // B社 LINE: CV計測ゼロ (計測欠落の疑い) → /audit 計測カテゴリが検出すべき

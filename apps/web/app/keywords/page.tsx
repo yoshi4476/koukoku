@@ -2,8 +2,8 @@
 
 import { Fragment, useMemo, useState } from 'react';
 import Link from 'next/link';
-import type { KeywordAction, KeywordOptimizeDto, KeywordRankItemDto, KeywordRowDto, ProposalDto } from '@adgrid/shared';
-import { isApprover } from '@adgrid/shared';
+import type { KeywordAction, KeywordDiscoveryDto, KeywordOptimizeDto, KeywordRankItemDto, KeywordRowDto, ProposalDto } from '@adgrid/shared';
+import { isApprover, KEYWORD_KIND_LABEL, VOLUME_LABEL } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
 import { useClients } from '@/components/client-context';
@@ -11,6 +11,48 @@ import { EmptyState, ErrorCard, HintBar, PlatformTag, SkeletonLines } from '@/co
 import { apiPost, ApiError, toApiError } from '@/lib/api';
 import { KEYWORD_ACTION_META, MATCH_TYPE_LABEL } from '@/lib/labels';
 import { formatNumber, formatPercent, formatYen } from '@/lib/format';
+
+const PRIORITY_CLS: Record<string, string> = { high: 'up', mid: 'warn', low: 'flat' };
+
+function DiscoverSection({ clientId }: { clientId: string }) {
+  const [open, setOpen] = useState(false);
+  const disc = useApi<KeywordDiscoveryDto>(open ? `/keywords/discover${clientId ? `?clientId=${encodeURIComponent(clientId)}` : ''}` : null);
+  return (
+    <div className="kw-discover">
+      <div className="c-head">
+        <h2>🔍 新しいキーワードを発見</h2>
+        <button className="btn sm sec" style={{ marginLeft: 'auto' }} onClick={() => setOpen((v) => !v)}>{open ? '閉じる' : '発見する'}</button>
+      </div>
+      {open ? (
+        <div className="c-body">
+          {disc.loading ? <SkeletonLines count={3} /> : disc.error ? <ErrorCard error={disc.error} onRetry={disc.retry} /> : disc.data ? (
+            <>
+              <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--ink-2)' }}>
+                既存キーワードと<mark>{disc.data.industryLabel}</mark>の傾向から、獲得に効く新規キーワード候補です。良さそうなものを媒体に追加しましょう。
+              </p>
+              <div className="kw-disc-grid">
+                {disc.data.suggestions.map((s, i) => (
+                  <div className="kw-disc-card" key={i}>
+                    <div className="kw-disc-top">
+                      <span className={`pill ${PRIORITY_CLS[s.priority]}`}>{s.priority === 'high' ? '優先' : s.priority === 'mid' ? '中' : '低'}</span>
+                      <span className="kw-disc-kw">{s.keyword}</span>
+                    </div>
+                    <div className="kw-disc-meta">
+                      <span>{KEYWORD_KIND_LABEL[s.kind]}</span>
+                      <span>ボリューム {VOLUME_LABEL[s.estimatedVolume]}</span>
+                      <span>推定CPC {formatYen(s.estimatedCpc)}</span>
+                    </div>
+                    <div className="kw-disc-rat">{s.rationale}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 type ActionFilter = 'all' | KeywordAction;
 
@@ -192,6 +234,8 @@ export default function KeywordsPage() {
         <mark>増額（伸ばすべき）</mark>・<mark>減額</mark>・<mark>停止（費用の無駄）</mark>を自動判定。上部の
         <mark>最高CTR・バランス最良・最高ROI</mark>ランキングで「どこに寄せるべきか」が一目でわかります。行をクリックすると推奨理由と推奨入札額が開きます。
       </HintBar>
+
+      <DiscoverSection clientId={selectedClientId} />
 
       {opt.error ? <ErrorCard error={opt.error} onRetry={opt.retry} /> : null}
 

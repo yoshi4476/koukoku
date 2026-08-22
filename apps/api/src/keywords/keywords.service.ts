@@ -1,13 +1,17 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { benchmarkFor } from '@adgrid/shared';
+import { benchmarkFor, industryProfileFor } from '@adgrid/shared';
 import type {
   CreateProposalInput,
   KeywordAction,
+  KeywordDiscoveryDto,
+  KeywordKind,
   KeywordOptimizeDto,
   KeywordRankItemDto,
   KeywordRowDto,
+  KeywordSuggestionDto,
   Platform,
   ProposalDto,
+  VolumeBucket,
 } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
@@ -119,6 +123,71 @@ export class KeywordsService {
       summary,
       rows: shownRows,
     };
+  }
+
+  /** キーワード発見・拡張 (F-20)。既存KWと業種から、獲得に効く新規KWを提案 */
+  async discover(tenantId: string, clientId?: string): Promise<KeywordDiscoveryDto> {
+    const rows = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.keywordStat.findMany({
+        where: clientId ? { clientId } : undefined,
+        include: { client: { select: { industryCode: true } } },
+      }),
+    );
+    const industryCode = clientId
+      ? ((rows[0] as unknown as { client: { industryCode: string } } | undefined)?.client.industryCode ?? 'other')
+      : 'other';
+    const bm = benchmarkFor(industryCode);
+    const profile = industryProfileFor(industryCode);
+
+    // 既存の平均CPC (推定CPCの基準)。無ければ業種CPAから概算
+    let totCost = 0;
+    let totClicks = 0;
+    const existing = new Set<string>();
+    const stems: string[] = [];
+    for (const r of rows as unknown as KwRow[]) {
+      existing.add(r.keyword);
+      totCost += Number(r.cost);
+      totClicks += Number(r.clicks);
+      // 指名・記号を除いた一般語を種にする
+      const first = r.keyword.split(/\s+/)[0];
+      if (first && first.length >= 2 && !stems.includes(first)) stems.push(first);
+    }
+    const avgCpc = totClicks > 0 ? Math.round(totCost / totClicks) : Math.max(50, Math.round(bm.cpa / 30));
+    if (stems.length === 0) stems.push(profile.label.split(/[・(]/)[0]);
+
+    const MODIFIERS: { suffix: string; kind: KeywordKind; volume: VolumeBucket; cpcFactor: number; priority: KeywordSuggestionDto['priority']; why: string }[] = [
+      { suffix: '料金', kind: 'purchase', volume: 'mid', cpcFactor: 1.1, priority: 'high', why: '料金を調べる=比較検討中で獲得に近い' },
+      { suffix: 'おすすめ', kind: 'purchase', volume: 'mid', cpcFactor: 1.0, priority: 'high', why: '選定中の顕在層。指名前の最後の一押し' },
+      { suffix: '比較', kind: 'competitor', volume: 'mid', cpcFactor: 1.2, priority: 'mid', why: '比較検討層。競合と並べて強みを訴求' },
+      { suffix: '口コミ', kind: 'longtail', volume: 'low', cpcFactor: 0.8, priority: 'high', why: 'ロングテールで安く獲得しやすい' },
+      { suffix: '評判', kind: 'longtail', volume: 'low', cpcFactor: 0.8, priority: 'mid', why: '不安を解消したい層。実績・レビューで訴求' },
+      { suffix: 'デメリット', kind: 'longtail', volume: 'low', cpcFactor: 0.7, priority: 'mid', why: '検討後半。正直な情報で信頼を得る' },
+      { suffix: `${profile.cvLabel}`, kind: 'purchase', volume: 'low', cpcFactor: 1.3, priority: 'high', why: `「${profile.cvLabel}」意図で獲得に最も近い` },
+    ];
+
+    const suggestions: KeywordSuggestionDto[] = [];
+    for (const stem of stems.slice(0, 4)) {
+      for (const m of MODIFIERS) {
+        const kw = `${stem} ${m.suffix}`;
+        if (existing.has(kw) || suggestions.some((s) => s.keyword === kw)) continue;
+        suggestions.push({
+          keyword: kw,
+          matchType: m.kind === 'longtail' ? 'phrase' : 'phrase',
+          kind: m.kind,
+          estimatedVolume: m.volume,
+          estimatedCpc: Math.max(30, Math.round(avgCpc * m.cpcFactor)),
+          priority: m.priority,
+          rationale: m.why,
+        });
+        if (suggestions.length >= 18) break;
+      }
+      if (suggestions.length >= 18) break;
+    }
+    // 優先度で並べる
+    const prio = { high: 0, mid: 1, low: 2 };
+    suggestions.sort((a, b) => prio[a.priority] - prio[b.priority]);
+
+    return { industryLabel: bm.label, suggestions };
   }
 
   /** 生の実績から指標・推奨・理由を算出する。業種相場を基準に正規化 (業種モード) */

@@ -5,9 +5,14 @@ import type {
   AssetStatus,
   AssetType,
   AuditResult,
+  BudgetPlanDto,
+  BudgetPlanItemDto,
   ConnectionStatus,
   CreateAssetInput,
   CreateProjectInput,
+  FatigueItemDto,
+  FatigueLevel,
+  FatigueReportDto,
   Platform,
   ProjectAccountDto,
   ProjectAssetDto,
@@ -368,6 +373,166 @@ export class ProjectsService {
         : '公開前にこのポイントを押さえておくと成果が出やすくなります。';
 
     return { assetId, type, summary, items };
+  }
+
+  private async projectAccountIds(tx: Tx, projectId: string): Promise<{ accountIds: string[] }> {
+    const p = await tx.project.findUnique({ where: { id: projectId }, include: { adAccounts: { select: { id: true } } } });
+    if (!p) throw new AppError(HttpStatus.NOT_FOUND, 'プロジェクトが見つかりません。', '一覧から選び直してください。');
+    return { accountIds: p.adAccounts.map((a) => a.id) };
+  }
+
+  /** 予算の最適配分 (F-20)。キャンペーン別の効率から、非効率→効率へ再配分し CV最大化 */
+  async budgetPlan(tenantId: string, projectId: string): Promise<BudgetPlanDto> {
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const { accountIds } = await this.projectAccountIds(tx, projectId);
+      if (accountIds.length === 0) {
+        return { totalMonthly: 0, reallocatable: 0, expectedCvGain: 0, items: [], note: '媒体アカウントがありません。' };
+      }
+      const grouped = await tx.factAdPerformance.groupBy({
+        by: ['campaignId', 'campaignName', 'platform'],
+        where: { adAccountId: { in: accountIds }, date: { gte: daysAgo(27), lte: daysAgo(0) } },
+        _sum: { cost: true, conversions: true },
+      });
+      const camps = grouped
+        .map((g) => {
+          const cost = Number(g._sum.cost ?? 0);
+          const conv = Number(g._sum.conversions ?? 0);
+          const monthly = Math.round((cost / 28) * 30);
+          return {
+            campaignId: g.campaignId,
+            campaignName: g.campaignName || g.campaignId,
+            platform: g.platform as Platform,
+            monthly,
+            conversions: +conv.toFixed(1),
+            cpa: conv > 0 ? Math.round(cost / conv) : null,
+          };
+        })
+        .filter((c) => c.monthly >= 10000); // 極小は対象外
+
+      const totalMonthly = camps.reduce((s, c) => s + c.monthly, 0);
+      const withConv = camps.filter((c) => c.cpa !== null);
+      const totalCost = withConv.reduce((s, c) => s + c.monthly, 0);
+      const totalConv = withConv.reduce((s, c) => s + c.conversions, 0);
+      const avgCpa = totalConv > 0 ? totalCost / totalConv : null;
+
+      // ソース(減額): CV0で高消化 or CPAが平均を大きく超過
+      const sources: { c: (typeof camps)[number]; cut: number }[] = [];
+      const targets: (typeof camps)[number][] = [];
+      for (const c of camps) {
+        if (c.cpa === null) {
+          if (c.monthly >= 30000) sources.push({ c, cut: Math.round(c.monthly * 0.4) });
+        } else if (avgCpa && c.cpa > avgCpa * 1.3) {
+          sources.push({ c, cut: Math.round(c.monthly * 0.3) });
+        } else if (avgCpa && c.cpa <= avgCpa * 0.85 && c.conversions >= 1) {
+          targets.push(c);
+        }
+      }
+      const reallocatable = sources.reduce((s, x) => s + x.cut, 0);
+      const weightSum = targets.reduce((s, t) => s + (t.cpa ? 1 / t.cpa : 0), 0);
+
+      const changeById = new Map<string, number>();
+      for (const s of sources) changeById.set(s.c.campaignId, -s.cut);
+      let cvGained = 0;
+      if (weightSum > 0) {
+        for (const t of targets) {
+          const received = Math.round((reallocatable * (1 / (t.cpa as number))) / weightSum);
+          changeById.set(t.campaignId, received);
+          cvGained += received / (t.cpa as number);
+        }
+      }
+      // 減額で失うCV (CPA既知のソースのみ)
+      let cvLost = 0;
+      for (const s of sources) if (s.c.cpa) cvLost += s.cut / s.c.cpa;
+      const expectedCvGain = +Math.max(0, cvGained - cvLost).toFixed(1);
+
+      const items: BudgetPlanItemDto[] = camps.map((c) => {
+        const chg = changeById.get(c.campaignId) ?? 0;
+        const action: BudgetPlanItemDto['action'] = chg > 0 ? 'increase' : chg < 0 ? 'decrease' : 'keep';
+        const reason =
+          chg < 0
+            ? c.cpa === null
+              ? `CV0で月${c.monthly.toLocaleString()}円を消化。予算を絞って効率の良い先へ`
+              : `CPA ${c.cpa?.toLocaleString()}円が平均(${Math.round(avgCpa ?? 0).toLocaleString()}円)を超過。減らして再配分`
+            : chg > 0
+              ? `CPA ${c.cpa?.toLocaleString()}円と効率が良い。予算を寄せてCVを伸ばす`
+              : '効率は標準的。現状維持';
+        return {
+          campaignId: c.campaignId, campaignName: c.campaignName, platform: c.platform,
+          monthlyCost: c.monthly, conversions: c.conversions, cpa: c.cpa, action, recommendedChange: chg, reason,
+        };
+      });
+      items.sort((a, b) => a.recommendedChange - b.recommendedChange); // 減額→増額
+
+      const note =
+        sources.length === 0 || targets.length === 0
+          ? '現状はキャンペーン間の効率差が小さく、再配分の余地は限定的です。'
+          : `非効率な配信から月 ${reallocatable.toLocaleString()}円を捻出し、効率の良い配信へ寄せることで、同じ予算で CVを約${expectedCvGain}件/月 増やせる見込みです。`;
+
+      return { totalMonthly, reallocatable, expectedCvGain, items, note };
+    });
+  }
+
+  /** クリエイティブ疲弊検知 (F-20)。直近7日と前7日のCTR/CVR低下から差し替え時期を判定 */
+  async creativeFatigue(tenantId: string, projectId: string): Promise<FatigueReportDto> {
+    return this.prisma.withTenant(tenantId, async (tx) => {
+      const { accountIds } = await this.projectAccountIds(tx, projectId);
+      if (accountIds.length === 0) return { items: [], fatiguedCount: 0, watchCount: 0 };
+      const agg = (since: Date, until: Date) =>
+        tx.factAdPerformance.groupBy({
+          by: ['campaignId', 'campaignName', 'platform'],
+          where: { adAccountId: { in: accountIds }, date: { gte: since, lte: until } },
+          _sum: { impressions: true, clicks: true, conversions: true },
+        });
+      const [recent, prior] = await Promise.all([agg(daysAgo(6), daysAgo(0)), agg(daysAgo(13), daysAgo(7))]);
+      const priorMap = new Map(prior.map((p) => [p.campaignId, p]));
+
+      const items: FatigueItemDto[] = [];
+      for (const r of recent) {
+        const impr = Number(r._sum.impressions ?? 0);
+        const clk = Number(r._sum.clicks ?? 0);
+        const conv = Number(r._sum.conversions ?? 0);
+        if (impr < 1000) continue; // 露出が小さいものは判定しない
+        const p = priorMap.get(r.campaignId);
+        const pImpr = Number(p?._sum.impressions ?? 0);
+        const pClk = Number(p?._sum.clicks ?? 0);
+        const pConv = Number(p?._sum.conversions ?? 0);
+        const ctrR = impr > 0 ? (clk / impr) * 100 : null;
+        const ctrP = pImpr > 0 ? (pClk / pImpr) * 100 : null;
+        const cvrR = clk > 0 ? (conv / clk) * 100 : null;
+        const cvrP = pClk > 0 ? (pConv / pClk) * 100 : null;
+        const ctrDelta = ctrR !== null && ctrP ? +(((ctrR - ctrP) / ctrP) * 100).toFixed(1) : null;
+
+        let level: FatigueLevel = 'ok';
+        if (ctrDelta !== null && ctrDelta <= -20) level = 'fatigued';
+        else if (ctrDelta !== null && ctrDelta <= -10) level = 'watch';
+        // CVRも大きく落ちていれば一段引き上げ
+        if (cvrR !== null && cvrP && cvrR < cvrP * 0.8 && level === 'watch') level = 'fatigued';
+
+        const recommendation =
+          level === 'fatigued'
+            ? 'クリエイティブが疲弊しています。新しい訴求・ビジュアルに差し替えましょう。'
+            : level === 'watch'
+              ? '反応が下がり始めています。次の差し替え候補を準備しておきましょう。'
+              : '反応は安定しています。';
+        items.push({
+          campaignId: r.campaignId, campaignName: r.campaignName || r.campaignId, platform: r.platform as Platform,
+          impressionsRecent: impr,
+          ctrRecent: ctrR !== null ? +ctrR.toFixed(2) : null,
+          ctrPrior: ctrP !== null ? +ctrP.toFixed(2) : null,
+          ctrDeltaPct: ctrDelta,
+          cvrRecent: cvrR !== null ? +cvrR.toFixed(2) : null,
+          cvrPrior: cvrP !== null ? +cvrP.toFixed(2) : null,
+          level, recommendation,
+        });
+      }
+      const order = { fatigued: 0, watch: 1, ok: 2 };
+      items.sort((a, b) => order[a.level] - order[b.level]);
+      return {
+        items,
+        fatiguedCount: items.filter((i) => i.level === 'fatigued').length,
+        watchCount: items.filter((i) => i.level === 'watch').length,
+      };
+    });
   }
 
   async create(tenantId: string, input: CreateProjectInput): Promise<ProjectDto> {

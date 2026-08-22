@@ -1,5 +1,5 @@
 import { Controller, Get, Param, Post, Query } from '@nestjs/common';
-import type { KeywordOptimizeDto, ProposalDto } from '@adgrid/shared';
+import type { KeywordDiscoveryDto, KeywordOptimizeDto, ProposalDto } from '@adgrid/shared';
 import { SessionInfo, SessionInfoValue, TenantId } from '../common/tenant';
 import { KeywordsService } from './keywords.service';
 
@@ -14,6 +14,11 @@ export class KeywordsController {
     @Query('q') q?: string,
   ): Promise<KeywordOptimizeDto> {
     return this.keywords.optimize(tenantId, { clientId: clientId || undefined, query: q || undefined });
+  }
+
+  @Get('discover')
+  discover(@TenantId() tenantId: string, @Query('clientId') clientId?: string): Promise<KeywordDiscoveryDto> {
+    return this.keywords.discover(tenantId, clientId || undefined);
   }
 
   @Post(':id/propose')

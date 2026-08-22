@@ -861,6 +861,76 @@ export interface UpdateAssetInput {
   note?: string;
 }
 
+/* ---- 予算の最適配分 (F-20) ---- */
+export interface BudgetPlanItemDto {
+  campaignId: string;
+  campaignName: string;
+  platform: Platform;
+  monthlyCost: number;
+  conversions: number;
+  cpa: number | null;
+  action: 'increase' | 'decrease' | 'keep';
+  /** 推奨する月額の増減 (円、符号付き) */
+  recommendedChange: number;
+  reason: string;
+}
+export interface BudgetPlanDto {
+  totalMonthly: number;
+  /** 非効率キャンペーンから捻出できる月額 */
+  reallocatable: number;
+  /** 再配分で見込めるCV増 (件/月) */
+  expectedCvGain: number;
+  items: BudgetPlanItemDto[];
+  note: string;
+}
+
+/* ---- クリエイティブ疲弊検知 (F-20) ---- */
+export type FatigueLevel = 'ok' | 'watch' | 'fatigued';
+export interface FatigueItemDto {
+  campaignId: string;
+  campaignName: string;
+  platform: Platform;
+  impressionsRecent: number;
+  ctrRecent: number | null;
+  ctrPrior: number | null;
+  ctrDeltaPct: number | null;
+  cvrRecent: number | null;
+  cvrPrior: number | null;
+  level: FatigueLevel;
+  recommendation: string;
+}
+export interface FatigueReportDto {
+  items: FatigueItemDto[];
+  fatiguedCount: number;
+  watchCount: number;
+}
+
+/* ---- キーワード発見・拡張 (F-20) ---- */
+export type KeywordKind = 'brand' | 'generic' | 'longtail' | 'competitor' | 'local' | 'purchase';
+export type VolumeBucket = 'low' | 'mid' | 'high';
+export const VOLUME_LABEL: Record<VolumeBucket, string> = { low: '小', mid: '中', high: '大' };
+export const KEYWORD_KIND_LABEL: Record<KeywordKind, string> = {
+  brand: '指名',
+  generic: '一般',
+  longtail: 'ロングテール',
+  competitor: '競合',
+  local: '地域',
+  purchase: '購買意欲',
+};
+export interface KeywordSuggestionDto {
+  keyword: string;
+  matchType: 'exact' | 'phrase' | 'broad';
+  kind: KeywordKind;
+  estimatedVolume: VolumeBucket;
+  estimatedCpc: number;
+  priority: 'high' | 'mid' | 'low';
+  rationale: string;
+}
+export interface KeywordDiscoveryDto {
+  industryLabel: string;
+  suggestions: KeywordSuggestionDto[];
+}
+
 /* ---- キーワード最適化 (F-18) ---- */
 /** 各キーワードへの推奨アクション。増額/維持/減額/停止 */
 export type KeywordAction = 'increase' | 'keep' | 'decrease' | 'pause';

@@ -775,6 +775,34 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .asset-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 4px; }
 .proj-assets-line { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted); }
 
+/* ---- 予算の最適配分 / 疲弊検知 ---- */
+.reall-summary { display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 8px; }
+.reall-summary .rs-l { font-size: 11.5px; color: var(--muted); }
+.reall-summary .rs-v { font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+.reall-summary .rs-v.up { color: var(--good); }
+.reall-summary .rs-u { font-size: 12px; color: var(--muted); font-weight: 500; margin-left: 2px; }
+.reall-note { font-size: 12.5px; color: var(--ink-2); margin: 4px 0 12px; }
+.fatigue-list { display: grid; gap: 8px; }
+.fatigue-row { border: 1px solid var(--line); border-left-width: 4px; border-radius: 9px; padding: 10px 13px; background: var(--surface); }
+.fatigue-row.fatigued { border-left-color: var(--bad); background: var(--bad-soft); }
+.fatigue-row.watch { border-left-color: var(--warn); background: var(--warn-soft); }
+.fatigue-row.ok { border-left-color: var(--good); }
+.fat-head { display: flex; align-items: center; gap: 8px; }
+.fat-name { font-weight: 700; font-size: 13.5px; }
+.fat-metrics { font-size: 12.5px; color: var(--ink-2); margin-top: 4px; font-variant-numeric: tabular-nums; }
+.fat-down { color: var(--bad); font-weight: 700; }
+.fat-up { color: var(--good); font-weight: 700; }
+.fat-rec { font-size: 12px; color: var(--ink-2); margin-top: 3px; }
+
+/* ---- キーワード発見 ---- */
+.kw-discover { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow-1); margin-bottom: 14px; }
+.kw-disc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.kw-disc-card { border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; background: var(--bg-sub); }
+.kw-disc-top { display: flex; align-items: center; gap: 7px; }
+.kw-disc-kw { font-weight: 700; font-size: 13.5px; color: var(--ink); }
+.kw-disc-meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin-top: 5px; }
+.kw-disc-rat { font-size: 11.5px; color: var(--ink-2); margin-top: 5px; line-height: 1.5; }
+
 /* ---- ヒアリングシート ---- */
 .hear-meter { background: var(--bg-sub); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
 .hear-bar { height: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }

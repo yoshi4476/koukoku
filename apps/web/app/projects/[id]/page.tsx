@@ -8,8 +8,10 @@ import type {
   AssetStatus,
   AssetType,
   BidStrategy,
+  BudgetPlanDto,
   CreateAssetInput,
   DailyPointDto,
+  FatigueReportDto,
   ProjectAssetDto,
   ProjectBrief,
   ProjectDetailDto,
@@ -549,6 +551,110 @@ function AssetsTab({ project, onChanged }: { project: ProjectDetailDto; onChange
   );
 }
 
+const FATIGUE_META: Record<string, { label: string; cls: string }> = {
+  fatigued: { label: '疲弊', cls: 'down' },
+  watch: { label: '注意', cls: 'warn' },
+  ok: { label: '安定', cls: 'flat' },
+};
+
+function ImproveTab({ project, goFiltered }: { project: ProjectDetailDto; goFiltered: (href: string) => void }) {
+  const budget = useApi<BudgetPlanDto>(`/projects/${project.id}/budget-plan`);
+  const fatigue = useApi<FatigueReportDto>(`/projects/${project.id}/fatigue`);
+
+  return (
+    <>
+      {/* 予算の最適配分 */}
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div className="c-head"><h2>💰 予算の最適配分</h2></div>
+        <div className="c-body">
+          {budget.loading ? <SkeletonLines count={3} /> : budget.error ? <ErrorCard error={budget.error} onRetry={budget.retry} /> : budget.data ? (
+            <>
+              <div className="reall-summary">
+                <div><div className="rs-l">再配分できる予算</div><div className="rs-v">{formatYen(budget.data.reallocatable)}<span className="rs-u">/月</span></div></div>
+                <div><div className="rs-l">見込めるCV増</div><div className="rs-v up">+{budget.data.expectedCvGain}<span className="rs-u">件/月</span></div></div>
+              </div>
+              <p className="reall-note">{budget.data.note}</p>
+              {budget.data.items.length > 0 ? (
+                <div className="tbl-scroll">
+                  <table className="data-tbl">
+                    <thead><tr><th>推奨</th><th>キャンペーン</th><th>現在月額</th><th>CV</th><th>CPA</th><th>増減</th></tr></thead>
+                    <tbody>
+                      {budget.data.items.map((it) => (
+                        <tr key={it.campaignId}>
+                          <td><span className={`pill ${it.action === 'increase' ? 'up' : it.action === 'decrease' ? 'warn' : 'flat'}`}>
+                            {it.action === 'increase' ? '▲ 増額' : it.action === 'decrease' ? '▼ 減額' : '＝ 維持'}</span></td>
+                          <td><div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><PlatformTag platform={it.platform} /><span>{it.campaignName}</span></div>
+                            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{it.reason}</div></td>
+                          <td>{formatYen(it.monthlyCost)}</td>
+                          <td>{formatNumber(it.conversions)}</td>
+                          <td>{formatYen(it.cpa)}</td>
+                          <td>{it.recommendedChange === 0 ? '—' :
+                            <span className={`num`} style={{ fontWeight: 700, color: it.recommendedChange > 0 ? 'var(--good)' : 'var(--bad)' }}>
+                              {it.recommendedChange > 0 ? '+' : ''}{formatYen(it.recommendedChange)}</span>}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      {/* クリエイティブ疲弊検知 */}
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div className="c-head"><h2>🎨 クリエイティブ疲弊検知</h2>
+          {fatigue.data && fatigue.data.fatiguedCount > 0 ? <span className="pill down" style={{ marginLeft: 'auto' }}>要差し替え {fatigue.data.fatiguedCount}</span> : null}
+        </div>
+        <div className="c-body">
+          {fatigue.loading ? <SkeletonLines count={2} /> : fatigue.error ? <ErrorCard error={fatigue.error} onRetry={fatigue.retry} /> : fatigue.data ? (
+            fatigue.data.items.length === 0 ? (
+              <p style={{ margin: 0, color: 'var(--muted)' }}>判定できる配信量のキャンペーンがまだありません。</p>
+            ) : (
+              <div className="fatigue-list">
+                {fatigue.data.items.map((it) => {
+                  const m = FATIGUE_META[it.level];
+                  return (
+                    <div key={it.campaignId} className={`fatigue-row ${it.level}`}>
+                      <div className="fat-head">
+                        <PlatformTag platform={it.platform} />
+                        <span className="fat-name">{it.campaignName}</span>
+                        <span className={`pill ${m.cls}`} style={{ marginLeft: 'auto' }}>{m.label}</span>
+                      </div>
+                      <div className="fat-metrics">
+                        CTR {it.ctrPrior ?? '—'}% → <b>{it.ctrRecent ?? '—'}%</b>
+                        {it.ctrDeltaPct !== null ? <span className={it.ctrDeltaPct < 0 ? 'fat-down' : 'fat-up'}> ({it.ctrDeltaPct > 0 ? '+' : ''}{it.ctrDeltaPct}%)</span> : null}
+                      </div>
+                      <div className="fat-rec">{it.recommendation}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
+          ) : null}
+        </div>
+      </div>
+
+      {/* 改善アクション */}
+      <div className="card">
+        <div className="c-head"><h2>改善アクション</h2></div>
+        <div className="c-body form-grid">
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-2)' }}>
+            未対応の改善提案は <b className="num" style={{ color: project.openFindings > 0 ? 'var(--warn)' : 'var(--good)' }}>{project.openFindings}件</b> です。
+          </p>
+          <div className="proj-actions">
+            <button className="btn pri" onClick={() => goFiltered('/audit')}>🩺 AI診断</button>
+            <button className="btn sec" onClick={() => goFiltered('/keywords')}>🔍 キーワード最適化・発見</button>
+            <button className="btn sec" onClick={() => goFiltered('/approvals')}>✅ 承認キュー</button>
+            <button className="btn sec" onClick={() => goFiltered('/report')}>📄 レポート作成</button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -690,23 +796,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           ) : null}
 
           {/* --- 改善 --- */}
-          {tab === 'improve' ? (
-            <div className="card">
-              <div className="c-head"><h2>改善する</h2></div>
-              <div className="c-body form-grid">
-                <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-2)' }}>
-                  未対応の改善提案は <b className="num" style={{ color: d.openFindings > 0 ? 'var(--warn)' : 'var(--good)' }}>{d.openFindings}件</b> です。
-                  下のボタンから、このプロジェクトの改善作業に進めます。
-                </p>
-                <div className="proj-actions">
-                  <button className="btn pri" onClick={() => goFiltered('/audit')}>🩺 AI診断で改善点を見る</button>
-                  <button className="btn sec" onClick={() => goFiltered('/keywords')}>🔍 キーワード最適化</button>
-                  <button className="btn sec" onClick={() => goFiltered('/approvals')}>✅ 承認キュー</button>
-                  <button className="btn sec" onClick={() => goFiltered('/report')}>📄 レポートを作成</button>
-                </div>
-              </div>
-            </div>
-          ) : null}
+          {tab === 'improve' ? <ImproveTab project={d} goFiltered={goFiltered} /> : null}
         </>
       ) : null}
     </>
