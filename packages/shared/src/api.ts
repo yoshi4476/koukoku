@@ -700,6 +700,10 @@ export interface ProjectDto {
   assetCount: number;
   publishedCount: number;
   lastReportAt: string | null;
+  /** 配信期間・月予算 (キャンペーンカレンダー用)。設定より */
+  startDate: string | null;
+  endDate: string | null;
+  monthlyBudget: number | null;
   createdAt: string;
 }
 

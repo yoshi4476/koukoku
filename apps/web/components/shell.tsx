@@ -149,6 +149,16 @@ const NAV_MAIN: NavItem[] = [
     ),
   },
   {
+    href: '/calendar',
+    label: 'カレンダー',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <rect x="2" y="3" width="10" height="9" rx="1.4" fill="none" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M2 5.5h10M4.5 2v2M9.5 2v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: '/portal',
     label: '媒体窓口',
     icon: (

@@ -140,6 +140,7 @@ export class ProjectsService {
         const prev = MetricsService.sumTotals(prevByAcc, accountIds);
         const lastReportAt = lastReportByClient.get(p.clientId) ?? null;
         const openFindings = accountIds.reduce((s, id) => s + (findingsByAcc.get(id) ?? 0), 0);
+        const settingsOf = this.mergeSettings(p.settings);
         const cpa = this.cpa(cur.cost, cur.conversions);
         const prevCpa = prev.conversions > 0 ? prev.cost / prev.conversions : null;
         const acctSet = new Set(accountIds);
@@ -163,6 +164,9 @@ export class ProjectsService {
           assetCount: p.assets.length,
           publishedCount: p.assets.filter((a) => a.status === 'published').length,
           lastReportAt: lastReportAt?.toISOString() ?? null,
+          startDate: settingsOf.startDate,
+          endDate: settingsOf.endDate,
+          monthlyBudget: settingsOf.monthlyBudgetTotal,
           createdAt: p.createdAt.toISOString(),
         });
       }

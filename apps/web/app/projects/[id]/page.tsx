@@ -43,6 +43,8 @@ import { CreativeGenerator } from './creative-gen';
 import { OpsCycleTab } from './ops-cycle';
 import { FunnelBox } from './funnel-box';
 import { PreflightPanel } from './preflight-panel';
+import { KpiPlanner } from './kpi-planner';
+import { UtmTool } from './utm-tool';
 import { CONNECTION_STATUS_META, INDUSTRY_LABEL } from '@/lib/labels';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
 
@@ -299,7 +301,11 @@ function SettingsTab({ project, onSaved }: { project: ProjectDetailDto; onSaved:
 
         <FunnelBox industryCode={project.industryCode} goal={project.goal} />
 
+        <KpiPlanner industryCode={project.industryCode} settings={s} canEdit={canEdit} onApply={applyPlan} />
+
         {canEdit ? <MediaPlanBox project={project} onApply={applyPlan} /> : null}
+
+        <UtmTool clientName={project.clientName} projectName={project.name} platforms={project.accounts.map((a) => a.platform)} />
 
         <div className="set-group">💴 予算・目標</div>
         <div className="set-row">

@@ -15,6 +15,11 @@ import {
   buildFunnel,
   relevantAssetTypes,
   assetTypeFitReason,
+  buildKpiTree,
+  buildUtmUrl,
+  normalizeToken,
+  campaignName,
+  checkUtmConsistency,
   DEFAULT_PROJECT_BRIEF,
 } from '@adgrid/shared';
 import { LlmService } from '../src/ai/llm.service';
@@ -356,6 +361,49 @@ describe('LLM原価計算 + プロンプトキャッシュ (F-09/F-31)', () => {
     expect(LlmService.costJpyFor('claude-opus-5', {
       input_tokens: 0, cache_creation_input_tokens: 2000, output_tokens: 0,
     })).toBeCloseTo(1.88, 2);
+  });
+});
+
+describe('KPIツリー逆算 (F-37)', () => {
+  it('目標CVから相場で クリック→IMP→予算 を逆算 (EC: cvr2.0/ctr1.2/cpa4000)', () => {
+    const t = buildKpiTree({ industryCode: 'ec', targetCv: 100 });
+    expect(t.clicks).toBe(5000); // 100 / 2.0%
+    expect(t.impressions).toBe(416667); // 5000 / 1.2%
+    expect(t.monthlyBudget).toBe(400000); // 100 * 4000
+    expect(t.cpc).toBe(80); // 400000 / 5000
+    expect(t.assumptions.source).toBe('benchmark');
+  });
+  it('目標CPA・CTR/CVR を入れると自社実績優先で再計算', () => {
+    const t = buildKpiTree({ industryCode: 'ec', targetCv: 50, targetCpa: 3000, cvr: 5, ctr: 2 });
+    expect(t.monthlyBudget).toBe(150000); // 50 * 3000
+    expect(t.clicks).toBe(1000); // 50 / 5%
+    expect(t.assumptions.source).toBe('custom');
+  });
+  it('客単価を入れると売上とROASを算出', () => {
+    const t = buildKpiTree({ industryCode: 'ec', targetCv: 100, avgOrderValue: 8000 });
+    expect(t.revenue).toBe(800000); // 100*8000
+    expect(t.roas).toBe(200); // 800000/400000
+  });
+});
+
+describe('UTM・命名規則 (F-38)', () => {
+  it('トークン正規化: 小文字・空白→ハイフン・記号除去', () => {
+    expect(normalizeToken('Spring Sale! 2026')).toBe('spring-sale-2026');
+  });
+  it('媒体別に標準化した source/medium でUTM生成', () => {
+    const url = buildUtmUrl('https://x.jp/lp', 'meta', 'camp', 'banner A');
+    expect(url).toContain('utm_source=facebook');
+    expect(url).toContain('utm_medium=paid_social');
+    expect(url).toContain('utm_content=banner-a');
+  });
+  it('命名規則は client_project_source_yyyymm を正規化', () => {
+    expect(campaignName('A社', '春 キャンペーン', 'google_ads', '202608')).toBe('a_google_202608');
+  });
+  it('一貫性チェック: campaign欠落=error / 大文字=warn', () => {
+    const r = checkUtmConsistency('https://x.jp/lp?utm_source=Google&utm_medium=cpc');
+    expect(r.ok).toBe(false); // utm_campaign欠落
+    expect(r.issues.some((i) => i.level === 'error' && i.message.includes('utm_campaign'))).toBe(true);
+    expect(r.issues.some((i) => i.level === 'warn' && i.message.includes('大文字'))).toBe(true);
   });
 });
 

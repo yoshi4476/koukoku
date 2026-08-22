@@ -1208,3 +1208,76 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .pfl-issue-title{font-size:13px;font-weight:700;color:var(--ink)}
 .pfl-issue-detail{font-size:12px;color:var(--ink-2);line-height:1.5}
 .pfl-issue-sug{font-size:12px;color:var(--primary);line-height:1.5;margin-top:2px}
+
+/* ===== KPIツリー逆算プランナー (F-37) ===== */
+.kpit{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--surface);margin-bottom:4px}
+.kpit-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.kpit-title{font-size:14.5px;font-weight:700;color:var(--ink)}
+.kpit-src{font-size:11px;color:var(--muted)}
+.kpit-lead{margin:6px 0 12px;font-size:12.5px;color:var(--ink-2);line-height:1.6}
+.kpit-inputs{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.kpit-field{display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--muted);flex:1;min-width:110px}
+.kpit-field .input{padding:6px 9px}
+.kpit-tree{display:flex;align-items:stretch;gap:0;flex-wrap:wrap}
+.kpit-node{flex:1;min-width:120px;background:var(--bg-sub);border:1px solid var(--line);border-radius:10px;padding:11px 13px;text-align:center}
+.kpit-node.goal{background:var(--primary-soft);border-color:transparent}
+.kn-l{font-size:11px;color:var(--muted)}
+.kn-v{font-size:22px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.2}
+.kpit-node.goal .kn-v{color:var(--primary)}
+.kn-s{font-size:10.5px;color:var(--ink-2)}
+.kpit-arrow{align-self:center;padding:0 8px;font-size:11px;color:var(--muted);font-weight:600;white-space:nowrap}
+.kpit-budget{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-top:14px;padding:12px 14px;background:var(--bg-sub);border-radius:10px}
+.kb-item{display:flex;flex-direction:column}
+.kb-item span{font-size:11px;color:var(--muted)}
+.kb-item b{font-size:17px;color:var(--ink);font-variant-numeric:tabular-nums}
+.kpit-note{margin:10px 0 0;font-size:11px;color:var(--muted)}
+@media(max-width:760px){.kpit-tree{flex-direction:column;gap:6px}.kpit-arrow{transform:rotate(90deg);padding:2px 0}}
+
+/* ===== UTM/命名規則 (F-38) ===== */
+.utm{border:1px solid var(--line);border-radius:12px;padding:16px;background:var(--surface);margin-bottom:4px}
+.utm-title{font-size:14.5px;font-weight:700;color:var(--ink)}
+.utm-inputs{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0 12px}
+.utm-rows{display:flex;flex-direction:column;gap:8px}
+.utm-row{display:flex;gap:12px;padding:9px 11px;background:var(--bg-sub);border-radius:9px}
+.utm-plat{font-size:12px;font-weight:700;color:var(--primary);min-width:70px;padding-top:3px}
+.utm-vals{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.utm-line{display:flex;align-items:center;gap:8px}
+.utm-k{font-size:10.5px;color:var(--muted);min-width:88px}
+.utm-line code{flex:1;min-width:0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:4px 7px;overflow-x:auto;white-space:nowrap}
+.utm-line .btn{flex-shrink:0}
+.utm-check{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.utm-check-h{font-size:12.5px;font-weight:700;color:var(--ink);margin-bottom:7px}
+.utm-ok{margin-top:7px;font-size:12px;color:var(--good);font-weight:600}
+.utm-issues{margin:7px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+.utm-issues li{font-size:12px;line-height:1.5}
+.utm-issues li.error{color:var(--bad)}
+.utm-issues li.warn{color:var(--warn)}
+
+/* ===== キャンペーンカレンダー (F-39) ===== */
+.cal-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px}
+.cal-month{border:1px solid var(--line);border-radius:9px;padding:8px;background:var(--bg-sub);min-height:78px}
+.cal-month.now{border-color:var(--primary);box-shadow:0 0 0 1px var(--primary)}
+.cal-mh{font-size:12px;font-weight:700;color:var(--ink);margin-bottom:5px}
+.cal-ev{font-size:10.5px;color:var(--ink-2);background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:2px 5px;margin-bottom:3px;line-height:1.35}
+.cal-ev.w3{background:var(--warn-soft);border-color:transparent;color:var(--warn);font-weight:600}
+.cal-ev.w2{background:var(--primary-soft);border-color:transparent;color:var(--primary)}
+.cal-ev.w1{}
+.cal-legend{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:11px;color:var(--muted)}
+.cal-legend .cal-ev{margin:0}
+@media(max-width:760px){.cal-grid{grid-template-columns:repeat(3,1fr)}}
+
+.tl{display:flex;flex-direction:column;gap:6px;overflow-x:auto}
+.tl-axis,.tl-row{display:grid;grid-template-columns:180px 1fr 110px;align-items:center;gap:10px;min-width:640px}
+.tl-axis{font-size:10.5px;color:var(--muted)}
+.tl-months{display:grid;grid-template-columns:repeat(12,1fr)}
+.tl-months .tl-mcell{text-align:center}
+.tl-name{display:flex;flex-direction:column;min-width:0}
+.tl-link{font-size:13px;font-weight:600;color:var(--ink)}
+.tl-link:hover{color:var(--primary)}
+.tl-client{font-size:11px;color:var(--muted)}
+.tl-track{position:relative;height:26px;background:var(--bg-sub);border-radius:6px}
+.tl-bar{position:absolute;top:3px;height:20px;border-radius:5px;background:var(--primary);color:#fff;font-size:10.5px;display:flex;align-items:center;padding:0 8px;white-space:nowrap;overflow:hidden}
+.tl-bar.paused{background:var(--warn)}
+.tl-bar.ended{background:var(--muted)}
+.tl-pace{text-align:right}
+.tl-nobudget{font-size:11px;color:var(--muted)}
