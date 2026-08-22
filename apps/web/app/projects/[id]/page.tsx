@@ -22,6 +22,7 @@ import {
   PROJECT_GOAL_LABEL,
   PROJECT_STATUS_LABEL,
   isApprover,
+  recommendMediaPlan,
 } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
@@ -81,6 +82,76 @@ function numOrNull(v: string): number | null {
   return v.trim() === '' || Number.isNaN(n) ? null : n;
 }
 
+function MediaPlanBox({ project, onApply }: { project: ProjectDetailDto; onApply: (patch: Partial<ProjectSettings>) => void }) {
+  const router = useRouter();
+  const { setSelectedClientId } = useClients();
+  const [open, setOpen] = useState(false);
+  const [budget, setBudget] = useState<number>(project.settings.monthlyBudgetTotal ?? 1000000);
+  const plan = useMemo(() => recommendMediaPlan(project.industryCode, project.goal, budget), [project.industryCode, project.goal, budget]);
+
+  const apply = () => {
+    onApply({
+      monthlyBudgetTotal: budget,
+      dailyBudget: Math.round(budget / 30),
+      targetCpa: plan.targetCpa,
+      targetRoas: plan.targetRoas,
+      bidStrategy: plan.bidStrategy,
+      regions: plan.targeting.regions,
+      ageRange: plan.targeting.ageRange,
+      gender: plan.targeting.gender,
+      devices: plan.targeting.devices,
+      conversionPoint: plan.conversionPoint,
+    });
+  };
+  const makeCopy = () => { setSelectedClientId(project.clientId); router.push('/copy'); };
+
+  return (
+    <div className="plan-box">
+      <div className="plan-head">
+        <div>
+          <div className="plan-title">🤖 最適な打ち出し方を提案</div>
+          <div className="plan-sub">{plan.industryLabel}・{plan.goalLabel}の一般的な最適解を、予算から自動で組み立てます。</div>
+        </div>
+        <button type="button" className="btn sm sec" onClick={() => setOpen((v) => !v)}>{open ? '閉じる' : '提案を見る'}</button>
+      </div>
+      {open ? (
+        <div className="plan-body">
+          <div className="plan-budget">
+            <label>月予算</label>
+            <input className="input" inputMode="numeric" value={budget}
+              onChange={(e) => setBudget(Number(e.target.value.replace(/[^0-9]/g, '')) || 0)} style={{ maxWidth: 160 }} />
+            <span className="plan-est">→ 目標CPA <b>{formatYen(plan.targetCpa)}</b> ・ 想定CV <b>{formatNumber(plan.expectedCv)}件/月</b></span>
+          </div>
+          <div className="plan-media">
+            {plan.media.map((m) => (
+              <div className="plan-media-card" key={m.platform}>
+                <div className="plan-media-row">
+                  <PlatformTag platform={m.platform} />
+                  <span className="plan-format">{m.format}</span>
+                  <div className="plan-bar"><div className="plan-bar-fill" style={{ width: `${m.sharePct}%` }} /></div>
+                  <span className="plan-share num">{m.sharePct}%</span>
+                  <span className="plan-amt num">{formatYen(m.monthlyBudget)}</span>
+                </div>
+                <div className="plan-playbook">📋 {m.playbook}</div>
+              </div>
+            ))}
+          </div>
+          <div className="plan-meta">
+            <div><span className="pm-l">推奨する訴求</span> {plan.appealAxes.slice(0, 4).map((a) => <span key={a} className="ind-chip pri">{a}</span>)}</div>
+            <div><span className="pm-l">ターゲット</span> {plan.targeting.regions}・{plan.targeting.ageRange}・{plan.targeting.gender === 'female' ? '女性' : plan.targeting.gender === 'male' ? '男性' : '男女'}・{plan.targeting.devices === 'mobile' ? 'スマホ中心' : plan.targeting.devices === 'desktop' ? 'PC中心' : '全デバイス'}</div>
+            <div><span className="pm-l">計測CV地点</span> {plan.conversionPoint}</div>
+          </div>
+          <p className="plan-note">💡 {plan.note}</p>
+          <div className="f-actions">
+            <button type="button" className="btn pri" onClick={apply}>この内容を下の設定に反映</button>
+            <button type="button" className="btn sec" onClick={makeCopy}>この訴求で広告文を作る →</button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function SettingsTab({ project, onSaved }: { project: ProjectDetailDto; onSaved: () => void }) {
   const { me } = useAuth();
   const canEdit = me.edition === 'agency';
@@ -89,6 +160,7 @@ function SettingsTab({ project, onSaved }: { project: ProjectDetailDto; onSaved:
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const set = <K extends keyof ProjectSettings>(k: K, v: ProjectSettings[K]) => { setS((p) => ({ ...p, [k]: v })); setSaved(false); };
+  const applyPlan = (patch: Partial<ProjectSettings>) => { setS((p) => ({ ...p, ...patch })); setSaved(false); };
 
   const save = () => {
     setBusy(true); setError(null);
@@ -103,6 +175,8 @@ function SettingsTab({ project, onSaved }: { project: ProjectDetailDto; onSaved:
       <div className="c-head"><h2>配信設定（金額・入札・ターゲティング）</h2></div>
       <div className="c-body form-grid">
         {error ? <ErrorCard error={error} /> : null}
+
+        {canEdit ? <MediaPlanBox project={project} onApply={applyPlan} /> : null}
 
         <div className="set-group">💴 予算・目標</div>
         <div className="set-row">

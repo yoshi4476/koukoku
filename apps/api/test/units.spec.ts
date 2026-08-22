@@ -8,6 +8,7 @@ import {
   editionAllows,
   industryProfileFor,
   industryModeFor,
+  recommendMediaPlan,
 } from '@adgrid/shared';
 import { limitsFor, widthUnits } from '../src/ai/copy-limits';
 import { scanLawDictionary } from '../src/ai/law-dictionary';
@@ -225,5 +226,27 @@ describe('キーワード最適化スコアリング (F-18)', () => {
   it('低ボリューム・CV0は判断保留の「維持」', () => {
     const r = recommendKeyword({ clicks: 10, cost: 1500, conversions: 0, cpa: null, roas: 0, efficiency: 5, bm: ecBm });
     expect(r.action).toBe('keep');
+  });
+});
+
+describe('打ち出し方の提案 (media plan)', () => {
+  it('予算配分は合計ほぼ100%・目標CPAは業種相場・想定CVは予算÷CPA', () => {
+    const p = recommendMediaPlan('saas', 'conversion', 1000000);
+    const total = p.media.reduce((s, m) => s + m.sharePct, 0);
+    expect(Math.abs(total - 100)).toBeLessThanOrEqual(2);
+    expect(p.targetCpa).toBe(15000);
+    expect(p.expectedCv).toBe(Math.round(1000000 / 15000));
+    expect(p.media.every((m) => m.monthlyBudget >= 0)).toBe(true);
+  });
+  it('目的で媒体の主役が変わる (アプリ認知はSNS動画が上位)', () => {
+    const app = recommendMediaPlan('app', 'awareness', 500000);
+    expect(app.media[0].platform).toBe('tiktok');
+    const saas = recommendMediaPlan('saas', 'conversion', 500000);
+    expect(saas.media[0].platform).toBe('google_ads');
+  });
+  it('美容は女性・スマホ中心のターゲティングを提案', () => {
+    const p = recommendMediaPlan('beauty', 'store', 800000);
+    expect(p.targeting.gender).toBe('female');
+    expect(p.targeting.devices).toBe('mobile');
   });
 });

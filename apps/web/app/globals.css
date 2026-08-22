@@ -775,6 +775,28 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .asset-actions { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 4px; }
 .proj-assets-line { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--muted); }
 
+/* ---- 打ち出し方の提案 (メディアプラン) ---- */
+.plan-box { border: 1.5px solid var(--primary); border-radius: 12px; background: var(--primary-soft); padding: 12px 14px; }
+.plan-head { display: flex; align-items: center; gap: 12px; }
+.plan-title { font-weight: 700; font-size: 14px; color: var(--primary-strong); }
+.plan-sub { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+.plan-head .btn { margin-left: auto; }
+.plan-body { margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+.plan-budget { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; }
+.plan-est { color: var(--ink-2); }
+.plan-media { display: grid; gap: 8px; }
+.plan-media-card { background: var(--surface); border: 1px solid var(--line); border-radius: 9px; padding: 9px 12px; }
+.plan-media-row { display: flex; align-items: center; gap: 10px; }
+.plan-format { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.plan-playbook { margin-top: 6px; font-size: 12px; color: var(--ink-2); line-height: 1.55; border-top: 1px dashed var(--line); padding-top: 6px; }
+.plan-bar { flex: 1; height: 8px; background: var(--bg-sub); border-radius: 5px; overflow: hidden; }
+.plan-bar-fill { height: 100%; background: var(--primary); border-radius: 5px; }
+.plan-share { font-size: 12px; min-width: 34px; text-align: right; font-weight: 700; }
+.plan-amt { font-size: 12px; min-width: 84px; text-align: right; color: var(--muted); }
+.plan-meta { display: grid; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
+.plan-meta .pm-l { display: inline-block; min-width: 96px; font-weight: 700; color: var(--muted); font-size: 11.5px; }
+.plan-note { margin: 0; font-size: 12px; color: var(--ink-2); }
+
 /* ---- 配信設定フォーム ---- */
 .set-group { font-size: 12.5px; font-weight: 700; color: var(--primary); margin-top: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
 .set-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
