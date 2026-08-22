@@ -21,6 +21,7 @@ import {
   campaignName,
   checkUtmConsistency,
   computeLift,
+  parseInstruction,
   DEFAULT_PROJECT_BRIEF,
 } from '@adgrid/shared';
 import { LlmService } from '../src/ai/llm.service';
@@ -362,6 +363,29 @@ describe('LLM原価計算 + プロンプトキャッシュ (F-09/F-31)', () => {
     expect(LlmService.costJpyFor('claude-opus-5', {
       input_tokens: 0, cache_creation_input_tokens: 2000, output_tokens: 0,
     })).toBeCloseTo(1.88, 2);
+  });
+});
+
+describe('AI運用エージェント: 指示の解釈 (F-43)', () => {
+  it('予算・目的・ターゲティングを抽出 (来店/女性/年齢/地域)', () => {
+    const h = parseInstruction('月30万円で来店予約を増やして。女性25-44歳・首都圏');
+    expect(h.budget).toBe(300000);
+    expect(h.goalHint).toBe('store');
+    expect(h.gender).toBe('female');
+    expect(h.ageRange).toBe('25-44');
+    expect(h.regions).toContain('首都圏');
+  });
+  it('目標CV・CPAを抽出し獲得目的と判定', () => {
+    const h = parseInstruction('CV100件・CPA5000円で獲得したい');
+    expect(h.targetCv).toBe(100);
+    expect(h.targetCpa).toBe(5000);
+    expect(h.goalHint).toBe('conversion');
+  });
+  it('認知重視は awareness、円指定も解釈', () => {
+    const h = parseInstruction('認知重視で全国に月500,000円');
+    expect(h.goalHint).toBe('awareness');
+    expect(h.budget).toBe(500000);
+    expect(h.regions).toContain('全国');
   });
 });
 

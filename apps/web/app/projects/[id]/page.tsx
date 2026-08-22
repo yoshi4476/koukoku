@@ -46,11 +46,13 @@ import { FunnelBox } from './funnel-box';
 import { PreflightPanel } from './preflight-panel';
 import { KpiPlanner } from './kpi-planner';
 import { UtmTool } from './utm-tool';
+import { AgentPanel } from './agent-panel';
 import { CONNECTION_STATUS_META, INDUSTRY_LABEL } from '@/lib/labels';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
 
-type Tab = 'cycle' | 'overview' | 'hearing' | 'delivery' | 'settings' | 'assets' | 'alerts' | 'improve';
+type Tab = 'agent' | 'cycle' | 'overview' | 'hearing' | 'delivery' | 'settings' | 'assets' | 'alerts' | 'improve';
 const TABS: { key: Tab; label: string }[] = [
+  { key: 'agent', label: '🤖 AIエージェント' },
   { key: 'cycle', label: '🔄 運用サイクル' },
   { key: 'overview', label: '概要（推移）' },
   { key: 'hearing', label: 'ヒアリング' },
@@ -917,6 +919,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               </button>
             ))}
           </div>
+
+          {/* --- AIエージェント (一気通貫) --- */}
+          {tab === 'agent' ? <AgentPanel project={d} goTab={(t) => setTab(t as Tab)} onChanged={detail.refresh} /> : null}
 
           {/* --- 運用サイクル --- */}
           {tab === 'cycle' ? <OpsCycleTab project={d} goTab={(t) => setTab(t as Tab)} /> : null}

@@ -93,6 +93,12 @@ def main():
     st, pf3 = api(ag, f"/projects/{pid}/preflight")
     check("削除後は検出されない", not any(u["assetId"] == badAsset["id"] for u in (pf3.get("undeployable") or [])))
 
+    # AI運用エージェント (F-43): 1指示で 設定反映+クリエイティブ生成 まで一気通貫
+    st, agr = api(ag, f"/projects/{pid}/agent", "POST", {"instruction": "月30万円で獲得を増やして。全国"})
+    check("AIエージェント一気通貫実行 (5ステップ)", st in (200, 201) and agr and len(agr.get("steps", [])) == 5, f"status={st}")
+    check("エージェントが配信設定を反映 (月予算30万)", bool(agr) and agr["appliedSettings"]["monthlyBudgetTotal"] == 300000)
+    check("エージェントが制作物を生成", bool(agr) and len(agr.get("createdAssetTitles", [])) >= 1)
+
     # クライアント共有ポータル (F-41): 発行 → 無認証で閲覧可 → 停止で無効
     st, clients = api(ag, "/clients")
     cid = clients[0]["id"]
