@@ -87,6 +87,7 @@ async function main() {
   await prisma.feedback.deleteMany({});
   await prisma.shareLink.deleteMany({});
   await prisma.liftTest.deleteMany({});
+  await prisma.measurementConfig.deleteMany({});
   await prisma.projectAsset.deleteMany({});
   await prisma.keywordStat.deleteMany({});
   await prisma.dashboard.deleteMany({});

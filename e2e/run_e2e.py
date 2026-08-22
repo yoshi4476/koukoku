@@ -112,6 +112,16 @@ def main():
     check("エージェントが配信設定を反映 (月予算30万)", bool(agr) and agr["appliedSettings"]["monthlyBudgetTotal"] == 300000)
     check("エージェントが制作物を生成", bool(agr) and len(agr.get("createdAssetTitles", [])) >= 1)
 
+    # 計測基盤 GA4/CAPI (F-46): ヘルス取得 → 設定保存でスコア上昇
+    st, clist = api(ag, "/clients")
+    cid = clist[0]["id"]
+    api(ag, f"/clients/{cid}/measurement", "PUT", {"ga4MeasurementId": "", "metaPixelId": "", "serverSideEnabled": False, "enhancedConversions": False})
+    st, mhLow = api(ag, f"/clients/{cid}/measurement/health")
+    check("計測ヘルス取得 (score/5項目)", st == 200 and mhLow and "score" in mhLow and len(mhLow.get("items", [])) == 5, f"status={st}")
+    api(ag, f"/clients/{cid}/measurement", "PUT", {"ga4MeasurementId": "G-E2E", "metaPixelId": "999", "serverSideEnabled": False, "enhancedConversions": True})
+    st, mhHigh = api(ag, f"/clients/{cid}/measurement/health")
+    check("計測設定を保存するとスコアが上がる", bool(mhHigh) and mhHigh["score"] > mhLow["score"], f"{mhLow.get('score')}→{mhHigh.get('score') if mhHigh else '?'}")
+
     # クライアント共有ポータル (F-41): 発行 → 無認証で閲覧可 → 停止で無効
     st, clients = api(ag, "/clients")
     cid = clients[0]["id"]

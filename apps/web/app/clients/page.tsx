@@ -9,6 +9,8 @@ import type {
   ClientDto,
   ClientOverviewDto,
   CreateClientAccessInput,
+  MeasurementConfigDto,
+  MeasurementHealthDto,
   Platform,
   SampleDataResultDto,
   ShareLinkDto,
@@ -17,7 +19,7 @@ import { ALL_PLATFORMS, PLATFORM_META, industryModeFor } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
 import { DeltaPill, ErrorCard, HintBar, Skeleton } from '@/components/ui';
-import { apiDelete, apiGet, apiPost, ApiError, toApiError } from '@/lib/api';
+import { apiDelete, apiGet, apiPost, apiPut, ApiError, toApiError } from '@/lib/api';
 import { AUDIT_CATEGORY_LABEL, INDUSTRY_LABEL } from '@/lib/labels';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
 
@@ -272,6 +274,68 @@ function ClientAccessPanel({ clientId }: { clientId: string }) {
   );
 }
 
+/* 計測基盤 (GA4/CAPI) の設定・ヘルス */
+function MeasurementForm({ initial, clientId, onSaved }: { initial: MeasurementConfigDto; clientId: string; onSaved: () => void }) {
+  const [ga4, setGa4] = useState(initial.ga4MeasurementId);
+  const [pixel, setPixel] = useState(initial.metaPixelId);
+  const [server, setServer] = useState(initial.serverSideEnabled);
+  const [enhanced, setEnhanced] = useState(initial.enhancedConversions);
+  const [busy, setBusy] = useState(false);
+  const save = () => {
+    setBusy(true);
+    apiPut(`/clients/${clientId}/measurement`, { ga4MeasurementId: ga4, metaPixelId: pixel, serverSideEnabled: server, enhancedConversions: enhanced })
+      .then(() => onSaved()).finally(() => setBusy(false));
+  };
+  return (
+    <div className="meas-form">
+      <div className="set-row">
+        <div className="field"><label>GA4 測定ID</label><input className="input" value={ga4} onChange={(e) => setGa4(e.target.value)} placeholder="G-XXXXXXX" /></div>
+        <div className="field"><label>Meta ピクセルID</label><input className="input" value={pixel} onChange={(e) => setPixel(e.target.value)} placeholder="数字のピクセルID" /></div>
+      </div>
+      <div className="set-row">
+        <label className="set-check"><input type="checkbox" checked={server} onChange={(e) => setServer(e.target.checked)} /> サーバーサイド計測 (CAPI/拡張CV) を使う</label>
+        <label className="set-check"><input type="checkbox" checked={enhanced} onChange={(e) => setEnhanced(e.target.checked)} /> 拡張コンバージョン</label>
+      </div>
+      {!initial.serverKeysReady && server ? <p className="meas-warn">※ サーバー送信の鍵 (META_CAPI_ACCESS_TOKEN / GA4_API_SECRET) が未設定です。.env に設定すると実送信されます。</p> : null}
+      <button className="btn sm pri" disabled={busy} onClick={save}>{busy ? '保存中…' : '計測設定を保存'}</button>
+    </div>
+  );
+}
+
+function MeasurementPanel({ clientId }: { clientId: string }) {
+  const cfg = useApi<MeasurementConfigDto>(`/clients/${clientId}/measurement`);
+  const health = useApi<MeasurementHealthDto>(`/clients/${clientId}/measurement/health`);
+  const gradeCls: Record<string, string> = { good: 'up', warn: 'warn', bad: 'down' };
+  const refresh = () => { cfg.refresh(); health.refresh(); };
+
+  return (
+    <div className="access-panel">
+      <div className="ap-head">📡 計測基盤（GA4 / CAPI）</div>
+      <p className="ap-desc">CV計測が正確なほど、AIの最適化精度が上がります。特に<b>サーバーサイド計測(CAPI/拡張CV)</b>はiOS/クッキー制限に強く、CVの取りこぼしを防ぎます。</p>
+      {health.loading || cfg.loading ? <Skeleton w="100%" h={40} /> : null}
+      {health.error ? <ErrorCard error={health.error} onRetry={health.retry} /> : null}
+      {health.data ? (
+        <div className={`meas-health ${gradeCls[health.data.grade]}`}>
+          <div className="meas-score-row">
+            <div className="meas-score">{health.data.score}<span>/100</span></div>
+            <div className="meas-bar"><div className={`meas-fill ${gradeCls[health.data.grade]}`} style={{ width: `${health.data.score}%` }} /></div>
+          </div>
+          <p className="meas-summary">{health.data.summary}</p>
+          <ul className="meas-items">
+            {health.data.items.map((i) => (
+              <li key={i.key} className={i.ok ? 'ok' : 'ng'}>
+                <span className="mi-mark">{i.ok ? '✓' : '✗'}</span>
+                <div><b>{i.label}</b><span className="mi-detail">{i.detail}</span></div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {cfg.data ? <MeasurementForm initial={cfg.data} clientId={clientId} onSaved={refresh} /> : null}
+    </div>
+  );
+}
+
 /* クライアント共有ポータル (閲覧専用リンクの発行・停止) */
 function SharePanel({ clientId }: { clientId: string }) {
   const { data, loading, error, retry, refresh } = useApi<ShareLinkDto>(`/clients/${clientId}/share`);
@@ -310,6 +374,7 @@ function ClientCard({ o, onChanged }: { o: ClientOverviewDto; onChanged: () => v
   const [modeOpen, setModeOpen] = useState(false);
   const [accessOpen, setAccessOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  const [measOpen, setMeasOpen] = useState(false);
   const c = o.client;
   const qs = `clientId=${encodeURIComponent(c.id)}`;
 
@@ -367,6 +432,9 @@ function ClientCard({ o, onChanged }: { o: ClientOverviewDto; onChanged: () => v
         <button type="button" className="btn sm sec" aria-expanded={shareOpen} onClick={() => setShareOpen((v) => !v)}>
           {shareOpen ? '閉じる' : '🔗 共有ポータル'}
         </button>
+        <button type="button" className="btn sm sec" aria-expanded={measOpen} onClick={() => setMeasOpen((v) => !v)}>
+          {measOpen ? '閉じる' : '📡 計測'}
+        </button>
         <button
           type="button"
           className="btn sm sec"
@@ -380,6 +448,7 @@ function ClientCard({ o, onChanged }: { o: ClientOverviewDto; onChanged: () => v
 
       {accessOpen ? <ClientAccessPanel clientId={c.id} /> : null}
       {shareOpen ? <SharePanel clientId={c.id} /> : null}
+      {measOpen ? <MeasurementPanel clientId={c.id} /> : null}
 
       {formOpen ? (
         <AddAccountForm

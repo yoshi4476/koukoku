@@ -135,6 +135,24 @@ model LiftTest {
   @@map("lift_tests")
 }
 
+// 計測基盤の設定 (F-46)。クライアント単位で GA4/Metaピクセル/サーバーサイド計測(CAPI/拡張CV)
+// の設定状況を保持し、計測ヘルスの土台にする。トークン等の秘密は環境変数で扱う。
+model MeasurementConfig {
+  id                 String   @id @default(cuid())
+  tenantId           String   @map("tenant_id")
+  clientId           String   @map("client_id")
+  ga4MeasurementId   String   @default("") @map("ga4_measurement_id")
+  ga4PropertyId      String   @default("") @map("ga4_property_id")
+  metaPixelId        String   @default("") @map("meta_pixel_id")
+  serverSideEnabled  Boolean  @default(false) @map("server_side_enabled")
+  enhancedConversions Boolean @default(false) @map("enhanced_conversions")
+  note               String   @default("")
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([tenantId, clientId])
+  @@map("measurement_configs")
+}
+
 // プロジェクト (目的・施策単位)。1クライアントに複数、複数の媒体アカウントを束ねる。
 // クライアントが「掲示・推移・アラート・改善」を1か所で行うためのハブ (F-19)。
 model Project {

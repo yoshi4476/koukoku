@@ -63,6 +63,8 @@ import { LiftService } from './lift/lift.service';
 import { LiftController } from './lift/lift.controller';
 import { AgentService } from './agent/agent.service';
 import { AgentController } from './agent/agent.controller';
+import { MeasurementService } from './measurement/measurement.service';
+import { MeasurementController } from './measurement/measurement.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -92,6 +94,7 @@ import { AgentController } from './agent/agent.controller';
     PublicShareController,
     LiftController,
     AgentController,
+    MeasurementController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -125,6 +128,7 @@ import { AgentController } from './agent/agent.controller';
     ShareService,
     LiftService,
     AgentService,
+    MeasurementService,
     MetricsService,
     LlmService,
     ImageGenService,
