@@ -11,6 +11,7 @@ import type {
   Platform,
   ProjectAccountDto,
   ProjectAssetDto,
+  ProjectBrief,
   ProjectDetailDto,
   ProjectDto,
   ProjectGoal,
@@ -19,7 +20,7 @@ import type {
   UpdateAssetInput,
   UpdateProjectInput,
 } from '@adgrid/shared';
-import { DEFAULT_PROJECT_SETTINGS, industryProfileFor } from '@adgrid/shared';
+import { DEFAULT_PROJECT_BRIEF, DEFAULT_PROJECT_SETTINGS, industryProfileFor } from '@adgrid/shared';
 import { PrismaService, Tx } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 import { MetricsService, daysAgo } from '../metrics/metrics.service';
@@ -188,6 +189,7 @@ export class ProjectsService {
         openFindings,
         assets: (p.assets as AssetRow[]).map(toAssetDto),
         settings: this.mergeSettings(p.settings),
+        brief: this.mergeBrief(p.brief),
         lastReportAt: lastReport?.createdAt.toISOString() ?? null,
         createdAt: p.createdAt.toISOString(),
       };
@@ -198,6 +200,11 @@ export class ProjectsService {
   private mergeSettings(raw: unknown): ProjectSettings {
     const s = (raw && typeof raw === 'object' ? raw : {}) as Partial<ProjectSettings>;
     return { ...DEFAULT_PROJECT_SETTINGS, ...s };
+  }
+
+  private mergeBrief(raw: unknown): ProjectBrief {
+    const b = (raw && typeof raw === 'object' ? raw : {}) as Partial<ProjectBrief>;
+    return { ...DEFAULT_PROJECT_BRIEF, ...b };
   }
 
   /* ---------------- 制作物 (assets) ---------------- */
@@ -406,6 +413,9 @@ export class ProjectsService {
       if (input.settings && typeof input.settings === 'object') {
         // 既存設定に部分更新をマージして保存
         data.settings = { ...this.mergeSettings(project.settings), ...input.settings } as object;
+      }
+      if (input.brief && typeof input.brief === 'object') {
+        data.brief = { ...this.mergeBrief(project.brief), ...input.brief } as object;
       }
       if (Object.keys(data).length) await tx.project.update({ where: { id }, data });
 

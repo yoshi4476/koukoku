@@ -86,6 +86,8 @@ model Project {
   note      String   @default("")
   // 配信設定 (予算・入札・ターゲティング・期間・計測)。ProjectSettings 形状のJSON
   settings  Json     @default("{}")
+  // ヒアリングシート (事業・強み・ターゲット・NG等)。ProjectBrief 形状のJSON。成果の土台
+  brief     Json     @default("{}")
   createdAt DateTime @default(now()) @map("created_at")
 
   tenant     Tenant         @relation(fields: [tenantId], references: [id])

@@ -664,6 +664,7 @@ export interface ProjectDetailDto {
   openFindings: number;
   assets: ProjectAssetDto[];
   settings: ProjectSettings;
+  brief: ProjectBrief;
   lastReportAt: string | null;
   createdAt: string;
 }
@@ -736,6 +737,50 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   note: '',
 };
 
+/* ヒアリングシート (成果の土台。しっかり記入するほど広告文・打ち出し方の精度が上がる) */
+export interface ProjectBrief {
+  business: string; // 事業内容
+  product: string; // 商材・サービスの内容
+  usp: string; // 強み・他社との違い (USP)
+  targetPersona: string; // ターゲット顧客像
+  painPoint: string; // 顧客の悩み・課題
+  offer: string; // 特典・オファー・保証
+  reasonToChoose: string; // 選ばれる理由・実績
+  competitors: string; // 競合
+  area: string; // 提供エリア
+  ngItems: string; // NG・言えないこと・規制事項
+  reference: string; // 参考LP・事例URL
+  note: string; // その他
+}
+
+export const DEFAULT_PROJECT_BRIEF: ProjectBrief = {
+  business: '', product: '', usp: '', targetPersona: '', painPoint: '', offer: '',
+  reasonToChoose: '', competitors: '', area: '', ngItems: '', reference: '', note: '',
+};
+
+/** 成果に効く重要項目 (記入率の分母/優先案内に使う) */
+export const BRIEF_KEY_FIELDS: (keyof ProjectBrief)[] = [
+  'business', 'product', 'usp', 'targetPersona', 'painPoint', 'offer', 'reasonToChoose',
+];
+
+export interface BriefCompleteness {
+  filled: number;
+  total: number;
+  pct: number;
+  missing: (keyof ProjectBrief)[];
+}
+
+export function briefCompleteness(brief: Partial<ProjectBrief>): BriefCompleteness {
+  const missing = BRIEF_KEY_FIELDS.filter((k) => !((brief[k] ?? '').toString().trim()));
+  const filled = BRIEF_KEY_FIELDS.length - missing.length;
+  return {
+    filled,
+    total: BRIEF_KEY_FIELDS.length,
+    pct: Math.round((filled / BRIEF_KEY_FIELDS.length) * 100),
+    missing,
+  };
+}
+
 export interface UpdateProjectInput {
   name?: string;
   goal?: ProjectGoal;
@@ -743,6 +788,7 @@ export interface UpdateProjectInput {
   note?: string;
   accountIds?: string[];
   settings?: Partial<ProjectSettings>;
+  brief?: Partial<ProjectBrief>;
 }
 
 /* 制作物の改善アドバイス (公開後の改善ポイント) */

@@ -11,6 +11,7 @@ import type {
   CreateAssetInput,
   DailyPointDto,
   ProjectAssetDto,
+  ProjectBrief,
   ProjectDetailDto,
   ProjectSettings,
 } from '@adgrid/shared';
@@ -21,6 +22,8 @@ import {
   BID_STRATEGY_LABEL,
   PROJECT_GOAL_LABEL,
   PROJECT_STATUS_LABEL,
+  briefCompleteness,
+  industryProfileFor,
   isApprover,
   recommendMediaPlan,
 } from '@adgrid/shared';
@@ -32,14 +35,30 @@ import { apiGet, apiPost, apiPut, toApiError, type ApiError } from '@/lib/api';
 import { CONNECTION_STATUS_META, INDUSTRY_LABEL } from '@/lib/labels';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
 
-type Tab = 'overview' | 'delivery' | 'settings' | 'assets' | 'alerts' | 'improve';
+type Tab = 'overview' | 'hearing' | 'delivery' | 'settings' | 'assets' | 'alerts' | 'improve';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'overview', label: '概要（推移）' },
+  { key: 'hearing', label: 'ヒアリング' },
   { key: 'delivery', label: '掲示' },
   { key: 'settings', label: '配信設定' },
   { key: 'assets', label: '制作物' },
   { key: 'alerts', label: 'アラート' },
   { key: 'improve', label: '改善' },
+];
+
+const BRIEF_FIELDS: { key: keyof ProjectBrief; label: string; ph: string; long?: boolean }[] = [
+  { key: 'business', label: '事業内容', ph: '例: 都内で美容脱毛クリニックを3院運営' },
+  { key: 'product', label: '商材・サービスの内容', ph: '例: 医療脱毛5回コース / 都度払いプラン' },
+  { key: 'usp', label: '強み・他社との違い (USP)', ph: '例: 完全個室・当日予約可・医師常駐・追加料金なし', long: true },
+  { key: 'targetPersona', label: 'ターゲット顧客像', ph: '例: 20-34歳女性、初めての脱毛で痛みと料金が不安', long: true },
+  { key: 'painPoint', label: '顧客の悩み・課題', ph: '例: 他院は追加料金が不明瞭・予約が取れない', long: true },
+  { key: 'offer', label: '特典・オファー・保証', ph: '例: 初回カウンセリング無料・のりかえ割20%OFF' },
+  { key: 'reasonToChoose', label: '選ばれる理由・実績', ph: '例: 累計10万件・満足度98%・口コミ★4.7' },
+  { key: 'competitors', label: '競合', ph: '例: A院(価格訴求)・B院(店舗数)' },
+  { key: 'area', label: '提供エリア', ph: '例: 新宿・渋谷・池袋' },
+  { key: 'ngItems', label: 'NG・言えないこと・規制', ph: '例: 効果を断定する表現はNG(医療広告ガイドライン)' },
+  { key: 'reference', label: '参考LP・事例URL', ph: 'https://…' },
+  { key: 'note', label: 'その他・補足', ph: '' },
 ];
 
 const BID_STRATEGIES: BidStrategy[] = ['maximize_conversions', 'target_cpa', 'target_roas', 'maximize_clicks', 'manual'];
@@ -80,6 +99,97 @@ function TrendChart({ points }: { points: DailyPointDto[] }) {
 function numOrNull(v: string): number | null {
   const n = Number(v.replace(/,/g, ''));
   return v.trim() === '' || Number.isNaN(n) ? null : n;
+}
+
+function HearingTab({ project, onSaved }: { project: ProjectDetailDto; onSaved: () => void }) {
+  const { me } = useAuth();
+  const router = useRouter();
+  const { setSelectedClientId } = useClients();
+  const canEdit = me.edition === 'agency';
+  const [b, setB] = useState<ProjectBrief>(project.brief);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
+  const set = (k: keyof ProjectBrief, v: string) => { setB((p) => ({ ...p, [k]: v })); setSaved(false); };
+
+  const comp = useMemo(() => briefCompleteness(b), [b]);
+  const profile = industryProfileFor(project.industryCode);
+
+  const draft = useMemo(() => {
+    const lines: string[] = [];
+    if (b.painPoint.trim()) lines.push(`【共感】${b.painPoint.trim()} ——そのお悩み、解決できます`);
+    if (b.usp.trim()) lines.push(`【強み】${b.usp.trim()}`);
+    if (b.reasonToChoose.trim()) lines.push(`【実績】${b.reasonToChoose.trim()}`);
+    if (b.offer.trim()) lines.push(`【今なら】${b.offer.trim()}`);
+    lines.push(`【訴求軸(業種)】${profile.appealAxes.slice(0, 3).join(' / ')}`);
+    lines.push(`【行動】${profile.cvLabel}はこちら`);
+    return lines;
+  }, [b, profile]);
+
+  const save = () => {
+    setBusy(true); setError(null);
+    apiPut(`/projects/${project.id}`, { brief: b })
+      .then(() => { setSaved(true); onSaved(); })
+      .catch((e: unknown) => setError(toApiError(e)))
+      .finally(() => setBusy(false));
+  };
+  const makeCopy = () => { setSelectedClientId(project.clientId); router.push('/copy'); };
+
+  const compCls = comp.pct >= 100 ? 'up' : comp.pct >= 60 ? 'warn' : 'down';
+
+  return (
+    <div className="card">
+      <div className="c-head">
+        <h2>ヒアリングシート</h2>
+        <span className={`pill ${compCls}`} style={{ marginLeft: 'auto' }}>記入率 {comp.pct}%</span>
+      </div>
+      <div className="c-body form-grid">
+        {error ? <ErrorCard error={error} /> : null}
+        <div className="hear-meter">
+          <div className="hear-bar"><div className={`hear-fill ${compCls}`} style={{ width: `${comp.pct}%` }} /></div>
+          <p className="hear-hint">
+            {comp.pct >= 100
+              ? '✅ 主要項目がすべて埋まりました。この内容から精度の高い広告文・打ち出し方が作れます。'
+              : `あと${comp.missing.length}項目でフル活用できます。しっかり記入するほど、成果の出る広告になります。`}
+          </p>
+        </div>
+
+        {BRIEF_FIELDS.map((f) => (
+          <div className="field" key={f.key}>
+            <label htmlFor={`br-${f.key}`}>
+              {f.label}
+              {(['business', 'product', 'usp', 'targetPersona', 'painPoint', 'offer', 'reasonToChoose'] as (keyof ProjectBrief)[]).includes(f.key)
+                ? <span className="hear-req">重要</span> : null}
+            </label>
+            {f.long ? (
+              <textarea id={`br-${f.key}`} className="textarea" rows={2} value={b[f.key]} disabled={!canEdit}
+                onChange={(e) => set(f.key, e.target.value)} placeholder={f.ph} />
+            ) : (
+              <input id={`br-${f.key}`} className="input" value={b[f.key]} disabled={!canEdit}
+                onChange={(e) => set(f.key, e.target.value)} placeholder={f.ph} />
+            )}
+          </div>
+        ))}
+
+        {canEdit ? (
+          <div className="f-actions">
+            <button className="btn pri" disabled={busy} onClick={save}>{busy ? '保存中…' : 'ヒアリングを保存'}</button>
+            {saved ? <span style={{ color: 'var(--good)', fontWeight: 600, fontSize: 13 }}>✓ 保存しました</span> : null}
+          </div>
+        ) : <p style={{ margin: 0, fontSize: 12, color: 'var(--muted)' }}>※ 提供先版では閲覧のみです。</p>}
+
+        {/* ヒアリングから訴求ドラフトを自動生成 */}
+        <div className="hear-draft">
+          <div className="hear-draft-h">🪄 ヒアリングから作る「訴求の型」</div>
+          <div className="hear-draft-body">
+            {draft.map((l, i) => <div key={i} className="hear-draft-line">{l}</div>)}
+          </div>
+          <p className="hear-draft-note">この型をベースに広告文を作ると、{profile.label}で成果が出やすくなります。</p>
+          <button className="btn sm pri" onClick={makeCopy}>この内容で広告文を作る →</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function MediaPlanBox({ project, onApply }: { project: ProjectDetailDto; onApply: (patch: Partial<ProjectSettings>) => void }) {
@@ -489,6 +599,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
             {TABS.map((t) => (
               <button key={t.key} className={`tab ${tab === t.key ? 'on' : ''}`} onClick={() => setTab(t.key)}>
                 {t.label}
+                {t.key === 'hearing' ? <span className="wtab-count">{briefCompleteness(d.brief).pct}%</span> : null}
                 {t.key === 'assets' && d.assets.length > 0 ? <span className="wtab-count">{d.assets.length}</span> : null}
                 {t.key === 'alerts' && d.alerts.length > 0 ? <span className="wtab-count">{d.alerts.length}</span> : null}
                 {t.key === 'improve' && d.openFindings > 0 ? <span className="wtab-count">{d.openFindings}</span> : null}
@@ -545,6 +656,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               </div>
             </div>
           ) : null}
+
+          {/* --- ヒアリング --- */}
+          {tab === 'hearing' ? <HearingTab project={d} onSaved={detail.retry} /> : null}
 
           {/* --- 配信設定 --- */}
           {tab === 'settings' ? <SettingsTab project={d} onSaved={detail.retry} /> : null}

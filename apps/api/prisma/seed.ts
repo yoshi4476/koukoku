@@ -269,6 +269,27 @@ async function main() {
     devices: 'desktop', conversionPoint: '資料請求・問い合わせ', dayparting: '平日9-18時', note: 'PC・法人向けにデスクトップ重視',
   });
 
+  // ヒアリングのデモ (記入済み)。訴求ドラフト・広告文精度の土台
+  await prisma.project.update({
+    where: { id: 'p_a_spring' },
+    data: {
+      brief: {
+        business: '自然派スキンケアのD2Cブランドを運営',
+        product: '化粧水・美容液の定期便 (初回半額)',
+        usp: '無添加・国産原料・皮膚科医監修・定期の縛りなし',
+        targetPersona: '30-44歳女性、肌の乾燥・敏感肌に悩み、成分を重視して選ぶ',
+        painPoint: '市販品が合わず肌荒れ・何を選べばいいか分からない',
+        offer: '初回50%OFF・30日間返金保証・送料無料',
+        reasonToChoose: '累計販売20万本・リピート率85%・口コミ★4.6',
+        competitors: '大手化粧品ブランド (価格・ブランド力)',
+        area: '全国',
+        ngItems: '「シミが消える」等の効果断定はNG(薬機法)',
+        reference: 'https://example.com/lp/skincare',
+        note: '母の日ギフト需要を5月に取り込みたい',
+      },
+    },
+  });
+
   // 制作物 (広告文/LP/チラシ/動画) のデモ。下書き〜公開の各段階を含む
   await prisma.projectAsset.createMany({
     data: [

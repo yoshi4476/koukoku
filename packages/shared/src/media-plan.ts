@@ -80,6 +80,14 @@ const INDUSTRY_ARCHETYPE: Record<string, Archetype> = {
   education: 'consideration',
   travel: 'consideration',
   hr: 'consideration',
+  clinic_beauty: 'local_store',
+  fitness: 'local_store',
+  legal: 'consideration',
+  repair: 'local_store',
+  reform: 'consideration',
+  pet: 'ec_visual',
+  moving: 'local_store',
+  funeral: 'consideration',
   other: 'consideration',
 };
 
@@ -118,7 +126,7 @@ const ARCHETYPE_MIX: Record<Archetype, { platform: Platform; share: number; reas
   ],
 };
 
-const FEMALE_INDUSTRIES = new Set(['beauty', 'apparel', 'bridal']);
+const FEMALE_INDUSTRIES = new Set(['beauty', 'apparel', 'bridal', 'clinic_beauty']);
 
 function targetingFor(industryCode: string, arch: Archetype): MediaPlanTargeting {
   const gender: MediaPlanTargeting['gender'] = FEMALE_INDUSTRIES.has(industryCode) ? 'female' : 'all';

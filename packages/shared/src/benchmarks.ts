@@ -27,6 +27,14 @@ export const INDUSTRY_BENCHMARKS: Record<string, IndustryBenchmark> = {
   medical: { code: 'medical', label: '医療・クリニック', ctr: 1.0, cvr: 2.0, cpa: 8000 },
   travel: { code: 'travel', label: '旅行・観光', ctr: 1.1, cvr: 1.5, cpa: 5000 },
   education: { code: 'education', label: '教育・スクール', ctr: 1.1, cvr: 1.3, cpa: 8000 },
+  clinic_beauty: { code: 'clinic_beauty', label: '美容クリニック・医療脱毛', ctr: 1.1, cvr: 2.2, cpa: 9000 },
+  fitness: { code: 'fitness', label: 'フィットネス・ジム', ctr: 1.2, cvr: 2.0, cpa: 7000 },
+  legal: { code: 'legal', label: '士業 (弁護士・税理士)', ctr: 1.0, cvr: 1.5, cpa: 12000 },
+  repair: { code: 'repair', label: '整体・整骨院・鍼灸', ctr: 1.1, cvr: 2.3, cpa: 5000 },
+  reform: { code: 'reform', label: 'リフォーム・工務店', ctr: 0.9, cvr: 1.0, cpa: 15000 },
+  pet: { code: 'pet', label: 'ペット', ctr: 1.3, cvr: 1.8, cpa: 4000 },
+  moving: { code: 'moving', label: '引越し・生活サービス', ctr: 1.0, cvr: 2.0, cpa: 6000 },
+  funeral: { code: 'funeral', label: '冠婚葬祭・葬儀', ctr: 0.9, cvr: 2.5, cpa: 10000 },
   other: { code: 'other', label: 'その他', ctr: 1.0, cvr: 1.2, cpa: 8000 },
 };
 
