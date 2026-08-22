@@ -4,6 +4,7 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 import { MetricsService, daysAgo } from '../metrics/metrics.service';
+import { AgentService } from '../agent/agent.service';
 
 /**
  * Slackスラッシュコマンド (B-6)。既存のSlack通知基盤を双方向化する。
@@ -18,6 +19,7 @@ export class SlackController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
+    private readonly agent: AgentService,
   ) {}
 
   @Post('command')
@@ -35,21 +37,55 @@ export class SlackController {
       return this.msg('このSlackワークスペースはADGRIDと連携されていません。設定画面から連携してください。');
     }
 
-    const sub = (body.text ?? '').trim().split(/\s+/)[0] || 'help';
+    const full = (body.text ?? '').trim();
+    const sub = full.split(/\s+/)[0] || 'help';
+    const rest = full.slice(sub.length).trim();
     switch (sub) {
       case 'summary':
         return this.summary(tenantId);
       case 'alerts':
         return this.alerts(tenantId);
+      case 'agent':
+      case 'run':
+        return this.runAgent(tenantId, rest);
       case 'help':
       default:
         return this.msg(
           '*ADGRID コマンド*\n' +
+            '`/adgrid agent <プロジェクト名> : <指示>` — AIが一気通貫で配信設定〜制作物を準備\n' +
+            '　例: `/adgrid agent 春の新規獲得 : 月30万で獲得を増やして。女性25-44・首都圏`\n' +
             '`/adgrid summary` — 全クライアントの直近7日サマリ\n' +
             '`/adgrid alerts` — 未確認アラート\n' +
             '`/adgrid help` — このヘルプ',
         );
     }
+  }
+
+  /** Slackから AIエージェントを起動 (プロジェクト名で解決)。公開はシステム側の最終確認を残す */
+  private async runAgent(tenantId: string, arg: string): Promise<{ response_type: string; text: string }> {
+    const [q, ...instr] = arg.split(/[:：]/);
+    const query = (q ?? '').trim();
+    const instruction = instr.join(':').trim();
+    if (!query || !instruction) {
+      return this.msg('形式: `/adgrid agent <プロジェクト名> : <指示>`\n例: `/adgrid agent 春の新規獲得 : 月30万で獲得を増やして`');
+    }
+    const projects = await this.prisma.withTenant(tenantId, (tx) => tx.project.findMany({ select: { id: true, name: true } }));
+    const matches = projects.filter((p) => p.name.toLowerCase().includes(query.toLowerCase()));
+    if (matches.length === 0) return this.msg(`「${query}」に一致するプロジェクトが見つかりません。`);
+    if (matches.length > 1) return this.msg(`複数一致しました。もっと具体的に指定してください:\n${matches.map((m) => `・${m.name}`).join('\n')}`);
+
+    const run = await this.agent.run(tenantId, matches[0].id, instruction, null);
+    const stepLines = run.steps.map((s) => `• ${s.title}`).join('\n');
+    const media = run.mediaPlan.map((m) => `${m.platformLabel} ${m.sharePct}%`).join(' / ');
+    return this.msg(
+      `*🤖 AIエージェント実行: ${matches[0].name}*\n` +
+        `${stepLines}\n\n` +
+        `*反映した配信設定*\n` +
+        `月予算 ¥${(run.appliedSettings.monthlyBudgetTotal ?? 0).toLocaleString('ja-JP')} / 目標CPA ¥${(run.appliedSettings.targetCpa ?? 0).toLocaleString('ja-JP')} / ${run.appliedSettings.regions}・${run.appliedSettings.ageRange}\n` +
+        `媒体配分: ${media}\n` +
+        `制作物: ${run.createdAssetTitles.length}件を下書き生成（${run.mocked ? 'テンプレ' : 'AI'}）\n\n` +
+        `▶ 公開はADGRIDの「制作物」→プレビュー→公開前チェックから最終確認してください。`,
+    );
   }
 
   private async summary(tenantId: string): Promise<{ response_type: string; text: string }> {

@@ -8,6 +8,7 @@ import json
 import sys
 import urllib.request
 import urllib.error
+import urllib.parse
 from playwright.sync_api import sync_playwright
 
 try:
@@ -92,6 +93,18 @@ def main():
     check("配信できない制作物を削除できる", st in (200, 204))
     st, pf3 = api(ag, f"/projects/{pid}/preflight")
     check("削除後は検出されない", not any(u["assetId"] == badAsset["id"] for u in (pf3.get("undeployable") or [])))
+
+    # Slack → エージェント連携 (F-45): 署名検証スキップ(dev)でスラッシュコマンドが応答
+    def slack(text):
+        d = urllib.parse.urlencode({"command": "/adgrid", "text": text}).encode()
+        rq = urllib.request.Request(API + "/slack/command", data=d, headers={"Content-Type": "application/x-www-form-urlencoded"})
+        try:
+            resp = urllib.request.urlopen(rq)
+            return resp.status, json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            return e.code, None
+    st, sh = slack("help")
+    check("Slack help に agent コマンドがある", st in (200, 201) and sh and "agent" in sh.get("text", ""), f"status={st}")
 
     # AI運用エージェント (F-43): 1指示で 設定反映+クリエイティブ生成 まで一気通貫
     st, agr = api(ag, f"/projects/{pid}/agent", "POST", {"instruction": "月30万円で獲得を増やして。全国"})
