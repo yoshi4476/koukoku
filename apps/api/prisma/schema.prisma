@@ -153,6 +153,26 @@ model MeasurementConfig {
   @@map("measurement_configs")
 }
 
+// 成約(商談)パイプライン (F-47)。広告で獲得したCVを、商談→受注(成約)まで追跡し、
+// 成約率・受注額・粗利ROAS を可視化する。広告→CV→成約の"出口"を一気通貫にする。
+model Deal {
+  id             String    @id @default(cuid())
+  tenantId       String    @map("tenant_id")
+  clientId       String    @map("client_id")
+  projectId      String?   @map("project_id")
+  name           String
+  stage          String    @default("lead") // lead / negotiation / won / lost
+  value          Int       @default(0) // 受注額(円)
+  grossMarginPct Int       @default(30) @map("gross_margin_pct") // 粗利率(%)
+  source         String    @default("") // 流入(媒体/キャンペーン)
+  note           String    @default("")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  closedAt       DateTime? @map("closed_at")
+
+  @@index([tenantId, clientId, createdAt])
+  @@map("deals")
+}
+
 // プロジェクト (目的・施策単位)。1クライアントに複数、複数の媒体アカウントを束ねる。
 // クライアントが「掲示・推移・アラート・改善」を1か所で行うためのハブ (F-19)。
 model Project {

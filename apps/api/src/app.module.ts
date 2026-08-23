@@ -65,6 +65,8 @@ import { AgentService } from './agent/agent.service';
 import { AgentController } from './agent/agent.controller';
 import { MeasurementService } from './measurement/measurement.service';
 import { MeasurementController } from './measurement/measurement.controller';
+import { DealsService } from './deals/deals.service';
+import { DealsController } from './deals/deals.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -95,6 +97,7 @@ import { MeasurementController } from './measurement/measurement.controller';
     LiftController,
     AgentController,
     MeasurementController,
+    DealsController,
     HomeController,
     DashboardController,
     ClientsController,
@@ -129,6 +132,7 @@ import { MeasurementController } from './measurement/measurement.controller';
     LiftService,
     AgentService,
     MeasurementService,
+    DealsService,
     MetricsService,
     LlmService,
     ImageGenService,

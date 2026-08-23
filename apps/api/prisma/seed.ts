@@ -88,6 +88,7 @@ async function main() {
   await prisma.shareLink.deleteMany({});
   await prisma.liftTest.deleteMany({});
   await prisma.measurementConfig.deleteMany({});
+  await prisma.deal.deleteMany({});
   await prisma.projectAsset.deleteMany({});
   await prisma.keywordStat.deleteMany({});
   await prisma.dashboard.deleteMany({});
@@ -329,6 +330,17 @@ async function main() {
       { tenantId: TENANT_ID, platform: 'meta', status: 'connected', lastSyncedAt: new Date() },
       { tenantId: TENANT_ID, platform: 'yahoo_search', status: 'needs_reauth', lastSyncedAt: daysAgo(2) },
       { tenantId: TENANT_ID, platform: 'line_ads', status: 'not_connected' },
+    ],
+  });
+
+  // 成約パイプラインのデモ (F-47): 広告→CV→成約の出口
+  await prisma.deal.createMany({
+    data: [
+      { tenantId: TENANT_ID, clientId: clientA.id, projectId: 'p_a_spring', name: '定期購入 まとめ買い A', stage: 'won', value: 48000, grossMarginPct: 45, source: 'Google検索', closedAt: daysAgo(5) },
+      { tenantId: TENANT_ID, clientId: clientA.id, projectId: 'p_a_spring', name: 'ギフトセット B', stage: 'won', value: 32000, grossMarginPct: 40, source: 'Meta', closedAt: daysAgo(2) },
+      { tenantId: TENANT_ID, clientId: clientA.id, projectId: 'p_a_spring', name: '法人まとめ発注 C', stage: 'negotiation', value: 180000, grossMarginPct: 35, source: 'Google検索' },
+      { tenantId: TENANT_ID, clientId: clientA.id, projectId: 'p_a_spring', name: '見込み客 D', stage: 'lead', value: 20000, grossMarginPct: 45, source: 'Meta' },
+      { tenantId: TENANT_ID, clientId: clientA.id, projectId: 'p_a_spring', name: '相見積で失注 E', stage: 'lost', value: 0, grossMarginPct: 0, source: 'Yahoo', closedAt: daysAgo(7) },
     ],
   });
 

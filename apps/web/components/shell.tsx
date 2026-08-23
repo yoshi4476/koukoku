@@ -106,6 +106,16 @@ const NAV_MAIN: NavItem[] = [
     ),
   },
   {
+    href: '/deals',
+    label: '成約パイプライン',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <path d="M2 4.5h10v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" strokeWidth="1.3" />
+        <path d="M5 4.5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M2 7.5h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: '/abtests',
     label: 'A/Bテスト',
     icon: (
@@ -310,7 +320,8 @@ interface NavPhase {
 const NAV_PHASES: NavPhase[] = [
   { label: null, hrefs: ['/', '/projects'] },
   { label: '作る（横断）', hrefs: ['/copy', '/knowledge'] },
-  { label: '報告する', hrefs: ['/report'] },
+  { label: '計画・検証', hrefs: ['/calendar', '/experiments'] },
+  { label: '報告する', hrefs: ['/report', '/deals'] },
   { label: '管理・設定', hrefs: ['/clients', '/reseller', '/feedback', '/settings', '/guide'] },
 ];
 

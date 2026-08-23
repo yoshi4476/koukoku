@@ -22,6 +22,8 @@ import {
   checkUtmConsistency,
   computeLift,
   parseInstruction,
+  computeDealSummary,
+  measurementHealth,
   DEFAULT_PROJECT_BRIEF,
 } from '@adgrid/shared';
 import { LlmService } from '../src/ai/llm.service';
@@ -363,6 +365,37 @@ describe('LLM原価計算 + プロンプトキャッシュ (F-09/F-31)', () => {
     expect(LlmService.costJpyFor('claude-opus-5', {
       input_tokens: 0, cache_creation_input_tokens: 2000, output_tokens: 0,
     })).toBeCloseTo(1.88, 2);
+  });
+});
+
+const D = (stage: 'lead' | 'negotiation' | 'won' | 'lost', value: number, grossMarginPct: number) =>
+  ({ id: 'x', clientId: 'c', projectId: null, name: 'd', stage, value, grossMarginPct, source: '', note: '', createdAt: '', closedAt: null }) as const;
+
+describe('成約パイプライン: 集計 (F-47)', () => {
+  it('成約率・受注額・粗利ROAS・進行中見込みを算出', () => {
+    const s = computeDealSummary(
+      [D('won', 300000, 30), D('won', 200000, 40), D('lost', 0, 0), D('negotiation', 500000, 30), D('lead', 100000, 30)],
+      100000,
+    );
+    expect(s.winRate).toBe(66.7); // 2/(2+1)
+    expect(s.wonValue).toBe(500000);
+    expect(s.avgWonValue).toBe(250000);
+    expect(s.grossProfit).toBe(170000); // 90000+80000
+    expect(s.grossRoas).toBe(170); // 170000/100000
+    expect(s.pipelineValue).toBe(600000); // 100000+500000
+  });
+  it('広告費0なら粗利ROASはnull', () => {
+    expect(computeDealSummary([D('won', 100000, 50)], 0).grossRoas).toBeNull();
+  });
+});
+
+describe('計測ヘルス (F-46)', () => {
+  it('CV地点+全設定で満点、サーバー鍵無しならサーバー計測は未達で70点', () => {
+    const full = measurementHealth({ hasCvPoint: true, hasGa4: true, hasPixel: true, serverSide: true, enhancedConversions: true, serverKeysReady: true });
+    expect(full.score).toBe(100);
+    const noKeys = measurementHealth({ hasCvPoint: true, hasGa4: true, hasPixel: true, serverSide: true, enhancedConversions: true, serverKeysReady: false });
+    expect(noKeys.score).toBe(70);
+    expect(noKeys.grade).toBe('warn');
   });
 });
 

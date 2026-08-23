@@ -15,3 +15,4 @@ export * from './calendar-events';
 export * from './lift-test';
 export * from './agent';
 export * from './measurement';
+export * from './deals';

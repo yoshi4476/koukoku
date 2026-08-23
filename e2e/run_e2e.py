@@ -112,6 +112,15 @@ def main():
     check("エージェントが配信設定を反映 (月予算30万)", bool(agr) and agr["appliedSettings"]["monthlyBudgetTotal"] == 300000)
     check("エージェントが制作物を生成", bool(agr) and len(agr.get("createdAssetTitles", [])) >= 1)
 
+    # 成約パイプライン (F-47): 案件作成→受注でサマリに反映
+    st, clist0 = api(ag, "/clients")
+    dcid = clist0[0]["id"]
+    st, deal = api(ag, "/deals", "POST", {"clientId": dcid, "name": "E2E成約案件", "stage": "won", "value": 500000, "grossMarginPct": 40, "source": "Google検索"})
+    check("成約案件を作成", st in (200, 201) and deal and deal.get("stage") == "won", f"status={st}")
+    st, dsum = api(ag, f"/deals/summary?clientId={dcid}")
+    check("成約サマリに受注・粗利ROASが反映", st == 200 and dsum and dsum["wonValue"] >= 500000 and dsum["grossProfit"] >= 200000, f"status={st}")
+    api(ag, f"/deals/{deal['id']}", "DELETE")
+
     # 計測基盤 GA4/CAPI (F-46): ヘルス取得 → 設定保存でスコア上昇
     st, clist = api(ag, "/clients")
     cid = clist[0]["id"]
