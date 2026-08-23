@@ -112,6 +112,10 @@ def main():
     check("エージェントが配信設定を反映 (月予算30万)", bool(agr) and agr["appliedSettings"]["monthlyBudgetTotal"] == 300000)
     check("エージェントが制作物を生成", bool(agr) and len(agr.get("createdAssetTitles", [])) >= 1)
 
+    # 外部連携 有効化状況 (F-48): 6連携の設定状況を返す
+    st, intg = api(ag, "/integrations/status")
+    check("外部連携ステータス取得 (6件)", st == 200 and intg and intg.get("total") == 6 and "readyCount" in intg, f"status={st}")
+
     # 成約パイプライン (F-47): 案件作成→受注でサマリに反映
     st, clist0 = api(ag, "/clients")
     dcid = clist0[0]["id"]

@@ -67,6 +67,7 @@ import { MeasurementService } from './measurement/measurement.service';
 import { MeasurementController } from './measurement/measurement.controller';
 import { DealsService } from './deals/deals.service';
 import { DealsController } from './deals/deals.controller';
+import { IntegrationsController } from './integrations/integrations.controller';
 
 @Module({
   imports: [PrismaModule],
@@ -98,6 +99,7 @@ import { DealsController } from './deals/deals.controller';
     AgentController,
     MeasurementController,
     DealsController,
+    IntegrationsController,
     HomeController,
     DashboardController,
     ClientsController,

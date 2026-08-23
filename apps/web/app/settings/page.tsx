@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import type { BillingDto, CalibrationDto, ConnectionDto, Edition, MeDto, MemberDto, UsageDto } from '@adgrid/shared';
+import type { BillingDto, CalibrationDto, ConnectionDto, Edition, IntegrationStatusDto, MeDto, MemberDto, UsageDto } from '@adgrid/shared';
 import { PLANS, isApprover, editionAllows, EDITION_LABEL } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
@@ -268,6 +268,55 @@ function EditionCard() {
   );
 }
 
+/* 外部連携の有効化状況・接続テスト (F-48) */
+function IntegrationsCard() {
+  const { me } = useAuth();
+  const canManage = isApprover(me.role);
+  const status = useApi<IntegrationStatusDto>(canManage ? '/integrations/status' : null);
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; message: string } | null>(null);
+  if (!canManage) return null;
+
+  const runTest = () => {
+    setTesting(true); setTestMsg(null);
+    apiPost<{ ok: boolean; message: string }>('/integrations/test/anthropic', {})
+      .then((r) => setTestMsg(r)).catch((e: unknown) => setTestMsg({ ok: false, message: toApiError(e).message })).finally(() => setTesting(false));
+  };
+
+  return (
+    <div className="card" style={{ marginBottom: 16, maxWidth: 780 }}>
+      <div className="c-head"><h2>🔌 外部連携（有効化状況）</h2>
+        {status.data ? <span className="sub" style={{ marginLeft: 'auto' }}>有効 <b className="num">{status.data.readyCount}</b>/<b className="num">{status.data.total}</b></span> : null}
+      </div>
+      <div className="c-body">
+        <p style={{ margin: '0 0 12px', fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+          各サービスの鍵を <code style={{ fontFamily: 'ui-monospace,monospace' }}>apps/api/.env</code> に設定してAPIを再起動すると、下の状態が「設定済」に変わり機能が有効になります。<b>秘密の値は保存・表示しません</b>（設定済か否かのみ判定）。
+        </p>
+        {status.loading ? <SkeletonLines count={4} /> : status.error ? <ErrorCard error={status.error} onRetry={status.retry} /> : status.data ? (
+          <div className="intg-list">
+            {status.data.items.map((it) => (
+              <div key={it.key} className={`intg-row ${it.configured ? 'on' : ''}`}>
+                <span className="intg-mark">{it.configured ? '✓' : '—'}</span>
+                <div className="intg-main">
+                  <div className="intg-h"><b>{it.label}</b><span className="intg-cat">{it.category}</span>
+                    <span className={`pill ${it.configured ? 'up' : 'flat'}`} style={{ marginLeft: 'auto' }}>{it.configured ? '設定済' : '未設定'}</span></div>
+                  <div className="intg-env">{it.envVars.join(' / ')}</div>
+                  <div className="intg-note">{it.configured ? `✅ ${it.activates}` : `未設定時: ${it.fallback}`}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div className="intg-test">
+          <button className="btn sm sec" disabled={testing} onClick={runTest}>{testing ? 'テスト中…' : '実Claude 接続テスト'}</button>
+          {testMsg ? <span className={testMsg.ok ? 'intg-ok' : 'intg-ng'}>{testMsg.ok ? '✓ ' : '✗ '}{testMsg.message}</span> : null}
+          <span className="intg-test-note">※ 最小1回だけ実呼び出し（約¥0.1）。鍵設定後の疎通確認に。</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { me } = useAuth();
   const usage = useApi<UsageDto>('/usage');
@@ -292,6 +341,9 @@ export default function SettingsPage() {
 
       {/* カード0: 版切替 */}
       <EditionCard />
+
+      {/* 外部連携の有効化状況 */}
+      <IntegrationsCard />
 
       {/* カード1: ワークスペース */}
       <div className="card" style={{ marginBottom: 16, maxWidth: 640 }}>

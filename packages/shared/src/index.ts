@@ -16,3 +16,4 @@ export * from './lift-test';
 export * from './agent';
 export * from './measurement';
 export * from './deals';
+export * from './integrations';

@@ -1394,3 +1394,20 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .deal-stage{padding:3px 8px;font-size:12px;font-weight:600;width:auto}
 .deal-stage.up{color:var(--good)}.deal-stage.down{color:var(--bad)}.deal-stage.ai{color:var(--primary)}
 @media(max-width:820px){.deal-kpis{grid-template-columns:1fr 1fr}}
+
+/* ===== 外部連携 有効化状況 (F-48) ===== */
+.intg-list{display:flex;flex-direction:column;gap:8px}
+.intg-row{display:flex;gap:10px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.intg-row.on{border-color:color-mix(in srgb,var(--good) 40%,transparent);background:color-mix(in srgb,var(--good-soft) 35%,var(--surface))}
+.intg-mark{font-weight:800;font-size:16px;color:var(--muted);width:18px;flex-shrink:0}
+.intg-row.on .intg-mark{color:var(--good)}
+.intg-main{flex:1;min-width:0}
+.intg-h{display:flex;align-items:center;gap:8px}
+.intg-h b{font-size:13.5px;color:var(--ink)}
+.intg-cat{font-size:10.5px;color:var(--primary);background:var(--primary-soft);border-radius:5px;padding:1px 7px}
+.intg-env{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;color:var(--muted);margin:2px 0}
+.intg-note{font-size:12px;color:var(--ink-2);line-height:1.5}
+.intg-test{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.intg-ok{font-size:12.5px;color:var(--good);font-weight:600}
+.intg-ng{font-size:12.5px;color:var(--bad);font-weight:600}
+.intg-test-note{font-size:11px;color:var(--muted)}
