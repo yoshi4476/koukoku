@@ -5,13 +5,31 @@ import { AppError } from '../common/errors';
 import { TrailService } from '../common/trail.service';
 import { AuthService, SESSION_COOKIE, verifySession } from './auth.service';
 
+/**
+ * セッションCookieの設定。
+ *
+ * Web と API を別ドメインに置く構成 (例: Web=Vercel / API=Railway) では、
+ * ブラウザから見て「クロスサイト」になるため SameSite=Lax ではCookieが送られず
+ * ログインできない。本番では SameSite=None + Secure にする必要がある
+ * (SameSite=None は Secure 必須。つまり HTTPS でしか動かない)。
+ *
+ * ローカル開発は http のため Lax のまま (同一サイト扱いで問題なく動く)。
+ * CROSS_SITE_COOKIE=false を明示すれば、同一ドメイン構成で Lax に固定できる。
+ */
+const IS_PROD = process.env.NODE_ENV === 'production';
+const CROSS_SITE = process.env.CROSS_SITE_COOKIE === 'false' ? false : IS_PROD;
+
 const COOKIE_OPTS = {
   httpOnly: true,
-  sameSite: 'lax' as const,
-  // ローカル開発はhttpのため secure なし。本番デプロイ時に secure: true を必須化
+  sameSite: (CROSS_SITE ? 'none' : 'lax') as 'none' | 'lax',
+  // SameSite=None は Secure 必須。本番は常に HTTPS 前提
+  secure: CROSS_SITE || IS_PROD,
   path: '/',
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
+
+/** clearCookie は set 時と同じ属性でないとブラウザが削除しない */
+const CLEAR_OPTS = { path: '/', sameSite: COOKIE_OPTS.sameSite, secure: COOKIE_OPTS.secure };
 
 @Controller('auth')
 export class AuthController {
@@ -51,7 +69,7 @@ export class AuthController {
 
   @Post('logout')
   logout(@Res({ passthrough: true }) res: Response): { ok: true } {
-    res.clearCookie(SESSION_COOKIE, { path: '/' });
+    res.clearCookie(SESSION_COOKIE, CLEAR_OPTS);
     return { ok: true };
   }
 

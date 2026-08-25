@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "pnpm --filter @adgrid/shared build && pnpm --filter @adgrid/web build",
+  "installCommand": "pnpm install --filter @adgrid/shared... --filter @adgrid/web...",
+  "outputDirectory": "apps/web/.next",
+  "framework": "nextjs"
+}

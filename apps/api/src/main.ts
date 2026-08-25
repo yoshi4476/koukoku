@@ -14,8 +14,20 @@ async function bootstrap() {
   app.use(cookieParser());
   // アップロードした画像・動画を /uploads/ で配信 (表示のみ。URLはcuidで推測困難)
   app.useStaticAssets(UPLOAD_DIR, { prefix: '/uploads/' });
+  // 許可オリジン。WEB_ORIGIN はカンマ区切りで複数指定できる (本番URL + プレビュー等)。
+  // Vercelのプレビューは毎回URLが変わるため、VERCEL_PREVIEW_SUFFIX で末尾一致も許可できる。
+  const allowed = (process.env.WEB_ORIGIN ?? 'http://localhost:3000')
+    .split(',').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean);
+  const previewSuffix = process.env.VERCEL_PREVIEW_SUFFIX?.trim();
   app.enableCors({
-    origin: process.env.WEB_ORIGIN ?? 'http://localhost:3000',
+    origin(origin, cb) {
+      // サーバ間呼出やcurl等 (Originなし) は許可する
+      if (!origin) return cb(null, true);
+      const o = origin.replace(/\/$/, '');
+      if (allowed.includes(o)) return cb(null, true);
+      if (previewSuffix && o.endsWith(previewSuffix)) return cb(null, true);
+      return cb(null, false); // 例外にせず、CORSヘッダを付けないことで拒否する
+    },
     credentials: true,
     allowedHeaders: ['content-type', 'x-tenant-id'],
   });
