@@ -153,6 +153,51 @@ model MeasurementConfig {
   @@map("measurement_configs")
 }
 
+// CV受信トークン (F-55)。公開エンドポイント /collect/:token は認証クッキーを持たないため、
+// テナント文脈なしで引ける必要がある。ShareLink と同じくRLSは付けず、token自体を秘密として扱う。
+model IngestToken {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  clientId  String   @map("client_id")
+  token     String   @unique
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([tenantId, clientId])
+  @@map("ingest_tokens")
+}
+
+// サーバーサイドCV (F-55)。クライアントのサイトから受信したコンバージョンを保持し、
+// Meta CAPI / GA4 Measurement Protocol へ転送する。eventId で重複排除する。
+model ConversionEvent {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  clientId     String   @map("client_id")
+  /** 媒体側のブラウザ計測と突合するための重複排除ID */
+  eventId      String   @map("event_id")
+  eventName    String   @default("Purchase") @map("event_name")
+  value        Float    @default(0)
+  currency     String   @default("JPY")
+  occurredAt   DateTime @map("occurred_at")
+  /** 個人情報はSHA-256ハッシュのみ保持 (平文は保存しない) */
+  emailHash    String   @default("") @map("email_hash")
+  phoneHash    String   @default("") @map("phone_hash")
+  gclid        String   @default("")
+  fbclid       String   @default("")
+  fbp          String   @default("")
+  sourceUrl    String   @default("") @map("source_url")
+  userAgent    String   @default("") @map("user_agent")
+  ipHash       String   @default("") @map("ip_hash")
+  metaStatus   String   @default("skipped") @map("meta_status") // sent / failed / skipped
+  ga4Status    String   @default("skipped") @map("ga4_status")
+  errorMessage String   @default("") @map("error_message")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([tenantId, clientId, eventId])
+  @@index([tenantId, clientId, occurredAt])
+  @@map("conversion_events")
+}
+
 // 成約(商談)パイプライン (F-47)。広告で獲得したCVを、商談→受注(成約)まで追跡し、
 // 成約率・受注額・粗利ROAS を可視化する。広告→CV→成約の"出口"を一気通貫にする。
 model Deal {
@@ -494,6 +539,12 @@ model MediaConnection {
   lastSyncedAt DateTime? @map("last_synced_at")
   lastSyncRows Int       @default(0) @map("last_sync_rows")
   errorMessage String    @default("") @map("error_message")
+
+  // OAuth実接続 (F-54)。リフレッシュトークンは AES-256-GCM で暗号化して保存する (平文保存禁止)
+  refreshTokenEnc String @default("") @map("refresh_token_enc")
+  /** Google広告のマネージャーアカウント(MCC) ID。ハイフン無しの数字 */
+  loginCustomerId String @default("") @map("login_customer_id")
+  authorizedAt    DateTime? @map("authorized_at")
 
   tenant Tenant @relation(fields: [tenantId], references: [id])
 

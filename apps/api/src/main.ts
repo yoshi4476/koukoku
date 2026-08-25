@@ -20,9 +20,11 @@ async function bootstrap() {
     allowedHeaders: ['content-type', 'x-tenant-id'],
   });
   app.useGlobalFilters(new AppExceptionFilter());
-  const port = Number(process.env.API_PORT ?? 4000);
-  await app.listen(port);
+  // PORT はホスティング(Railway等)が注入する。ローカルは API_PORT / 4000
+  const port = Number(process.env.PORT ?? process.env.API_PORT ?? 4000);
+  // コンテナ環境では 0.0.0.0 で待ち受けないと外部から到達できない
+  await app.listen(port, '0.0.0.0');
   // eslint-disable-next-line no-console
-  console.log(`ADGRID API listening on http://localhost:${port}`);
+  console.log(`ADGRID API listening on port ${port}`);
 }
 bootstrap();

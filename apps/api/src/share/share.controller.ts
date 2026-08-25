@@ -17,13 +17,13 @@ export class ShareController {
   @Post(':clientId/share')
   enable(@TenantId() tenantId: string, @SessionInfo() user: SessionInfoValue, @Param('clientId') clientId: string): Promise<ShareLinkDto> {
     assertEditor(user);
-    return this.share.enable(tenantId, clientId);
+    return this.share.enable(tenantId, clientId, user.userId);
   }
 
   @Delete(':clientId/share')
   disable(@TenantId() tenantId: string, @SessionInfo() user: SessionInfoValue, @Param('clientId') clientId: string): Promise<ShareLinkDto> {
     assertEditor(user);
-    return this.share.disable(tenantId, clientId);
+    return this.share.disable(tenantId, clientId, user.userId);
   }
 }
 

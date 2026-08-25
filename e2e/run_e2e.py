@@ -89,6 +89,11 @@ def main():
     st, pf2 = api(ag, f"/projects/{pid}/preflight")
     flagged = any(u["assetId"] == badAsset["id"] for u in (pf2.get("undeployable") or []))
     check("URL無しLPが配信不可として検出される", flagged)
+    # H-1 セキュリティ: 制作物urlのパストラバーサル/内部パス偽装を拒否 (削除時の越境ファイル操作を防ぐ)
+    st, _ = api(ag, f"/projects/assets/{badAsset['id']}", "PUT", {"url": "/uploads/t_demo_agency/../evil.png"})
+    check("制作物urlのパストラバーサルを拒否 (400)", st == 400, f"status={st}")
+    st, okurl = api(ag, f"/projects/assets/{badAsset['id']}", "PUT", {"url": "https://example.com/lp/e2e"})
+    check("正常なhttps urlは許可", st in (200, 201) and okurl.get("url") == "https://example.com/lp/e2e", f"status={st}")
     st, _ = api(ag, f"/projects/assets/{badAsset['id']}", "DELETE")
     check("配信できない制作物を削除できる", st in (200, 204))
     st, pf3 = api(ag, f"/projects/{pid}/preflight")
@@ -103,14 +108,78 @@ def main():
             return resp.status, json.loads(resp.read())
         except urllib.error.HTTPError as e:
             return e.code, None
+    # Slackの署名検証が有効(本番相当)なら、無署名リクエストは拒否されるのが正しい
+    st, intg0 = api(ag, "/integrations/status")
+    slack_signed = any(i.get("key") == "slack" and i.get("configured") for i in (intg0.get("items") or []))
     st, sh = slack("help")
-    check("Slack help に agent コマンドがある", st in (200, 201) and sh and "agent" in sh.get("text", ""), f"status={st}")
+    if slack_signed:
+        check("Slack署名検証が有効なら無署名は拒否 (401)", st == 401, f"status={st}")
+    else:
+        check("Slack help に agent コマンドがある", st in (200, 201) and sh and "agent" in sh.get("text", ""), f"status={st}")
 
     # AI運用エージェント (F-43): 1指示で 設定反映+クリエイティブ生成 まで一気通貫
     st, agr = api(ag, f"/projects/{pid}/agent", "POST", {"instruction": "月30万円で獲得を増やして。全国"})
-    check("AIエージェント一気通貫実行 (5ステップ)", st in (200, 201) and agr and len(agr.get("steps", [])) == 5, f"status={st}")
+    check("AIエージェント一気通貫実行 (6ステップ)", st in (200, 201) and agr and len(agr.get("steps", [])) == 6, f"status={st} steps={len(agr.get('steps', [])) if agr else '?'}")
+    step_keys = [s2.get("key") for s2 in (agr.get("steps") or [])] if agr else []
+    check("エージェントが検索キーワードまで設計する", "keywords" in step_keys, step_keys)
+    check("エージェントが入稿準備まで到達する", "publish" in step_keys, step_keys)
     check("エージェントが配信設定を反映 (月予算30万)", bool(agr) and agr["appliedSettings"]["monthlyBudgetTotal"] == 300000)
     check("エージェントが制作物を生成", bool(agr) and len(agr.get("createdAssetTitles", [])) >= 1)
+
+    # 媒体別 入稿シート (F-58): 媒体ごとに仕様が切り替わり、規定内に収まる
+    sheets = {}
+    for plat in ("google_ads", "meta", "line_ads"):
+        st, sh = api(ag, f"/projects/{pid}/launch-sheet?platform={plat}")
+        sheets[plat] = sh if st == 200 else None
+    check("媒体別の入稿シートを出力できる", all(v is not None for v in sheets.values()),
+          {k: (v is not None) for k, v in sheets.items()})
+    g, m, l = sheets["google_ads"], sheets["meta"], sheets["line_ads"]
+    if g and m and l:
+        check("媒体ごとに構成が切り替わる",
+              "キーワード" in g["structure"] and "広告セット" in m["structure"], f"{g['structure']} / {m['structure']}")
+        check("検索媒体だけキーワードを載せる", len(g["keywords"]) >= 0 and len(m["keywords"]) == 0, len(m["keywords"]))
+        check("Metaは本文枠・縦型画像を持つ",
+              len(m["primaryTexts"]) > 0 and any(i["ratio"] == "9:16" for i in m["images"]), len(m["primaryTexts"]))
+        check("LINEは3比率の画像仕様を返す", len(l["images"]) >= 3, len(l["images"]))
+        over = [t for sh in (g, m, l) for t in sh["headlines"] + sh["descriptions"] + sh["primaryTexts"] if not t["ok"]]
+        check("各媒体の文字数上限に収まるよう調整される（超過は3件以下）", len(over) <= 3, len(over))
+
+    # 検索キーワードの自動設計 (F-57): 意図の強い語を厚く、除外KWも返す
+    st, kplan = api(ag, f"/projects/{pid}/keyword-plan")
+    ok_kp = st == 200 and isinstance(kplan, dict) and len(kplan.get("keywords", [])) > 0
+    check("検索キーワードを自動設計できる", ok_kp, f"status={st}")
+    if ok_kp:
+        tiers = [k.get("tier") for k in kplan["keywords"]]
+        check("発注意図の強い語(now)が情報収集(explore)より多い",
+              tiers.count("now") > tiers.count("explore"), f"now={tiers.count('now')} explore={tiers.count('explore')}")
+        check("無駄クリックを防ぐ除外キーワードを返す", len(kplan.get("negatives", [])) >= 5, len(kplan.get("negatives", [])))
+        st, applied = api(ag, f"/projects/{pid}/keyword-plan/apply", "POST", {"plan": kplan})
+        check("キーワードを配信設定へ反映できる",
+              st in (200, 201) and applied and applied.get("keywordCount", 0) > 0, f"status={st}")
+
+    # Google広告への実入稿 (F-56): プランは不足を具体的に示し、準備不足なら実行を拒否する
+    st, lplan = api(ag, f"/projects/{pid}/launch-plan")
+    check("入稿プラン取得 (制作物→広告文の自動変換)",
+          st == 200 and isinstance(lplan, dict) and "ready" in lplan and isinstance(lplan.get("issues"), list), f"status={st}")
+    if isinstance(lplan, dict) and not lplan.get("ready"):
+        st, _ = api(ag, f"/projects/{pid}/launch", "POST", {})
+        check("入稿の準備不足は実行を拒否 (400)", st == 400, f"status={st}")
+
+    # CV受信 → GA4/Meta転送 (F-55)
+    st, cl2 = api(ag, "/clients")
+    ccid = cl2[0]["id"]
+    st, tok = api(ag, f"/clients/{ccid}/measurement/token", "POST", {})
+    check("CV受信トークン発行", st in (200, 201) and tok and len(tok.get("token", "")) > 30, f"status={st}")
+    api(ag, f"/clients/{ccid}/measurement", "PUT", {"ga4MeasurementId": "G-E2E", "metaPixelId": "", "serverSideEnabled": True, "enhancedConversions": True})
+    st, cv = api("", f"/collect/{tok['token']}", "POST", {"eventName": "Purchase", "eventId": "e2e-suite-cv", "value": 5000, "email": "E2E@Example.com"})
+    check("CVを認証なしで受信できる", st in (200, 201) and cv and cv.get("accepted"), f"status={st}")
+    st, cv2 = api("", f"/collect/{tok['token']}", "POST", {"eventName": "Purchase", "eventId": "e2e-suite-cv", "value": 5000})
+    check("同一eventIdは重複排除される", bool(cv2) and cv2.get("duplicate") is True, cv2)
+    st, _ = api("", "/collect/invalid_token_zzz", "POST", {"value": 1})
+    check("不正な計測トークンは404", st == 404, f"status={st}")
+    st, evs = api(ag, f"/clients/{ccid}/measurement/events")
+    check("受信CVに平文メールが保存されない",
+          st == 200 and isinstance(evs, list) and "e2e@example.com" not in json.dumps(evs).lower(), f"status={st}")
 
     # 外部連携 有効化状況 (F-48): 6連携の設定状況を返す
     st, intg = api(ag, "/integrations/status")
@@ -151,6 +220,34 @@ def main():
     st_off, _ = api("", f"/share/{token}")
     check("共有停止後は公開ポータル404", st_off == 404, f"status={st_off}")
 
+    # レポート配信 + 監査ログ (F-50)
+    st, rep = api(ag, "/reports/run", "POST", {"clientId": cid, "periodType": "weekly"})
+    rid = rep.get("id") if isinstance(rep, dict) else None
+    st, dl = api(ag, f"/reports/{rid}/deliver", "POST", {})
+    check("レポート配信 (共有リンク発行)", st in (200, 201) and isinstance(dl, dict) and "/share/" in dl.get("url", ""), f"status={st}")
+    ch = dl.get("channel") if isinstance(dl, dict) else None
+    check("配信チャネルが環境に応じて決まる (slack/link)", ch in ("slack", "link"), ch)
+    st, alog = api(ag, "/audit-log")
+    acts = [e["action"] for e in alog] if isinstance(alog, list) else []
+    check("監査ログ取得 (操作証跡)", st == 200 and isinstance(alog, list) and len(alog) > 0, f"status={st}")
+    check("監査ログにレポート配信・ログインが記録される", "report_delivered" in acts and "login" in acts, sorted(set(acts))[:8])
+    st, flog = api(ag, "/audit-log?action=report_delivered")
+    check("監査ログの操作フィルタが効く", st == 200 and isinstance(flog, list) and all(e["action"] == "report_delivered" for e in flog), f"status={st}")
+
+    # 自動反映ループ: 予算ペーシング → 承認キューへ提案 (F-51)
+    st, pac = api(ag, "/pacing")
+    check("予算ペーシング取得", st == 200 and isinstance(pac, list), f"status={st}")
+    st, aq0 = api(ag, "/proposals")
+    n0 = len(aq0) if isinstance(aq0, list) else 0
+    st, sweep = api(ag, "/pacing/propose", "POST", {})
+    okshape = st in (200, 201) and isinstance(sweep, dict) and sweep.get("scanned") == sweep.get("created", 0) + sweep.get("skipped", 0)
+    check("ペーシング自動提案スイープ (scanned=created+skipped)", okshape, f"status={st} {sweep if isinstance(sweep,dict) else ''}")
+    st, aq1 = api(ag, "/proposals")
+    n1 = len(aq1) if isinstance(aq1, list) else 0
+    check("作成分だけ承認キューが増える", isinstance(sweep, dict) and n1 == n0 + sweep.get("created", 0), f"{n0}->{n1}")
+    st, sweep2 = api(ag, "/pacing/propose", "POST", {})
+    check("再スイープは重複回避 (created=0)", isinstance(sweep2, dict) and sweep2.get("created", 0) == 0, sweep2 if isinstance(sweep2, dict) else st)
+
     # ---- 2. 提供先(clientScope) の分離。clienta@ は c_a に限定された提供先アクセス ----
     cl = login("clienta@adgrid.jp", PW)
     check("提供先ログイン", bool(cl))
@@ -175,6 +272,10 @@ def main():
     check("提供先はリセラー一覧を取得不可 (403)", st == 403, f"status={st}")
     st, _ = api(cl, "/projects", "POST", {"name": "x", "clientId": scope})
     check("提供先はプロジェクト作成不可 (403)", st == 403, f"status={st}")
+    st, _ = api(cl, "/audit-log")
+    check("提供先は監査ログを閲覧不可 (403)", st == 403, f"status={st}")
+    st, _ = api(cl, "/pacing/propose", "POST", {})
+    check("提供先は自動予算提案不可 (403)", st == 403, f"status={st}")
 
     # 提供先はフィードバック送信可 (ホワイトリスト内)
     st, _ = api(cl, "/feedback", "POST", {"message": "E2Eテスト送信"})
@@ -198,8 +299,23 @@ def main():
         check("プロジェクトに運用サイクル(5フェーズ)",
               all(s in body for s in ("AI自律運用サイクル", "クリエイティブ作成", "確認・承認", "広告出稿・入稿", "分析・提案", "改善実行")))
 
-        pg.get_by_role("button", name="配信設定").first.click(); pg.wait_for_timeout(800)
-        check("配信設定に業種別導線設計", "業種別 導線設計" in pg.content())
+        # タブは一気通貫の順序に番号付き (② 配信設定)
+        pg.get_by_role("button", name="配信設定").first.click(); pg.wait_for_timeout(1200)
+        body2 = pg.content()
+        check("配信設定に業種別導線設計", "業種別 導線設計" in body2)
+        check("配信設定に販促カレンダーが統合されている", "販促カレンダー" in body2)
+        # 改善タブに最適化ツールが統合されている
+        pg.get_by_role("button", name="改善").first.click(); pg.wait_for_timeout(2500)
+        body3 = pg.content()
+        check("改善タブに診断・キーワード・予算ペース・変更履歴が統合",
+              all(t in body3 for t in ("AI診断", "キーワード最適化", "予算ペース", "変更履歴")))
+        check("改善タブにA/B・増分効果テストが統合",
+              all(t in body3 for t in ("A/Bテスト", "増分効果テスト")))
+        # 報告タブでレポート生成〜配信まで到達できる
+        pg.get_by_role("button", name="報告").first.click(); pg.wait_for_timeout(1200)
+        body4 = pg.content()
+        check("報告タブにレポート生成とライブポータル",
+              "週次レポートを生成" in body4 and "ライブポータル" in body4)
 
         check("UIにページ例外なし", len(perr) == 0, f"errors={perr[:2]}")
         b.close()

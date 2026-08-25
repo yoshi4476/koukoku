@@ -17,8 +17,14 @@ export interface SessionPayload {
 export const SESSION_COOKIE = 'adgrid_session';
 
 function authSecret(): string {
-  // 本番では必ず AUTH_SECRET を設定する。ローカル開発のみのデフォルト
-  return process.env.AUTH_SECRET ?? 'adgrid-local-dev-secret-change-me';
+  // 空文字も未設定として扱う (?? だと '' が漏れて jwt.sign が例外→500 になるため || を使う)。
+  const s = process.env.AUTH_SECRET;
+  if (s) return s;
+  // 本番では必ず実値を設定する (未設定/空はfail-closed)。ローカル開発のみデフォルトで継続。
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('AUTH_SECRET must be set in production');
+  }
+  return 'adgrid-local-dev-secret-change-me';
 }
 
 export function signSession(payload: SessionPayload): string {

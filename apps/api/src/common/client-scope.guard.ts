@@ -19,7 +19,6 @@ const CLIENT_ALLOW: { m: string; re: RegExp }[] = [
   { m: 'GET', re: /^\/projects\/[^/]+\/(budget-plan|fatigue)$/ },
   { m: 'GET', re: /^\/projects\/assets\/[^/]+\/(advice|review)$/ },
   { m: 'GET', re: /^\/keywords\/(optimize|discover)$/ },
-  { m: 'GET', re: /^\/dashboard$/ },
   { m: 'GET', re: /^\/insights$/ },
   { m: 'GET', re: /^\/reports$/ },
   { m: 'GET', re: /^\/reports\/[^/]+\/(pdf|pptx)$/ },

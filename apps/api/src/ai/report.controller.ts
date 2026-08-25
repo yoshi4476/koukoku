@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpStatus, Param, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
-import type { ReportRunDto } from '@adgrid/shared';
+import type { ReportRunDto, ReportDeliveryDto } from '@adgrid/shared';
 import { isApprover } from '@adgrid/shared';
 import { ClientScope, SessionInfo, SessionInfoValue, TenantId } from '../common/tenant';
 import { AppError } from '../common/errors';
@@ -69,6 +69,23 @@ export class ReportController {
       throw new AppError(HttpStatus.FORBIDDEN, '実行権限がありません。', 'オーナーまたは管理者で操作してください。');
     }
     return this.scheduler.runWeeklyForAllTenants();
+  }
+
+  /** レポートをクライアントに配信する (F-50)。配信は owner/admin 限定 */
+  @Post(':id/deliver')
+  deliver(
+    @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
+    @ClientScope() scope: string | null,
+    @Param('id') id: string,
+  ): Promise<ReportDeliveryDto> {
+    if (!isApprover(user.role)) {
+      throw new AppError(HttpStatus.FORBIDDEN, '配信の権限がありません。', 'オーナーまたは管理者で操作してください。');
+    }
+    if (scope) {
+      throw new AppError(HttpStatus.FORBIDDEN, '配信は運用担当のみ実行できます。', '自社運用版で操作してください。');
+    }
+    return this.reports.deliver(tenantId, id, user);
   }
 
   @Post('run')

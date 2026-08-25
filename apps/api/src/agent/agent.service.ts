@@ -4,6 +4,8 @@ import { BID_STRATEGY_LABEL, DEFAULT_PROJECT_SETTINGS, PROJECT_GOAL_LABEL, build
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 import { ProjectsService } from '../projects/projects.service';
+import { KeywordPlanService } from '../projects/keyword-plan.service';
+import { LaunchService } from '../projects/launch.service';
 
 /**
  * AI運用エージェント (F-43)。1つの指示から、AIが最適な順序で
@@ -15,6 +17,8 @@ export class AgentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly projects: ProjectsService,
+    private readonly keywordPlan: KeywordPlanService,
+    private readonly launch: LaunchService,
   ) {}
 
   async run(tenantId: string, projectId: string, instruction: string, scope?: string | null): Promise<AgentRunDto> {
@@ -96,12 +100,31 @@ export class AgentService {
       status: 'done',
     });
 
-    // ステップ5: プレビュー・公開準備 (公開は最終確認を残す)
-    steps.push({
-      key: 'publish', title: '⑤ プレビュー → 公開準備',
-      detail: '制作物タブで見え方を確認し、「公開前チェック」→各制作物の「公開」で配信できます。公開は承認者の最終確認を通します。',
-      status: 'done',
-    });
+    // ステップ5: 検索キーワードを自動設計し配信設定へ反映 (CPAを決める最重要要素)
+    let kwDetail = 'キーワードを設計できませんでした。「② 配信設定」で手入力してください。';
+    try {
+      const kp = await this.keywordPlan.plan(tenantId, projectId);
+      const applied = await this.keywordPlan.apply(tenantId, projectId, kp);
+      const nowCount = kp.keywords.filter((k) => k.tier === 'now').length;
+      kwDetail = `検索意図の強い語を中心に ${applied.keywordCount}語（うち今すぐ客 ${nowCount}語）を設定。無駄クリックを防ぐ除外キーワード ${applied.negativeCount}語も登録`;
+    } catch {
+      /* キーワード設計の失敗で一気通貫を止めない */
+    }
+    steps.push({ key: 'keywords', title: '⑤ 検索キーワードを自動設計', detail: kwDetail, status: 'done' });
+
+    // ステップ6: 入稿準備 (実際の入稿は承認者の確認を通す)
+    let launchDetail = '「④ 掲示」の「Google広告へ入稿」から、一時停止の状態でキャンペーンを作成できます。';
+    let launchReady = false;
+    try {
+      const lp = await this.launch.plan(tenantId, projectId);
+      launchReady = lp.ready;
+      launchDetail = lp.ready
+        ? `入稿準備が整いました（日予算${Math.round(lp.dailyBudget).toLocaleString('ja-JP')}円 / 見出し${lp.headlines.length}本 / キーワード${lp.keywords.length}語）。「④ 掲示」の「入稿する」で一時停止のまま作成できます。`
+        : `あと少しで入稿できます: ${lp.issues[0]}`;
+    } catch {
+      /* 入稿プランが作れない場合も他ステップの結果は返す */
+    }
+    steps.push({ key: 'publish', title: '⑥ 入稿準備 → 公開', detail: launchDetail, status: launchReady ? 'done' : 'todo' });
 
     return {
       mocked: gen.mocked,

@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { Prisma, PrismaClient } from '@prisma/client';
 
 export type Tx = Prisma.TransactionClient;
@@ -17,8 +17,57 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     });
   }
 
+  private readonly logger = new Logger(PrismaService.name);
+
   async onModuleInit() {
     await this.$connect();
+    await this.assertTenantIsolation();
+  }
+
+  /**
+   * fail-closed: テナント分離(RLS)が本当に効いているかを起動時に実測する。
+   *
+   * 属性チェックだけでは不十分。PostgreSQLでは **テーブル所有者はRLSを迂回する** ため、
+   * 所有者ロール(Supabaseの postgres など)で接続すると BYPASSRLS が無くてもRLSが効かない。
+   * そこで存在しないテナントIDを設定して実際に行が見えないかを確認する。
+   */
+  private async assertTenantIsolation(): Promise<void> {
+    const fail = (msg: string) => {
+      if (process.env.NODE_ENV === 'production') throw new Error(msg);
+      this.logger.error(msg); // 開発では起動を継続するが強く警告する
+    };
+    try {
+      const roles = await this.$queryRaw<Array<{ current_user: string; bypassrls: boolean }>>(
+        Prisma.sql`SELECT current_user, rolbypassrls AS bypassrls FROM pg_roles WHERE rolname = current_user`,
+      );
+      const role = roles[0];
+      if (role?.bypassrls) {
+        return fail(
+          `致命的: アプリDBロール "${role.current_user}" は BYPASSRLS を持つためRLSが無効です。` +
+            'APP_DATABASE_URL に非特権ロール(adgrid_app)を設定してください。',
+        );
+      }
+
+      // 実測: 存在しないテナントを設定した状態で、RLS対象テーブルが1件も見えないこと
+      const probe = await this.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT set_config('app.tenant_id', '__rls_probe_no_such_tenant__', true)`;
+        const r = await tx.$queryRaw<Array<{ n: bigint }>>(
+          Prisma.sql`SELECT count(*)::bigint AS n FROM clients`,
+        );
+        return Number(r[0]?.n ?? 0);
+      });
+      if (probe > 0) {
+        return fail(
+          `致命的: テナント分離が機能していません (存在しないテナントで ${probe} 件が参照可能)。` +
+            `ロール "${role?.current_user}" がテーブル所有者の可能性があります。` +
+            'アプリは所有者以外の非特権ロール(adgrid_app)で接続してください。',
+        );
+      }
+      this.logger.log(`テナント分離OK (role=${role?.current_user})`);
+    } catch (e) {
+      if (process.env.NODE_ENV === 'production') throw e;
+      this.logger.warn(`テナント分離の検証をスキップ: ${(e as Error).message}`);
+    }
   }
 
   async onModuleDestroy() {

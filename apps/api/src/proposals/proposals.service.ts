@@ -49,6 +49,14 @@ export class ProposalsService {
     return readSettings(tenant?.settings).applyEnabled !== false; // 既定は有効
   }
 
+  /** 予算ペーシング自動提案(日次cron)のオプトイン。既定OFF (キルスイッチ applyEnabled とは独立) */
+  async getAutoPacingEnabled(tenantId: string): Promise<boolean> {
+    const tenant = await this.prisma.withTenant(tenantId, (tx) =>
+      tx.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } }),
+    );
+    return readSettings(tenant?.settings).autoPacingEnabled === true;
+  }
+
   async setApplyEnabled(tenantId: string, enabled: boolean, user: SessionInfoValue): Promise<boolean> {
     this.assertApprover(user);
     await this.assertAgencyEdition(tenantId);
@@ -240,9 +248,12 @@ export class ProposalsService {
         const connector = this.media.resolveConnector(
           proposal.adAccount.platform as Platform,
           (conn?.mode as 'mock' | 'oauth') ?? 'mock',
+          tenantId,
         );
         // campaignId 未指定 ('' 含む) はアカウント単位のフォールバックにする (?? は '' を通すため使わない)
         const campaignId = String(payload.campaignId ?? '').trim();
+        // 実API(Google広告)は customerId が必須。提案payloadに無ければ対象アカウントの外部IDを使う
+        if (!payload.customerId) payload.customerId = proposal.adAccount.externalAccountId;
         const result = await connector.applyChange({
           requiresApproval: true,
           approvalId: proposal.id,

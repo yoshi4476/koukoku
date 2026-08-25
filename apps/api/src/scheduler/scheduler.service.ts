@@ -5,6 +5,9 @@ import { PrismaClient } from '@prisma/client';
 import { ReportService } from '../ai/report.service';
 import { AlertsService } from '../alerts/alerts.service';
 import { MediaSyncService } from '../media-connector/sync.service';
+import { ProposalsService } from '../proposals/proposals.service';
+import { PacingProposalService } from '../insights/pacing-proposal.service';
+import type { SessionInfoValue } from '../common/tenant';
 import { PrismaService } from '../prisma/prisma.service';
 import { daysAgo } from '../metrics/metrics.service';
 
@@ -17,6 +20,12 @@ const ALERT_CRON = '0 * * * *';
 const SYNC_QUEUE_NAME = 'media-sync';
 // 当日分は3時間毎の増分同期 (別冊D §⑤。MVPは30日洗い替えで代替)
 const SYNC_CRON = '30 */3 * * *';
+const PACING_QUEUE_NAME = 'pacing-proposals';
+// JST 06:30 (= UTC 21:30) に予算逸脱→予算提案を自動下書き (F-51)。自動反映ONのテナントのみ
+const PACING_CRON = '30 21 * * *';
+
+// 自動スイープ用の合成セッション (承認者権限。列挙は管理者接続で行い、書込は withTenant/RLS)
+const SYSTEM_SESSION: SessionInfoValue = { userId: null, role: 'owner', clientScopeId: null };
 
 const LOCAL_REDIS_URL = 'redis://localhost:56379';
 const LOCAL_ADMIN_DB_URL =
@@ -31,6 +40,8 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private alertWorker: Worker | null = null;
   private syncQueue: Queue | null = null;
   private syncWorker: Worker | null = null;
+  private pacingQueue: Queue | null = null;
+  private pacingWorker: Worker | null = null;
   private connection: IORedis | null = null;
   // テナント一覧の列挙のみ管理者接続を使う (RLS下のアプリロールでは他テナントが見えないため)。
   // 業務データの読み書きは従来どおり withTenant (RLS) を通す。
@@ -41,6 +52,8 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly reports: ReportService,
     private readonly alerts: AlertsService,
     private readonly mediaSync: MediaSyncService,
+    private readonly proposals: ProposalsService,
+    private readonly pacingProposals: PacingProposalService,
   ) {}
 
   async onModuleInit() {
@@ -99,8 +112,22 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
         this.logger.error(`media sync job failed: ${err.message}`),
       );
 
+      this.pacingQueue = new Queue(PACING_QUEUE_NAME, { connection: this.connection });
+      await this.pacingQueue.upsertJobScheduler('daily', { pattern: PACING_CRON, tz: 'UTC' });
+      this.pacingWorker = new Worker(
+        PACING_QUEUE_NAME,
+        async () => {
+          const r = await this.runPacingProposalsForAllTenants();
+          this.logger.log(`pacing proposals: created ${r.created}, skipped ${r.skipped} across ${r.tenants} tenant(s)`);
+        },
+        { connection: this.connection },
+      );
+      this.pacingWorker.on('failed', (_job, err) =>
+        this.logger.error(`pacing proposal job failed: ${err.message}`),
+      );
+
       this.logger.log(
-        `scheduler ready (${QUEUE_NAME} ${WEEKLY_CRON} / ${ALERT_QUEUE_NAME} ${ALERT_CRON} / ${SYNC_QUEUE_NAME} ${SYNC_CRON} UTC)`,
+        `scheduler ready (${QUEUE_NAME} ${WEEKLY_CRON} / ${ALERT_QUEUE_NAME} ${ALERT_CRON} / ${SYNC_QUEUE_NAME} ${SYNC_CRON} / ${PACING_QUEUE_NAME} ${PACING_CRON} UTC)`,
       );
     } catch (e) {
       this.logger.warn(`scheduler disabled (redis unavailable): ${String(e)}`);
@@ -202,6 +229,39 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     return total;
   }
 
+  /**
+   * 全テナントの予算逸脱を検出し、承認キューに予算提案を自動下書き (F-51)。
+   * 自動ペーシング提案にオプトイン(autoPacingEnabled=true, 既定OFF)したテナントのみ対象。
+   * 実適用は人手承認を挟む。列挙のみ管理者接続
+   */
+  async runPacingProposalsForAllTenants(): Promise<{ created: number; skipped: number; tenants: number }> {
+    if (!this.adminPrisma) {
+      this.adminPrisma = new PrismaClient({
+        datasources: { db: { url: process.env.DATABASE_URL ?? LOCAL_ADMIN_DB_URL } },
+      });
+    }
+    const tenants = await this.adminPrisma.tenant.findMany({
+      where: { status: 'active' },
+      select: { id: true },
+    });
+    let created = 0;
+    let skipped = 0;
+    let active = 0;
+    for (const t of tenants) {
+      try {
+        if (!(await this.proposals.getAutoPacingEnabled(t.id))) continue; // 自動ペーシング提案にオプトインしたテナントのみ (既定OFF)
+        active++;
+        const r = await this.pacingProposals.sweep(t.id, SYSTEM_SESSION);
+        created += r.created;
+        skipped += r.skipped;
+      } catch (e) {
+        // 非エージェント版などは提案作成不可。best-effortで継続
+        this.logger.warn(`pacing proposal failed tenant=${t.id}: ${String(e)}`);
+      }
+    }
+    return { created, skipped, tenants: active };
+  }
+
   private async cleanup() {
     await this.worker?.close().catch(() => undefined);
     await this.queue?.close().catch(() => undefined);
@@ -209,11 +269,15 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     await this.alertQueue?.close().catch(() => undefined);
     await this.syncWorker?.close().catch(() => undefined);
     await this.syncQueue?.close().catch(() => undefined);
+    await this.pacingWorker?.close().catch(() => undefined);
+    await this.pacingQueue?.close().catch(() => undefined);
     this.connection?.disconnect();
     this.worker = null;
     this.queue = null;
     this.alertWorker = null;
     this.alertQueue = null;
+    this.pacingWorker = null;
+    this.pacingQueue = null;
     this.connection = null;
   }
 

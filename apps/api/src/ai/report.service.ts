@@ -1,12 +1,14 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { ReportResultSchema } from '@adgrid/shared';
-import type { ReportResult, ReportRunDto, AuditResult, PlatformBreakdownDto } from '@adgrid/shared';
+import type { ReportResult, ReportRunDto, ReportDeliveryDto, AuditResult, PlatformBreakdownDto } from '@adgrid/shared';
 import { PLATFORM_META } from '@adgrid/shared';
 import type { Platform } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 import { fmtYen } from '../common/format';
+import type { SessionInfoValue } from '../common/tenant';
 import { TrailService } from '../common/trail.service';
+import { ShareService } from '../share/share.service';
 import { MetricsService, Totals, daysAgo, isoDate } from '../metrics/metrics.service';
 import { LlmService } from './llm.service';
 import { OUTPUT_SCHEMAS, PROMPTS } from './prompt-registry';
@@ -40,7 +42,60 @@ export class ReportService {
     private readonly metrics: MetricsService,
     private readonly llm: LlmService,
     private readonly trail: TrailService,
+    private readonly share: ShareService,
   ) {}
+
+  /**
+   * レポートをクライアントに配信する (F-50)。
+   * SLACK_REPORT_WEBHOOK_URL があれば Slack へ投稿、なければ共有リンクを発行して「配信準備完了(リンク)」を返す。
+   * どちらでも 監査ログに report_delivered を記録する。
+   */
+  async deliver(tenantId: string, reportId: string, user: SessionInfoValue): Promise<ReportDeliveryDto> {
+    const { report, clientName } = await this.prisma.withTenant(tenantId, async (tx) => {
+      const report = await tx.report.findUnique({ where: { id: reportId } });
+      if (!report) throw new AppError(HttpStatus.NOT_FOUND, 'レポートが見つかりません。', 'レポート一覧から選び直してください。');
+      const client = await tx.client.findUnique({ where: { id: report.clientId }, select: { name: true } });
+      return { report, clientName: client?.name ?? 'クライアント' };
+    });
+
+    const token = await this.share.ensureToken(tenantId, report.clientId, user.userId);
+    const base = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
+    const url = `${base}/share/${token}`;
+    const period = isoDate(report.periodStart);
+
+    let channel: ReportDeliveryDto['channel'] = 'link';
+    let status: ReportDeliveryDto['status'] = 'ready';
+    const webhook = process.env.SLACK_REPORT_WEBHOOK_URL;
+    if (webhook) {
+      try {
+        const res = await fetch(webhook, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text: `📊 ${clientName} の広告レポート(${period}〜)\nライブポータル: ${url}` }),
+        });
+        if (res.ok) {
+          channel = 'slack';
+          status = 'sent';
+        }
+      } catch {
+        // Webhook不達時は共有リンクにフォールバック
+      }
+    }
+
+    await this.trail.record({
+      tenantId,
+      userId: user.userId,
+      action: 'report_delivered',
+      resource: reportId,
+      detail: { clientId: report.clientId, channel, url, period },
+    });
+
+    const message =
+      channel === 'slack'
+        ? `Slackに配信しました。ライブポータルのリンクも共有済みです。`
+        : `共有リンクを発行しました。このURLをクライアントに送ってください（ログイン不要で閲覧できます）。`;
+    return { reportId, clientId: report.clientId, channel, status, url, deliveredAt: new Date().toISOString(), message };
+  }
 
   private async buildInput(tenantId: string, clientId: string): Promise<ReportInput> {
     return this.prisma.withTenant(tenantId, async (tx) => {

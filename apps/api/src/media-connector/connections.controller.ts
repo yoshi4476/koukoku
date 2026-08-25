@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, HttpStatus, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpStatus, Param, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import type { AuthorizeResultDto, ConnectionDto, ConnectionStatus, Platform, SyncResultDto } from '@adgrid/shared';
 import { ALL_PLATFORMS } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
@@ -6,6 +7,8 @@ import { TenantId } from '../common/tenant';
 import { AppError } from '../common/errors';
 import { BillingService } from '../billing/billing.service';
 import { MediaSyncService } from './sync.service';
+import { GoogleAdsConnector } from './google-ads.connector';
+import { encryptSecret } from '../common/token-crypto';
 
 @Controller('connections')
 export class ConnectionsController {
@@ -43,6 +46,46 @@ export class ConnectionsController {
       throw new AppError(HttpStatus.BAD_REQUEST, '不明な媒体です。', '媒体を選び直してください。');
     }
     return this.sync.authorize(tenantId, platform as Platform);
+  }
+
+  /**
+   * Google OAuth コールバック (F-54)。認可コードをリフレッシュトークンに交換し暗号化保存する。
+   * ブラウザからの遷移先のため認証クッキーが無い場合があり、テナントは state で受け取る。
+   */
+  @Get('google_ads/callback')
+  async googleCallback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Query('error') error: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const web = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
+    const back = (q: string) => res.redirect(`${web}/connections?${q}`);
+    if (error) return back(`google=denied`);
+    if (!code || !state) return back(`google=invalid`);
+    try {
+      const { refreshToken } = await GoogleAdsConnector.exchangeCode(code);
+      await this.prisma.withTenant(state, (tx) =>
+        tx.mediaConnection.upsert({
+          where: { tenantId_platform: { tenantId: state, platform: 'google_ads' } },
+          update: {
+            mode: 'oauth', status: 'connected', errorMessage: '',
+            refreshTokenEnc: encryptSecret(refreshToken),
+            loginCustomerId: (process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID ?? '').replace(/[^0-9]/g, ''),
+            authorizedAt: new Date(),
+          },
+          create: {
+            tenantId: state, platform: 'google_ads', mode: 'oauth', status: 'connected',
+            refreshTokenEnc: encryptSecret(refreshToken),
+            loginCustomerId: (process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID ?? '').replace(/[^0-9]/g, ''),
+            authorizedAt: new Date(),
+          },
+        }),
+      );
+      return back('google=connected');
+    } catch {
+      return back('google=failed');
+    }
   }
 
   /** ウィザードStep3: アカウント選択+クライアント割当 → 接続確定+初回同期 */

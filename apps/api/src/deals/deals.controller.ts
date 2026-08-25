@@ -21,13 +21,13 @@ export class DealsController {
   @Post()
   create(@TenantId() tenantId: string, @SessionInfo() user: SessionInfoValue, @Body() body: CreateDealInput): Promise<DealDto> {
     assertEditor(user);
-    return this.deals.create(tenantId, body);
+    return this.deals.create(tenantId, body, user.userId);
   }
 
   @Put(':id')
   update(@TenantId() tenantId: string, @SessionInfo() user: SessionInfoValue, @Param('id') id: string, @Body() body: UpdateDealInput): Promise<DealDto> {
     assertEditor(user);
-    return this.deals.update(tenantId, id, body);
+    return this.deals.update(tenantId, id, body, user.userId);
   }
 
   @Delete(':id')

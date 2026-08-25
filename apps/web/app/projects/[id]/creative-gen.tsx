@@ -11,10 +11,13 @@ import { ErrorCard, SkeletonLines } from '@/components/ui';
  */
 export function CreativeGenerator({
   projectId,
+  briefPct,
   onAdopted,
   onClose,
 }: {
   projectId: string;
+  /** ヒアリング記入率。低いと広告文が一般論になるため警告を出す (F-52) */
+  briefPct?: number;
   onAdopted: () => void;
   onClose: () => void;
 }) {
@@ -53,6 +56,13 @@ export function CreativeGenerator({
 
   return (
     <div className="cgen">
+      {typeof briefPct === 'number' && briefPct < 60 ? (
+        <div className="brief-empty">
+          ⚠ <b>ヒアリングの記入率が {briefPct}% です。</b>
+          この状態だと、AIに渡す材料が足りず<b>どの会社にも当てはまる一般論</b>の広告文になります。
+          先に「ヒアリング」タブで<b>強み・実績・オファー</b>を埋めてください（サイトURLからの自動入力も使えます）。
+        </div>
+      ) : null}
       <p className="cgen-lead">
         この業種{data ? `（${data.industryLabel}）` : ''}とヒアリング内容から、<mark>訴求軸ちがいの広告案</mark>を作りました。
         良いものを選んで「制作物に採用」すると、下書きとして登録できます。<b>ヒアリングを詳しく入れるほど内容が具体的になります。</b>

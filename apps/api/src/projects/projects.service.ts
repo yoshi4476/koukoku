@@ -40,13 +40,14 @@ import { PrismaService, Tx } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 import { MetricsService, daysAgo } from '../metrics/metrics.service';
 import { AlertsService } from '../alerts/alerts.service';
+import { TrailService } from '../common/trail.service';
 import { LlmService } from '../ai/llm.service';
 import { PROMPTS, OUTPUT_SCHEMAS } from '../ai/prompt-registry';
 import { scanLawDictionary } from '../ai/law-dictionary';
 import { widthUnits } from '../ai/copy-limits';
 import type { SessionInfoValue } from '../common/tenant';
 import { mkdir, unlink, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { join, resolve, sep } from 'path';
 import { ALLOWED_UPLOAD, MAX_UPLOAD_BYTES, UPLOAD_DIR } from './upload.constants';
 
 const GOALS: ProjectGoal[] = ['conversion', 'awareness', 'traffic', 'store'];
@@ -72,6 +73,7 @@ export class ProjectsService {
     private readonly metrics: MetricsService,
     private readonly alerts: AlertsService,
     private readonly llm: LlmService,
+    private readonly trail: TrailService,
   ) {}
 
   private cpa(cost: number, conv: number): number | null {
@@ -395,7 +397,13 @@ export class ProjectsService {
       const data: Record<string, unknown> = {};
       if (typeof input.title === 'string' && input.title.trim()) data.title = input.title.trim();
       if (typeof input.content === 'string') data.content = input.content;
-      if (typeof input.url === 'string') data.url = input.url;
+      // url は外部LP等の http(s) か空のみ許可。/uploads の内部パスはアップロード処理でのみ設定し、
+      // ユーザー入力での偽装(パストラバーサル起点)を防ぐ。
+      if (typeof input.url === 'string') {
+        const u = input.url.trim();
+        if (u === '' || /^https?:\/\//i.test(u)) data.url = u;
+        else throw new AppError(HttpStatus.BAD_REQUEST, 'URLの形式が正しくありません。', 'http(s) で始まるURLを入力してください。');
+      }
       if (typeof input.note === 'string') data.note = input.note;
       if (input.status && ASSET_STATUSES.includes(input.status)) {
         data.status = input.status;
@@ -589,17 +597,30 @@ export class ProjectsService {
   }
 
   /** 制作物を削除する (F-35)。展開できない/不要な制作物の削除。アップロード実体も消す */
-  async deleteAsset(tenantId: string, assetId: string): Promise<{ ok: true }> {
+  async deleteAsset(tenantId: string, assetId: string, userId?: string | null): Promise<{ ok: true }> {
     const asset = await this.prisma.withTenant(tenantId, (tx) => tx.projectAsset.findUnique({ where: { id: assetId } }));
     if (!asset) {
       throw new AppError(HttpStatus.NOT_FOUND, '制作物が見つかりません。', '再読み込みしてください。');
     }
-    // アップロード実体があれば削除 (/uploads/<tenant>/... のみ対象)
+    // アップロード実体があれば削除 (/uploads/<tenant>/... のみ対象)。
+    // url は改ざんされうるため、解決後パスが必ず自テナントのuploads配下に収まることを検証し、
+    // ../ によるトラバーサル(他テナント/任意ファイル削除)を防ぐ。
     if (asset.url.startsWith(`/uploads/${tenantId}/`)) {
-      const rel = asset.url.replace(`/uploads/${tenantId}/`, '');
-      await unlink(join(UPLOAD_DIR, tenantId, rel)).catch(() => undefined);
+      const rel = asset.url.slice(`/uploads/${tenantId}/`.length);
+      const base = resolve(UPLOAD_DIR, tenantId);
+      const target = resolve(base, rel);
+      if (target === base || target.startsWith(base + sep)) {
+        await unlink(target).catch(() => undefined);
+      }
     }
     await this.prisma.withTenant(tenantId, (tx) => tx.projectAsset.delete({ where: { id: assetId } }));
+    await this.trail.record({
+      tenantId,
+      userId,
+      action: 'asset_deleted',
+      resource: assetId,
+      detail: { projectId: asset.projectId, type: asset.type, title: asset.title },
+    });
     return { ok: true };
   }
 
@@ -662,6 +683,13 @@ export class ProjectsService {
         where: { id: assetId },
         data: { status: 'published', publishedAt: new Date() },
       });
+    });
+    await this.trail.record({
+      tenantId,
+      userId: user.userId,
+      action: 'project_published',
+      resource: assetId,
+      detail: { projectId: row.projectId, type: row.type, title: row.title },
     });
     return toAssetDto(row as AssetRow);
   }

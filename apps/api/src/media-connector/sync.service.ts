@@ -21,8 +21,10 @@ export class MediaSyncService {
     private readonly trail: TrailService,
   ) {}
 
-  resolveConnector(platform: Platform, mode: 'mock' | 'oauth'): PlatformConnector {
-    if (mode === 'oauth' && platform === 'google_ads') return new GoogleAdsConnector();
+  resolveConnector(platform: Platform, mode: 'mock' | 'oauth', tenantId?: string): PlatformConnector {
+    if (mode === 'oauth' && platform === 'google_ads' && tenantId) {
+      return new GoogleAdsConnector(this.prisma, tenantId);
+    }
     return new MockConnector(platform);
   }
 
@@ -36,7 +38,7 @@ export class MediaSyncService {
       );
     }
     if (platform === 'google_ads' && GoogleAdsConnector.configured) {
-      return new GoogleAdsConnector().authorize(tenantId);
+      return new GoogleAdsConnector(this.prisma, tenantId).authorize(tenantId);
     }
     return new MockConnector(platform).authorize(tenantId);
   }
@@ -53,7 +55,7 @@ export class MediaSyncService {
         'API接続画面から媒体を接続してください。',
       );
     }
-    const connector = this.resolveConnector(conn.platform as Platform, conn.mode as 'mock' | 'oauth');
+    const connector = this.resolveConnector(conn.platform as Platform, conn.mode as 'mock' | 'oauth', tenantId);
     const since = isoDate(daysAgo(SYNC_WINDOW_DAYS - 1));
     const until = isoDate(daysAgo(0));
 

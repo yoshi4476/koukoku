@@ -5,16 +5,17 @@ import { ClientScopeGuard } from './common/client-scope.guard';
 import { MetricsService } from './metrics/metrics.service';
 import { DashboardController } from './metrics/dashboard.controller';
 import { ClientsController } from './clients/clients.controller';
-import { PortalController } from './portal/portal.controller';
 import { HomeController } from './home/home.controller';
 import { LlmService } from './ai/llm.service';
 import { ImageGenService } from './ai/image-gen.service';
+import { BriefExtractService } from './projects/brief-extract.service';
+import { LaunchService } from './projects/launch.service';
+import { KeywordPlanService } from './projects/keyword-plan.service';
+import { LaunchSheetService } from './projects/launch-sheet.service';
 import { AuditService } from './ai/audit.service';
 import { AuditController } from './ai/audit.controller';
 import { ReportService } from './ai/report.service';
 import { ReportController } from './ai/report.controller';
-import { CopyService } from './ai/copy.service';
-import { CopyController } from './ai/copy.controller';
 import { CsvService } from './imports/csv.service';
 import { ImportsController } from './imports/imports.controller';
 import { AuthService } from './auth/auth.service';
@@ -33,18 +34,16 @@ import { ConnectionsController } from './media-connector/connections.controller'
 import { ProposalsService } from './proposals/proposals.service';
 import { ProposalsController } from './proposals/proposals.controller';
 import { PacingController } from './insights/pacing.controller';
+import { PacingService } from './insights/pacing.service';
+import { PacingProposalService } from './insights/pacing-proposal.service';
 import { BenchmarkController } from './insights/benchmark.controller';
 import { AbTestsService } from './abtests/abtests.service';
 import { AbTestsController } from './abtests/abtests.controller';
 import { CalibrationService } from './calibration/calibration.service';
-import { KnowledgeService } from './knowledge/knowledge.service';
-import { KnowledgeController } from './knowledge/knowledge.controller';
 import { EvalController } from './eval/eval.controller';
 import { ChangeLogService } from './changelog/changelog.service';
 import { ChangeLogController } from './changelog/changelog.controller';
 import { SlackController } from './slack/slack.controller';
-import { DashboardsService } from './dashboards/dashboards.service';
-import { DashboardsController } from './dashboards/dashboards.controller';
 import { KeywordsService } from './keywords/keywords.service';
 import { KeywordsController } from './keywords/keywords.controller';
 import { ProjectsService } from './projects/projects.service';
@@ -59,12 +58,16 @@ import { ResellerService } from './reseller/reseller.service';
 import { ResellerController } from './reseller/reseller.controller';
 import { ShareService } from './share/share.service';
 import { ShareController, PublicShareController } from './share/share.controller';
+import { AuditLogService } from './audit-log/audit-log.service';
+import { AuditLogController } from './audit-log/audit-log.controller';
 import { LiftService } from './lift/lift.service';
 import { LiftController } from './lift/lift.controller';
 import { AgentService } from './agent/agent.service';
 import { AgentController } from './agent/agent.controller';
 import { MeasurementService } from './measurement/measurement.service';
 import { MeasurementController } from './measurement/measurement.controller';
+import { ConversionService } from './measurement/conversion.service';
+import { CollectController, ConversionAdminController } from './measurement/conversion.controller';
 import { DealsService } from './deals/deals.service';
 import { DealsController } from './deals/deals.controller';
 import { IntegrationsController } from './integrations/integrations.controller';
@@ -82,11 +85,9 @@ import { IntegrationsController } from './integrations/integrations.controller';
     PacingController,
     BenchmarkController,
     AbTestsController,
-    KnowledgeController,
     EvalController,
     ChangeLogController,
     SlackController,
-    DashboardsController,
     KeywordsController,
     ProjectsController,
     InsightsController,
@@ -95,18 +96,19 @@ import { IntegrationsController } from './integrations/integrations.controller';
     ResellerController,
     ShareController,
     PublicShareController,
+    AuditLogController,
     LiftController,
     AgentController,
     MeasurementController,
+    CollectController,
+    ConversionAdminController,
     DealsController,
     IntegrationsController,
     HomeController,
     DashboardController,
     ClientsController,
-    PortalController,
     AuditController,
     ReportController,
-    CopyController,
     ImportsController,
   ],
   providers: [
@@ -119,11 +121,11 @@ import { IntegrationsController } from './integrations/integrations.controller';
     BillingService,
     MediaSyncService,
     ProposalsService,
+    PacingService,
+    PacingProposalService,
     AbTestsService,
     CalibrationService,
-    KnowledgeService,
     ChangeLogService,
-    DashboardsService,
     KeywordsService,
     ProjectsService,
     InsightsService,
@@ -131,16 +133,21 @@ import { IntegrationsController } from './integrations/integrations.controller';
     FeedbackService,
     ResellerService,
     ShareService,
+    AuditLogService,
     LiftService,
     AgentService,
     MeasurementService,
+    ConversionService,
     DealsService,
     MetricsService,
     LlmService,
     ImageGenService,
+    BriefExtractService,
+    LaunchService,
+    KeywordPlanService,
+    LaunchSheetService,
     AuditService,
     ReportService,
-    CopyService,
     CsvService,
   ],
 })

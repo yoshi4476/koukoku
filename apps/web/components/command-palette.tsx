@@ -40,16 +40,10 @@ export function CommandPalette({
       { label: 'ホーム', href: '/', keywords: 'home kanri 司令室' },
       { label: 'プロジェクト', href: '/projects', keywords: 'projects purojekuto 施策 キャンペーン 案件' },
       { label: 'クライアント', href: '/clients', keywords: 'clients kuraianto 管理 一覧' },
-      { label: 'ダッシュボード', href: '/dashboard', keywords: 'dashboard kpi' },
-      { label: 'カスタムボード', href: '/boards', keywords: 'boards custom dashboard looker widget uijetto カスタム ボード ウィジェット' },
       { label: 'AI診断', href: '/audit', keywords: 'audit shindan 診断' },
       { label: 'キーワード最適化', href: '/keywords', keywords: 'keyword kiwado 最適化 入札 増額 減額 停止 ctr roi roas 効率' },
       { label: 'レポート', href: '/report', keywords: 'report houkoku' },
-      { label: '広告文', href: '/copy', keywords: 'copy koukokubun 生成' },
-      { label: 'A/Bテスト', href: '/abtests', keywords: 'abtest ab test kenshou 検定 勝者 有意差' },
-      { label: '勝ちパターン', href: '/knowledge', keywords: 'knowledge kachi pattern 勝ちパターン ナレッジ 資産 訴求 勝率', feature: 'knowledge' },
       { label: '予算ペース', href: '/pacing', keywords: 'pacing yosan pace 着地 消化 予測' },
-      { label: '媒体窓口', href: '/portal', keywords: 'portal baitai リンク' },
       { label: 'アラート', href: '/alerts', keywords: 'alerts arato 通知 検知 異常' },
       { label: '承認キュー', href: '/approvals', keywords: 'approvals shounin 承認 提案 適用 実行', feature: 'approvals' },
       { label: 'データ取込', href: '/import', keywords: 'import csv torikomi', feature: 'imports' },
@@ -75,7 +69,7 @@ export function CommandPalette({
       keywords: 'client kuraianto',
       run: () => {
         setSelectedClientId(c.id);
-        router.push('/dashboard');
+        router.push('/projects');
       },
     }));
     const actionItems: PaletteItem[] = [

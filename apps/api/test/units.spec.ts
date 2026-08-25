@@ -24,15 +24,24 @@ import {
   parseInstruction,
   computeDealSummary,
   measurementHealth,
+  lpScore,
+  LP_CHECK_ITEMS,
+  buildPacingProposal,
+  buildPacingProposals,
+  buildKeywordPlan,
+  launchableKeywords,
+  buildLaunchSheet,
+  adSpecFor,
+  sheetToText,
   DEFAULT_PROJECT_BRIEF,
 } from '@adgrid/shared';
+import type { PacingDto } from '@adgrid/shared';
 import { LlmService } from '../src/ai/llm.service';
 import { limitsFor, widthUnits } from '../src/ai/copy-limits';
 import { scanLawDictionary } from '../src/ai/law-dictionary';
 import { normalizeHeader, parseCsv, parseDate, parseNumber } from '../src/imports/csv.service';
 import { readSettings } from '../src/common/tenant-settings';
 import { runAllSuites } from '../src/eval/runner';
-import { metricValue } from '../src/dashboards/dashboards.service';
 import { efficiencyScore, recommendKeyword } from '../src/keywords/keyword-scoring';
 
 describe('widthUnits (全角=2/半角=1)', () => {
@@ -135,21 +144,6 @@ describe('業種ベンチマーク判定 (A-3)', () => {
   it('未知業種はotherにフォールバック', () => {
     expect(benchmarkFor('unknown').code).toBe('other');
     expect(benchmarkFor('ec').label).toBe('EC・物販');
-  });
-});
-
-describe('カスタムダッシュボードの指標計算 (B-5)', () => {
-  const t = { cost: 100000, impressions: 500000, clicks: 5000, conversions: 50, conversionValue: 400000 };
-  it('派生指標を正しく計算', () => {
-    expect(metricValue('cost', t)).toBe(100000);
-    expect(metricValue('cpa', t)).toBe(2000); // 100000/50
-    expect(metricValue('ctr', t)).toBe(1); // 5000/500000*100
-    expect(metricValue('cvr', t)).toBe(1); // 50/5000*100
-    expect(metricValue('roas', t)).toBe(400); // 400000/100000*100
-  });
-  it('ゼロ除算はnull', () => {
-    expect(metricValue('cpa', { ...t, conversions: 0 })).toBeNull();
-    expect(metricValue('ctr', { ...t, impressions: 0 })).toBeNull();
   });
 });
 
@@ -526,5 +520,201 @@ describe('業種別 導線設計 (F-28)', () => {
   it('人材は応募導線 (recruit)、未知業種は lead にフォールバック', () => {
     expect(buildFunnel('hr', 'conversion').archetype).toBe('recruit');
     expect(buildFunnel('___x___', 'conversion').archetype).toBe('lead');
+  });
+});
+
+describe('LP最適化スコア (F-49 ポストクリック)', () => {
+  it('チェック重みの合計が100点', () => {
+    expect(LP_CHECK_ITEMS.reduce((s, i) => s + i.weight, 0)).toBe(100);
+  });
+  it('未チェックは0点/bad、全チェックは100点/good', () => {
+    expect(lpScore([])).toMatchObject({ score: 0, grade: 'bad' });
+    const all = lpScore(LP_CHECK_ITEMS.map((i) => i.key));
+    expect(all.score).toBe(100);
+    expect(all.grade).toBe('good');
+    expect(all.topFixes).toHaveLength(0);
+  });
+  it('スコアはチェック項目の重み合計、境界は warn(50)/good(80)', () => {
+    // fv_value(18)+fv_cta(14)+form_minimal(14)+speed(12) = 58 → warn
+    const warn = lpScore(['fv_value', 'fv_cta', 'form_minimal', 'speed']);
+    expect(warn.score).toBe(58);
+    expect(warn.grade).toBe('warn');
+  });
+  it('改善提案は未達のうち重みの大きい順に最大3件', () => {
+    const r = lpScore(['cv_tag']); // 残り7項目が未達
+    expect(r.topFixes).toHaveLength(3);
+    expect(r.topFixes[0].label).toBe(LP_CHECK_ITEMS[0].label); // fv_value(18)が先頭
+    const weights = r.topFixes.map((f) => LP_CHECK_ITEMS.find((i) => i.label === f.label)!.weight);
+    expect(weights).toEqual([...weights].sort((a, b) => b - a));
+  });
+  it('未知のキーは無視する', () => {
+    expect(lpScore(['___nope___', 'fv_value']).score).toBe(18);
+  });
+});
+
+describe('ペーシング→予算提案の自動生成 (F-51)', () => {
+  const base: PacingDto = {
+    adAccountId: 'a1', accountName: 'テストAcc', clientName: 'C', platform: 'google',
+    monthlyBudget: 300000, monthToDateCost: 150000, projectedMonthEnd: 300000, projectedPct: 100,
+    recommendedDailyBudget: 10000, currentDailyAvg: 10000, status: 'on_track', runOutDate: null, daysLeft: 15,
+  };
+  it('順調(逸脱<15%)は提案しない', () => {
+    expect(buildPacingProposal({ ...base, projectedPct: 108, projectedMonthEnd: 324000, status: 'on_track' })).toBeNull();
+  });
+  it('超過ペースは増額提案 (実効ペースへright-size, 1000円丸め)', () => {
+    const d = buildPacingProposal({ ...base, projectedPct: 130, projectedMonthEnd: 390000, status: 'over' });
+    expect(d).not.toBeNull();
+    expect(d!.direction).toBe('increase');
+    expect(d!.newMonthlyBudget).toBe(390000);
+    expect(d!.confidence).toBe('high'); // 逸脱30%以上
+  });
+  it('未消化は減額提案', () => {
+    const d = buildPacingProposal({ ...base, projectedPct: 78, projectedMonthEnd: 234000, status: 'under' });
+    expect(d).not.toBeNull();
+    expect(d!.direction).toBe('decrease');
+    expect(d!.newMonthlyBudget).toBe(234000);
+    expect(d!.confidence).toBe('mid'); // 逸脱30%未満
+  });
+  it('消化ゼロ (データ不足) は提案しない', () => {
+    expect(buildPacingProposal({ ...base, monthToDateCost: 0, projectedPct: 130, status: 'over' })).toBeNull();
+  });
+  it('right-size後が現行と同額なら提案しない', () => {
+    expect(buildPacingProposal({ ...base, projectedPct: 120, projectedMonthEnd: 300000, status: 'over' })).toBeNull();
+  });
+  it('一覧からは提案対象だけを抽出する', () => {
+    const list: PacingDto[] = [
+      { ...base, adAccountId: 'x', projectedPct: 100, status: 'on_track' },
+      { ...base, adAccountId: 'y', projectedPct: 140, projectedMonthEnd: 420000, status: 'over' },
+    ];
+    const drafts = buildPacingProposals(list);
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0].adAccountId).toBe('y');
+  });
+});
+
+describe('検索キーワードの自動設計 (F-57)', () => {
+  const base = {
+    industryLabel: '広告運用', industryCode: 'other',
+    product: '広告運用代行', business: 'デジタルマーケティング支援', usp: 'LP制作まで一体対応', area: '',
+  };
+
+  it('発注意図の強い語 (now) を最も多く出す', () => {
+    const p = buildKeywordPlan(base);
+    const now = p.keywords.filter((k) => k.tier === 'now').length;
+    const explore = p.keywords.filter((k) => k.tier === 'explore').length;
+    expect(now).toBeGreaterThan(0);
+    // 情報収集はCPAが悪化するため最小限に抑える
+    expect(explore).toBeLessThan(now);
+  });
+
+  it('エリア指定があると地域×サービスの掛け合わせを作る', () => {
+    const p = buildKeywordPlan({ ...base, area: '大阪' });
+    expect(p.keywords.some((k) => k.text.includes('大阪'))).toBe(true);
+    expect(p.note).toContain('大阪');
+  });
+
+  it('「全国」「オンライン」は地域名として掛け合わせない', () => {
+    const p = buildKeywordPlan({ ...base, area: '全国 オンライン対応' });
+    expect(p.keywords.some((k) => k.text.includes('全国'))).toBe(false);
+  });
+
+  it('発注意思のない検索を除外キーワードに含める', () => {
+    const p = buildKeywordPlan(base);
+    for (const w of ['求人', '無料', '自分で', '転職']) expect(p.negatives).toContain(w);
+  });
+
+  it('業種ごとの除外キーワードが追加される', () => {
+    expect(buildKeywordPlan({ ...base, industryCode: 'beauty' }).negatives).toContain('セルフ');
+    expect(buildKeywordPlan({ ...base, industryCode: 'hr' }).negatives).toContain('退職');
+  });
+
+  it('キーワードは重複せず30字以内', () => {
+    const p = buildKeywordPlan({ ...base, area: '大阪 兵庫' });
+    const texts = p.keywords.map((k) => k.text);
+    expect(new Set(texts).size).toBe(texts.length);
+    for (const t of texts) expect(t.length).toBeLessThanOrEqual(30);
+  });
+
+  it('入稿対象は既定で情報収集層を除外する', () => {
+    const p = buildKeywordPlan(base);
+    const forLaunch = launchableKeywords(p);
+    const explore = p.keywords.filter((k) => k.tier === 'explore').map((k) => k.text);
+    for (const e of explore) expect(forLaunch).not.toContain(e);
+    expect(launchableKeywords(p, true).length).toBeGreaterThanOrEqual(forLaunch.length);
+  });
+
+  it('ヒアリングが空でも業種名から最低限の案を作る', () => {
+    const p = buildKeywordPlan({ ...base, product: '', business: '', usp: '' });
+    expect(p.keywords.length).toBeGreaterThan(0);
+  });
+});
+
+describe('媒体別 入稿シート (F-58)', () => {
+  const base = {
+    clientName: 'テスト社', projectName: '春の獲得',
+    headlines: ['短い見出し', 'これは30字を明確に超える非常に長い見出しの例で一文なので短縮できません'],
+    descriptions: ['短い説明。', '一文目です。二文目はここにあります。三文目もあります。'],
+    primaryTexts: ['一文目です。二文目はここにあります。'],
+    keywords: ['広告運用代行 大阪'], negatives: ['求人'],
+    monthlyBudget: 300000, targetCpa: 5000, finalUrl: 'https://example.com',
+    regions: '大阪', audience: '経営者', startDate: null, endDate: null,
+  };
+
+  it('媒体ごとに構成・文字数・画像仕様が切り替わる', () => {
+    const g = buildLaunchSheet({ ...base, platform: 'google_ads' })!;
+    const m = buildLaunchSheet({ ...base, platform: 'meta' })!;
+    expect(g.structure).toContain('キーワード');
+    expect(m.structure).toContain('広告セット');
+    // Metaは見出し40字・本文枠あり、Googleは見出し30字・本文枠なし
+    expect(adSpecFor('google_ads')!.headline.maxLen).toBe(30);
+    expect(adSpecFor('meta')!.headline.maxLen).toBe(40);
+    expect(m.primaryTexts.length).toBeGreaterThan(0);
+    expect(g.primaryTexts.length).toBe(0);
+    expect(m.images.some((i) => i.ratio === '9:16')).toBe(true);
+  });
+
+  it('検索媒体だけキーワードを載せる', () => {
+    expect(buildLaunchSheet({ ...base, platform: 'google_ads' })!.keywords.length).toBe(1);
+    expect(buildLaunchSheet({ ...base, platform: 'meta' })!.keywords.length).toBe(0);
+    expect(buildLaunchSheet({ ...base, platform: 'line_ads' })!.negatives.length).toBe(0);
+  });
+
+  it('上限超過は文単位で短縮し、印を付ける', () => {
+    const sheet = buildLaunchSheet({
+      ...base, platform: 'line_ads',
+      descriptions: ['一文目です。二文目には広告運用代行の強みと実績をできるだけ具体的に書いています。三文目にはさらに詳しい説明を追加して合計が七十五文字の上限を確実に超えるようにしています。四文目も念のため足しておきます。'],
+    })!;
+    const d = sheet.descriptions[0];
+    expect(d.len).toBeLessThanOrEqual(adSpecFor('line_ads')!.description.maxLen);
+    expect(d.shortened).toBe(true);
+    // 文の途中で切らない
+    expect(/[。！？]$/.test(d.text)).toBe(true);
+  });
+
+  it('1文でも収まらない必須項目は超過として残し修正を促す', () => {
+    const sheet = buildLaunchSheet({ ...base, platform: 'google_ads' })!;
+    const over = sheet.headlines.filter((h) => !h.ok);
+    expect(over.length).toBeGreaterThan(0);
+    expect(sheet.issues.some((i) => i.includes('文字数超過'))).toBe(true);
+  });
+
+  it('不足があれば ready=false、揃えば ready=true', () => {
+    expect(buildLaunchSheet({ ...base, platform: 'google_ads', finalUrl: '' })!.ready).toBe(false);
+    expect(buildLaunchSheet({ ...base, platform: 'google_ads', monthlyBudget: 0 })!.ready).toBe(false);
+    const ok = buildLaunchSheet({
+      ...base, platform: 'google_ads',
+      headlines: ['見出しA', '見出しB', '見出しC'],
+      descriptions: ['説明文A。', '説明文B。'],
+    })!;
+    expect(ok.ready).toBe(true);
+  });
+
+  it('仕様が無い媒体は null を返す', () => {
+    expect(buildLaunchSheet({ ...base, platform: 'criteo' })).toBeNull();
+  });
+
+  it('テキスト書き出しに主要セクションが含まれる', () => {
+    const t = sheetToText(buildLaunchSheet({ ...base, platform: 'google_ads' })!);
+    for (const sec of ['【設定】', '【見出し】', '【キーワード】', '【入稿前チェック】']) expect(t).toContain(sec);
   });
 });

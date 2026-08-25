@@ -8,6 +8,7 @@ import type {
   AssetStatus,
   AssetType,
   BidStrategy,
+  BriefExtractDto,
   BudgetPlanDto,
   CreateAssetInput,
   DailyPointDto,
@@ -48,20 +49,29 @@ import { PreflightPanel } from './preflight-panel';
 import { KpiPlanner } from './kpi-planner';
 import { UtmTool } from './utm-tool';
 import { AgentPanel } from './agent-panel';
+import { LpOptimizer } from './lp-optimizer';
+import { ReportTab } from './report-tab';
+import { ImproveTools } from './improve-tools';
+import { ExperimentTools } from './experiment-tools';
+import { SeasonCalendar } from './season-calendar';
+import { LaunchPanel } from './launch-panel';
+import { KeywordPlanner } from './keyword-planner';
+import { LaunchSheet } from './launch-sheet';
 import { CONNECTION_STATUS_META, INDUSTRY_LABEL } from '@/lib/labels';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
 
-type Tab = 'agent' | 'cycle' | 'overview' | 'hearing' | 'delivery' | 'settings' | 'assets' | 'alerts' | 'improve';
+type Tab = 'agent' | 'cycle' | 'hearing' | 'settings' | 'assets' | 'delivery' | 'overview' | 'improve' | 'report';
+// 一気通貫の順序: 材料 → 設定 → 制作 → 配信 → 成果 → 改善 → 報告
 const TABS: { key: Tab; label: string }[] = [
   { key: 'agent', label: '🤖 AIエージェント' },
   { key: 'cycle', label: '🔄 運用サイクル' },
-  { key: 'overview', label: '概要（推移）' },
-  { key: 'hearing', label: 'ヒアリング' },
-  { key: 'delivery', label: '掲示' },
-  { key: 'settings', label: '配信設定' },
-  { key: 'assets', label: '制作物' },
-  { key: 'alerts', label: 'アラート' },
-  { key: 'improve', label: '改善' },
+  { key: 'hearing', label: '① ヒアリング' },
+  { key: 'settings', label: '② 配信設定' },
+  { key: 'assets', label: '③ 制作物' },
+  { key: 'delivery', label: '④ 掲示' },
+  { key: 'overview', label: '⑤ 成果' },
+  { key: 'improve', label: '⑥ 改善' },
+  { key: 'report', label: '⑦ 報告' },
 ];
 
 const BRIEF_FIELDS: { key: keyof ProjectBrief; label: string; ph: string; long?: boolean }[] = [
@@ -129,6 +139,30 @@ function HearingTab({ project, onSaved }: { project: ProjectDetailDto; onSaved: 
   const [error, setError] = useState<ApiError | null>(null);
   const set = (k: keyof ProjectBrief, v: string) => { setB((p) => ({ ...p, [k]: v })); setSaved(false); };
 
+  // サイトURLからヒアリングを自動入力 (F-52)
+  const [siteUrl, setSiteUrl] = useState('');
+  const [extracting, setExtracting] = useState(false);
+  const [extracted, setExtracted] = useState<BriefExtractDto | null>(null);
+  const extractFromUrl = () => {
+    if (!siteUrl.trim()) return;
+    setExtracting(true); setError(null); setExtracted(null);
+    apiPost<BriefExtractDto>(`/projects/${project.id}/brief/from-url`, { url: siteUrl.trim() })
+      .then((r) => {
+        // 空欄のみ埋める。担当者がすでに書いた内容は上書きしない
+        setB((p) => {
+          const next = { ...p };
+          for (const [k, v] of Object.entries(r.brief)) {
+            const key = k as keyof ProjectBrief;
+            if (typeof v === 'string' && v && !next[key].trim()) next[key] = v;
+          }
+          return next;
+        });
+        setExtracted(r); setSaved(false);
+      })
+      .catch((e: unknown) => setError(toApiError(e)))
+      .finally(() => setExtracting(false));
+  };
+
   const comp = useMemo(() => briefCompleteness(b), [b]);
   const profile = industryProfileFor(project.industryCode);
 
@@ -150,7 +184,6 @@ function HearingTab({ project, onSaved }: { project: ProjectDetailDto; onSaved: 
       .catch((e: unknown) => setError(toApiError(e)))
       .finally(() => setBusy(false));
   };
-  const makeCopy = () => { setSelectedClientId(project.clientId); router.push('/copy'); };
 
   const compCls = comp.pct >= 100 ? 'up' : comp.pct >= 60 ? 'warn' : 'down';
 
@@ -170,6 +203,34 @@ function HearingTab({ project, onSaved }: { project: ProjectDetailDto; onSaved: 
               : `あと${comp.missing.length}項目でフル活用できます。しっかり記入するほど、成果の出る広告になります。`}
           </p>
         </div>
+
+        {canEdit ? (
+          <div className="brief-url">
+            <div className="brief-url-h">🔎 サイトURLから自動入力</div>
+            <p className="brief-url-desc">
+              クライアントのサイトURLを入れると、AIがページを読んで<mark>空欄のヒアリング項目だけ</mark>を埋めます。
+              入力済みの内容は上書きしません。<b>ヒアリングが空のままだと、広告文はどの会社にも当てはまる一般論になります。</b>
+            </p>
+            <div className="brief-url-row">
+              <input
+                className="input" value={siteUrl} placeholder="https://example.co.jp"
+                onChange={(e) => setSiteUrl(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') extractFromUrl(); }}
+              />
+              <button type="button" className="btn sm pri" disabled={extracting || !siteUrl.trim()} onClick={extractFromUrl}>
+                {extracting ? '読み取り中…' : '読み取る'}
+              </button>
+            </div>
+            {extracted ? (
+              <div className={`brief-url-res ${extracted.filledKeys.length > 0 ? 'ok' : 'warn'}`}>
+                {extracted.filledKeys.length > 0
+                  ? <>✓ {extracted.filledKeys.length}項目を自動入力しました。<b>内容を確認・修正してから「ヒアリングを保存」</b>を押してください。</>
+                  : <>読み取れる情報が見つかりませんでした。別のページ（会社概要・サービス紹介など）でお試しください。</>}
+                {extracted.caution ? <div className="brief-url-caution">⚠ {extracted.caution}</div> : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {BRIEF_FIELDS.map((f) => (
           <div className="field" key={f.key}>
@@ -202,7 +263,6 @@ function HearingTab({ project, onSaved }: { project: ProjectDetailDto; onSaved: 
             {draft.map((l, i) => <div key={i} className="hear-draft-line">{l}</div>)}
           </div>
           <p className="hear-draft-note">この型をベースに広告文を作ると、{profile.label}で成果が出やすくなります。</p>
-          <button className="btn sm pri" onClick={makeCopy}>この内容で広告文を作る →</button>
         </div>
       </div>
     </div>
@@ -230,7 +290,6 @@ function MediaPlanBox({ project, onApply }: { project: ProjectDetailDto; onApply
       conversionPoint: plan.conversionPoint,
     });
   };
-  const makeCopy = () => { setSelectedClientId(project.clientId); router.push('/copy'); };
 
   return (
     <div className="plan-box">
@@ -271,7 +330,6 @@ function MediaPlanBox({ project, onApply }: { project: ProjectDetailDto; onApply
           <p className="plan-note">💡 {plan.note}</p>
           <div className="f-actions">
             <button type="button" className="btn pri" onClick={apply}>この内容を下の設定に反映</button>
-            <button type="button" className="btn sec" onClick={makeCopy}>この訴求で広告文を作る →</button>
           </div>
         </div>
       ) : null}
@@ -354,6 +412,16 @@ function SettingsTab({ project, onSaved }: { project: ProjectDetailDto; onSaved:
             onChange={(e) => set('targetCv', numOrNull(e.target.value))} placeholder="例: 260 — 概要タブで達成ペースを表示" /></div>
 
         <div className="set-group">🎯 ターゲティング</div>
+        <div className="set-row">
+          <div className="field" style={{ flex: '1 1 100%' }}>
+            <KeywordPlanner projectId={project.id} canEdit={canEdit} onSaved={onSaved} />
+            <label style={{ marginTop: 12 }}>検索キーワード（入稿に使います）</label>
+            <textarea className="textarea" rows={3} value={s.keywords} disabled={!canEdit}
+              onChange={(e) => set('keywords', e.target.value)}
+              placeholder="1行に1語、または読点区切り（例: 広告運用代行 大阪）" />
+            <span className="set-hint">ここに入れた語が「④ 掲示」からGoogle広告へ<b>フレーズ一致</b>で入稿されます。</span>
+          </div>
+        </div>
         <div className="set-row">
           <div className="field"><label>対象地域</label>
             <input className="input" value={s.regions} disabled={!canEdit} onChange={(e) => set('regions', e.target.value)} placeholder="例: 全国 / 東京・神奈川" /></div>
@@ -569,6 +637,7 @@ function AssetCard({ asset, project, canPublish, canEdit, onChanged }: {
   const [error, setError] = useState<ApiError | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showLp, setShowLp] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [pubError, setPubError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -632,6 +701,7 @@ function AssetCard({ asset, project, canPublish, canEdit, onChanged }: {
       {error ? <div style={{ fontSize: 11.5, color: 'var(--bad)' }}>{error.message}</div> : null}
       <div className="asset-actions">
         <button className="btn sm sec" disabled={busy} onClick={() => setShowPreview(true)}>👁 プレビュー</button>
+        {asset.type === 'lp' ? <button className="btn sm sec" onClick={() => setShowLp(true)}>🖥 LP最適化</button> : null}
         {canEdit ? (
           <>
             <button className="btn sm sec" disabled={busy} onClick={() => fileRef.current?.click()}>
@@ -669,6 +739,11 @@ function AssetCard({ asset, project, canPublish, canEdit, onChanged }: {
       {showPreview ? (
         <Modal title={`広告プレビュー — ${asset.title}`} onClose={() => setShowPreview(false)}>
           <AdPreview asset={asset} project={project} showBanner onAssetChanged={onChanged} />
+        </Modal>
+      ) : null}
+      {showLp ? (
+        <Modal title={`🖥 LP最適化 — ${asset.title}`} onClose={() => setShowLp(false)} wide>
+          <LpOptimizer assetId={asset.id} url={asset.url} />
         </Modal>
       ) : null}
       {showConfirm ? (
@@ -721,7 +796,12 @@ function AssetsTab({ project, onChanged }: { project: ProjectDetailDto; onChange
         ) : null}
         {showGen ? (
           <Modal title="🎨 業種に合わせてAIでクリエイティブ作成" onClose={() => setShowGen(false)} wide>
-            <CreativeGenerator projectId={project.id} onAdopted={onChanged} onClose={() => setShowGen(false)} />
+            <CreativeGenerator
+              projectId={project.id}
+              briefPct={briefCompleteness(project.brief).pct}
+              onAdopted={onChanged}
+              onClose={() => setShowGen(false)}
+            />
           </Modal>
         ) : null}
         {showForm ? <AddAssetForm projectId={project.id} types={fitTypes} onDone={() => { setShowForm(false); onChanged(); }} onCancel={() => setShowForm(false)} /> : null}
@@ -878,20 +958,22 @@ function ImproveTab({ project, goFiltered }: { project: ProjectDetailDto; goFilt
       </div>
 
       {/* 改善アクション */}
-      <div className="card">
-        <div className="c-head"><h2>改善アクション</h2></div>
-        <div className="c-body form-grid">
-          <p style={{ margin: 0, fontSize: 14, color: 'var(--ink-2)' }}>
-            未対応の改善提案は <b className="num" style={{ color: project.openFindings > 0 ? 'var(--warn)' : 'var(--good)' }}>{project.openFindings}件</b> です。
-          </p>
-          <div className="proj-actions">
-            {isAgency ? <button className="btn pri" onClick={() => goFiltered('/audit')}>🩺 AI診断</button> : null}
-            <button className="btn sec" onClick={() => goFiltered('/keywords')}>🔍 キーワード最適化・発見</button>
-            {isAgency ? <button className="btn sec" onClick={() => goFiltered('/approvals')}>✅ 承認キュー</button> : null}
-            <button className="btn sec" onClick={() => goFiltered('/report')}>📄 レポート{isAgency ? '作成' : ''}</button>
+      {/* 最適化ツールをこのタブ内で完結させる (F-53) */}
+      {/* 診断・予算ペース・変更履歴・実験は運用担当の操作領域 (提供先版では非表示) */}
+      {isAgency ? (
+        <>
+          <ImproveTools clientId={project.clientId} accounts={project.accounts} openFindings={project.openFindings} />
+          <ExperimentTools clientId={project.clientId} />
+        </>
+      ) : null}
+
+      {isAgency ? (
+        <div className="card">
+          <div className="c-body proj-actions">
+            <button className="btn sec" onClick={() => goFiltered('/approvals')}>✅ 承認キューを開く（変更の適用はここ）</button>
           </div>
         </div>
-      </div>
+      ) : null}
     </>
   );
 }
@@ -950,7 +1032,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 {t.label}
                 {t.key === 'hearing' ? <span className="wtab-count">{briefCompleteness(d.brief).pct}%</span> : null}
                 {t.key === 'assets' && d.assets.length > 0 ? <span className="wtab-count">{d.assets.length}</span> : null}
-                {t.key === 'alerts' && d.alerts.length > 0 ? <span className="wtab-count">{d.alerts.length}</span> : null}
+                {t.key === 'overview' && d.alerts.length > 0 ? <span className="wtab-count warn">{d.alerts.length}</span> : null}
                 {t.key === 'improve' && d.openFindings > 0 ? <span className="wtab-count">{d.openFindings}</span> : null}
               </button>
             ))}
@@ -977,15 +1059,39 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
               </div>
               <div className="card">
                 <div className="c-head"><h2>消化額の推移 (直近14日)</h2>
-                  <button className="btn sm sec" style={{ marginLeft: 'auto' }} onClick={() => goFiltered('/dashboard')}>詳しいダッシュボードへ</button>
                 </div>
                 <div className="c-body"><TrendChart points={d.trend} /></div>
               </div>
+
+              {/* アラート: 成果とあわせて見る */}
+          
+            <div className="card">
+              <div className="c-head"><h2>このプロジェクトのアラート</h2>
+                {isAgency ? <button className="btn sm sec" style={{ marginLeft: 'auto' }} onClick={() => goFiltered('/alerts')}>アラート設定へ</button> : null}
+              </div>
+              <div className="c-body">
+                {d.alerts.length === 0 ? (
+                  <p style={{ margin: 0, color: 'var(--good)', fontWeight: 600 }}>✓ 対応が必要なアラートはありません。</p>
+                ) : (
+                  <div className="proj-alerts">
+                    {d.alerts.map((e) => (
+                      <div key={e.id} className={`proj-alert ${e.severity}`}>
+                        <div className="pa-title">{e.title}</div>
+                        <div className="pa-body">{e.accountName}: {e.body.replace(`${e.accountName}: `, '')}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
             </>
           ) : null}
 
           {/* --- 掲示 --- */}
           {tab === 'delivery' ? (
+            <>
+            {isAgency ? <LaunchPanel projectId={d.id} /> : null}
+            {isAgency ? <LaunchSheet projectId={d.id} platforms={d.accounts.map((a) => a.platform)} /> : null}
             <div className="card">
               <div className="c-head"><h2>掲示（配信中の媒体）</h2>
                 {isAgency ? <button className="btn sm sec" style={{ marginLeft: 'auto' }} onClick={() => goFiltered('/connections')}>媒体接続を管理</button> : null}
@@ -1011,42 +1117,28 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
                 </table>
               </div>
             </div>
+            </>
           ) : null}
 
           {/* --- ヒアリング --- */}
           {tab === 'hearing' ? <HearingTab project={d} onSaved={detail.refresh} /> : null}
 
           {/* --- 配信設定 --- */}
-          {tab === 'settings' ? <SettingsTab project={d} onSaved={detail.refresh} /> : null}
+          {tab === 'settings' ? (
+            <>
+              <SettingsTab project={d} onSaved={detail.refresh} />
+              <SeasonCalendar industryCode={d.industryCode} startDate={d.settings.startDate} endDate={d.settings.endDate} />
+            </>
+          ) : null}
 
           {/* --- 制作物 --- */}
           {tab === 'assets' ? <AssetsTab project={d} onChanged={detail.refresh} /> : null}
 
-          {/* --- アラート --- */}
-          {tab === 'alerts' ? (
-            <div className="card">
-              <div className="c-head"><h2>このプロジェクトのアラート</h2>
-                {isAgency ? <button className="btn sm sec" style={{ marginLeft: 'auto' }} onClick={() => goFiltered('/alerts')}>アラート設定へ</button> : null}
-              </div>
-              <div className="c-body">
-                {d.alerts.length === 0 ? (
-                  <p style={{ margin: 0, color: 'var(--good)', fontWeight: 600 }}>✓ 対応が必要なアラートはありません。</p>
-                ) : (
-                  <div className="proj-alerts">
-                    {d.alerts.map((e) => (
-                      <div key={e.id} className={`proj-alert ${e.severity}`}>
-                        <div className="pa-title">{e.title}</div>
-                        <div className="pa-body">{e.accountName}: {e.body.replace(`${e.accountName}: `, '')}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : null}
-
           {/* --- 改善 --- */}
           {tab === 'improve' ? <ImproveTab project={d} goFiltered={goFiltered} /> : null}
+
+          {/* --- 報告 --- */}
+          {tab === 'report' ? <ReportTab clientId={d.clientId} clientName={d.clientName} /> : null}
         </>
       ) : null}
     </>

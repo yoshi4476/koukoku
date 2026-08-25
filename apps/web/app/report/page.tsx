@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { ReportRunDto } from '@adgrid/shared';
+import type { ReportRunDto, ReportDeliveryDto } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
 import { ErrorCard, HintBar, MockBadge, SkeletonLines } from '@/components/ui';
@@ -10,6 +10,60 @@ import { REPORT_SECTION_LABEL } from '@/lib/labels';
 import { formatDate, formatDateTime } from '@/lib/format';
 
 const SECTION_ORDER: Record<string, number> = { result: 0, cause: 1, action: 2 };
+
+/** レポートをクライアントに配信する (F-50)。Slack未設定時は共有リンクを発行 */
+function DeliverPanel({ reportId }: { reportId: string }) {
+  const [state, setState] = useState<'idle' | 'sending'>('idle');
+  const [result, setResult] = useState<ReportDeliveryDto | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const deliver = () => {
+    setState('sending');
+    setError(null);
+    apiPost<ReportDeliveryDto>(`/reports/${encodeURIComponent(reportId)}/deliver`, {})
+      .then((r) => { setResult(r); setState('idle'); })
+      .catch((e: unknown) => { setError(toApiError(e)); setState('idle'); });
+  };
+
+  const copy = () => {
+    if (!result) return;
+    navigator.clipboard?.writeText(result.url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    }).catch(() => undefined);
+  };
+
+  return (
+    <div className="deliver">
+      <div className="deliver-row">
+        <button type="button" className="btn sm pri" onClick={deliver} disabled={state === 'sending'}>
+          {state === 'sending' ? '配信中…' : result ? '再配信' : 'クライアントに配信'}
+        </button>
+        {result ? (
+          <span className={`pill ${result.channel === 'slack' ? 'up' : 'flat'}`}>
+            {result.channel === 'slack' ? 'Slackに配信済' : '共有リンク発行済'}
+          </span>
+        ) : (
+          <span className="deliver-hint">Slack未設定でも共有リンクを発行して配信できます</span>
+        )}
+      </div>
+      {error ? <ErrorCard error={error} onRetry={deliver} /> : null}
+      {result ? (
+        <div className="deliver-result">
+          <p className="deliver-msg">{result.message}</p>
+          <div className="deliver-link">
+            <input readOnly className="input" value={result.url} onFocus={(e) => e.currentTarget.select()} />
+            <button type="button" className="btn sm sec" onClick={copy}>{copied ? 'コピー済' : 'コピー'}</button>
+            {/^https?:\/\//i.test(result.url) ? (
+              <a className="btn sm sec" href={result.url} target="_blank" rel="noopener noreferrer">開く ↗</a>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function ReportView({ report, clientName }: { report: ReportRunDto; clientName: string }) {
   const sections = [...report.result.sections].sort(
@@ -46,7 +100,8 @@ function ReportView({ report, clientName }: { report: ReportRunDto; clientName: 
           </a>
         </div>
         <div className="c-body">
-          <p style={{ margin: 0 }}>{report.result.executive_summary}</p>
+          <p style={{ margin: '0 0 12px' }}>{report.result.executive_summary}</p>
+          <DeliverPanel reportId={report.id} />
         </div>
       </div>
       {sections.map((s, i) => (

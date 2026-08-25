@@ -8,6 +8,8 @@ import { Tx } from '../prisma/prisma.service';
 export interface TenantSettings {
   slackWebhookUrl?: string;
   applyEnabled?: boolean;
+  /** 予算ペーシングの自動提案スイープ(日次cron)のオプトイン。既定OFF。手動起票とは独立 (F-51) */
+  autoPacingEnabled?: boolean;
 }
 
 export function readSettings(raw: unknown): TenantSettings {

@@ -433,6 +433,62 @@ export interface ChangeLogDto {
   note: string;
 }
 
+/* ---- Google広告への実入稿 (F-56) ---- */
+export interface LaunchPlanDto {
+  projectName: string;
+  clientName: string;
+  accounts: { adAccountId: string; externalAccountId: string; name: string }[];
+  campaignName: string;
+  /** 日予算(円)。月予算を30.4で割った値 */
+  dailyBudget: number;
+  monthlyBudget: number;
+  targetCpa: number | null;
+  finalUrl: string;
+  headlines: string[];
+  descriptions: string[];
+  keywords: string[];
+  startDate: string | null;
+  endDate: string | null;
+  /** 入稿できない理由。空なら実行可能 */
+  issues: string[];
+  ready: boolean;
+}
+
+export interface LaunchResultDto {
+  campaignId: string;
+  adGroupId: string;
+  keywordCount: number;
+  /** 事故防止のため必ず一時停止で作成される */
+  status: 'PAUSED';
+  accountName: string;
+  message: string;
+}
+
+/* ---- 監査ログ / レポート配信 (F-50) ---- */
+// 既存の操作証跡 (audit_trail / F-10) を閲覧用に整形したもの
+export interface AuditEventDto {
+  id: string;
+  action: string; // login / report_run / proposal_execute / report_delivered / share_issued ...
+  actorName: string; // 実行者 (ユーザー名 / ADGRID)
+  resource: string;
+  detail: Record<string, unknown>;
+  ip: string;
+  createdAt: string;
+}
+
+export type DeliveryChannel = 'slack' | 'link';
+
+/** レポート配信の結果 (F-50)。link=共有リンク発行(外部キー不要のフォールバック) */
+export interface ReportDeliveryDto {
+  reportId: string;
+  clientId: string;
+  channel: DeliveryChannel;
+  status: 'sent' | 'ready';
+  url: string; // 共有ポータルURL
+  deliveredAt: string;
+  message: string; // 画面表示用の案内文
+}
+
 /* ---- 勝ちパターン資産集 (B-1 / F-17) ---- */
 export type KnowledgeObjective = 'conversion' | 'awareness' | 'traffic';
 
@@ -857,6 +913,8 @@ export interface ProjectSettings {
   devices: 'all' | 'mobile' | 'desktop';
   /** 言語 (例: 日本語) */
   language: string;
+  /** 検索キーワード (入稿用。改行・読点区切り) */
+  keywords: string;
   /** 興味関心・オーディエンス (自由記述) */
   audience: string;
   /** リターゲティング (再訪ユーザーへの再配信) */
@@ -895,6 +953,7 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
   gender: 'all',
   devices: 'all',
   language: '日本語',
+  keywords: '',
   audience: '',
   retargeting: false,
   lookalike: false,
@@ -935,6 +994,19 @@ export const DEFAULT_PROJECT_BRIEF: ProjectBrief = {
 export const BRIEF_KEY_FIELDS: (keyof ProjectBrief)[] = [
   'business', 'product', 'usp', 'targetPersona', 'painPoint', 'offer', 'reasonToChoose',
 ];
+
+/**
+ * サイトURLからヒアリングを自動抽出した結果 (F-52)。
+ * ヒアリングが空だと広告文が一般論になるため、入力の手間を外して記入率を上げるのが狙い。
+ */
+export interface BriefExtractDto {
+  sourceUrl: string;
+  brief: Partial<ProjectBrief>;
+  /** 実際に値が取れた項目 */
+  filledKeys: (keyof ProjectBrief)[];
+  /** 読み取れなかった/確認が必要な点 (画面に注意として出す) */
+  caution: string;
+}
 
 export interface BriefCompleteness {
   filled: number;

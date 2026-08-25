@@ -3,6 +3,7 @@ import type { CreateDealInput, DealDto, DealStage, DealSummaryDto, UpdateDealInp
 import { DEAL_STAGES, computeDealSummary } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
+import { TrailService } from '../common/trail.service';
 import { MetricsService, daysAgo } from '../metrics/metrics.service';
 
 type Row = {
@@ -16,7 +17,20 @@ export class DealsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
+    private readonly trail: TrailService,
   ) {}
+
+  /** 受注確定/失注を監査ログに記録する (F-50) */
+  private async recordClose(tenantId: string, deal: Row, userId?: string | null): Promise<void> {
+    if (deal.stage !== 'won' && deal.stage !== 'lost') return;
+    await this.trail.record({
+      tenantId,
+      userId,
+      action: deal.stage === 'won' ? 'deal_won' : 'deal_lost',
+      resource: deal.id,
+      detail: { name: deal.name, value: deal.value, clientId: deal.clientId },
+    });
+  }
 
   private toDto(r: Row): DealDto {
     return {
@@ -33,7 +47,7 @@ export class DealsService {
     return (rows as Row[]).map((r) => this.toDto(r));
   }
 
-  async create(tenantId: string, input: CreateDealInput): Promise<DealDto> {
+  async create(tenantId: string, input: CreateDealInput, userId?: string | null): Promise<DealDto> {
     if (!input?.name?.trim() || !input?.clientId) {
       throw new AppError(HttpStatus.BAD_REQUEST, '案件名またはクライアントが未指定です。', '案件名とクライアントを入力してください。');
     }
@@ -41,22 +55,31 @@ export class DealsService {
     const row = await this.prisma.withTenant(tenantId, async (tx) => {
       const client = await tx.client.findUnique({ where: { id: input.clientId } });
       if (!client) throw new AppError(HttpStatus.NOT_FOUND, 'クライアントが見つかりません。', 'クライアントを選び直してください。');
+      // projectId は自テナント かつ 同一クライアントのプロジェクトに限定 (他テナント混入防止)
+      let projectId: string | null = null;
+      if (input.projectId) {
+        const p = await tx.project.findUnique({ where: { id: input.projectId }, select: { clientId: true } });
+        projectId = p && p.clientId === input.clientId ? input.projectId : null;
+      }
       return tx.deal.create({
         data: {
-          tenantId, clientId: input.clientId, projectId: input.projectId ?? null, name: input.name.trim(), stage,
+          tenantId, clientId: input.clientId, projectId, name: input.name.trim(), stage,
           value: Math.max(0, Math.round(input.value ?? 0)), grossMarginPct: Math.min(100, Math.max(0, Math.round(input.grossMarginPct ?? 30))),
           source: input.source ?? '', note: input.note ?? '',
           closedAt: stage === 'won' || stage === 'lost' ? new Date() : null,
         },
       });
     });
+    await this.recordClose(tenantId, row as Row, userId);
     return this.toDto(row as Row);
   }
 
-  async update(tenantId: string, id: string, input: UpdateDealInput): Promise<DealDto> {
+  async update(tenantId: string, id: string, input: UpdateDealInput, userId?: string | null): Promise<DealDto> {
+    let stageChanged = false;
     const row = await this.prisma.withTenant(tenantId, async (tx) => {
       const existing = await tx.deal.findUnique({ where: { id } });
       if (!existing) throw new AppError(HttpStatus.NOT_FOUND, '案件が見つかりません。', '一覧から選び直してください。');
+      stageChanged = !!input.stage && DEAL_STAGES.includes(input.stage) && input.stage !== existing.stage;
       const data: Record<string, unknown> = {};
       if (typeof input.name === 'string' && input.name.trim()) data.name = input.name.trim();
       if (input.stage && DEAL_STAGES.includes(input.stage)) {
@@ -69,6 +92,7 @@ export class DealsService {
       if (typeof input.note === 'string') data.note = input.note;
       return tx.deal.update({ where: { id }, data });
     });
+    if (stageChanged) await this.recordClose(tenantId, row as Row, userId);
     return this.toDto(row as Row);
   }
 

@@ -65,7 +65,8 @@ export interface AgentStep {
   key: string;
   title: string;
   detail: string;
-  status: 'done' | 'skip';
+  /** todo = 実行済みだが、担当者の操作がまだ残っている段階 */
+  status: 'done' | 'skip' | 'todo';
 }
 
 export interface AgentRunDto {

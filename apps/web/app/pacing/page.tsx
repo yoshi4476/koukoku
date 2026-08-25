@@ -1,9 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import type { PacingDto } from '@adgrid/shared';
+import { useState } from 'react';
+import type { PacingDto, PacingSweepDto } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { EmptyState, ErrorCard, HintBar, PlatformTag, SkeletonLines } from '@/components/ui';
+import { apiPost, ApiError, toApiError } from '@/lib/api';
 import { formatDate, formatPercent, formatYen } from '@/lib/format';
 
 const STATUS_META: Record<PacingDto['status'], { pill: string; label: string; seg: string }> = {
@@ -104,12 +106,57 @@ function PaceCard({ p }: { p: PacingDto }) {
   );
 }
 
+/** 予算逸脱アカウントを承認キューへ一括提案する自動反映ループの起点 (F-51) */
+function AutoProposeBar({ deviating }: { deviating: number }) {
+  const [state, setState] = useState<'idle' | 'running'>('idle');
+  const [result, setResult] = useState<PacingSweepDto | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+
+  const run = () => {
+    setState('running');
+    setError(null);
+    apiPost<PacingSweepDto>('/pacing/propose', {})
+      .then((r) => { setResult(r); setState('idle'); })
+      .catch((e: unknown) => { setError(toApiError(e)); setState('idle'); });
+  };
+
+  return (
+    <div className="autoprop">
+      <div className="autoprop-row">
+        <div className="autoprop-txt">
+          <b>自動反映ループ</b>
+          <span>予算逸脱アカウントを検出し、予算調整の提案を承認キューに下書きします。適用は承認が必要です。</span>
+        </div>
+        <button type="button" className="btn sm pri" onClick={run} disabled={state === 'running' || deviating === 0}>
+          {state === 'running' ? '作成中…' : `予算提案を作成${deviating > 0 ? ` (${deviating}件対象)` : ''}`}
+        </button>
+      </div>
+      {error ? <ErrorCard error={error} onRetry={run} /> : null}
+      {result ? (
+        <div className={`autoprop-result ${result.created > 0 ? 'ok' : 'flat'}`}>
+          {result.created > 0 ? (
+            <>
+              <span>{result.created}件の予算提案を承認キューに作成しました{result.skipped > 0 ? `（${result.skipped}件は保留中のためスキップ）` : ''}。</span>
+              <Link href="/approvals" className="btn sm sec">承認キューを開く →</Link>
+            </>
+          ) : result.scanned > 0 ? (
+            <span>対象{result.scanned}件はすでに保留中の提案があるため、新規作成はありませんでした。</span>
+          ) : (
+            <span>提案が必要な予算逸脱は見つかりませんでした。</span>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function PacingPage() {
   const pacing = useApi<PacingDto[]>('/pacing');
   const list = pacing.data ?? [];
   const overCount = list.filter((p) => p.status === 'over').length;
   const underCount = list.filter((p) => p.status === 'under').length;
   const onTrackCount = list.filter((p) => p.status === 'on_track').length;
+  const deviating = overCount + underCount;
 
   return (
     <>
@@ -132,6 +179,7 @@ export default function PacingPage() {
 
       {list.length > 0 ? (
         <>
+          <AutoProposeBar deviating={deviating} />
           <div className="pace-summary">
             <span className="pill down">超過 {overCount}件</span>
             <span className="pill warn">未消化 {underCount}件</span>

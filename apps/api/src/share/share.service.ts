@@ -4,6 +4,7 @@ import type { DailyPointDto, PublicPortalDto, ShareLinkDto } from '@adgrid/share
 import { industryProfileFor } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
+import { TrailService } from '../common/trail.service';
 import { MetricsService, daysAgo } from '../metrics/metrics.service';
 
 /**
@@ -16,6 +17,7 @@ export class ShareService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly metrics: MetricsService,
+    private readonly trail: TrailService,
   ) {}
 
   /** 現在の共有状態を返す (自社側) */
@@ -25,7 +27,7 @@ export class ShareService {
   }
 
   /** 共有リンクを発行(または再有効化)する */
-  async enable(tenantId: string, clientId: string): Promise<ShareLinkDto> {
+  async enable(tenantId: string, clientId: string, userId?: string | null): Promise<ShareLinkDto> {
     const client = await this.prisma.withTenant(tenantId, (tx) => tx.client.findUnique({ where: { id: clientId } }));
     if (!client) {
       throw new AppError(HttpStatus.NOT_FOUND, 'クライアントが見つかりません。', 'クライアントを選び直してください。');
@@ -36,12 +38,22 @@ export class ShareService {
       update: { enabled: true, token },
       create: { tenantId, clientId, token, enabled: true },
     });
+    await this.trail.record({ tenantId, userId, action: 'share_issued', resource: clientId, detail: { clientName: client.name } });
     return { token: link.token, enabled: true, createdAt: link.createdAt.toISOString() };
   }
 
+  /** 配信用にトークンを確保する。既存の有効リンクがあれば再利用、なければ発行する (F-50) */
+  async ensureToken(tenantId: string, clientId: string, userId?: string | null): Promise<string> {
+    const existing = await this.prisma.shareLink.findUnique({ where: { tenantId_clientId: { tenantId, clientId } } });
+    if (existing?.enabled) return existing.token;
+    const link = await this.enable(tenantId, clientId, userId);
+    return link.token as string;
+  }
+
   /** 共有を停止する (リンクを無効化) */
-  async disable(tenantId: string, clientId: string): Promise<ShareLinkDto> {
+  async disable(tenantId: string, clientId: string, userId?: string | null): Promise<ShareLinkDto> {
     await this.prisma.shareLink.updateMany({ where: { tenantId, clientId }, data: { enabled: false } });
+    await this.trail.record({ tenantId, userId, action: 'share_revoked', resource: clientId });
     return { token: null, enabled: false, createdAt: null };
   }
 

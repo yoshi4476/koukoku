@@ -231,7 +231,7 @@ export default function HomePage() {
           <div className="empty">
             <div className="e-title">今日は対応事項がありません</div>
             <div className="e-sub">アラート・AI提案・レポート予定はすべて対応済みです。</div>
-            <Link href="/dashboard" className="btn pri">ダッシュボードを見る</Link>
+            <Link href="/projects" className="btn pri">プロジェクトを見る</Link>
           </div>
         )
       ) : null}

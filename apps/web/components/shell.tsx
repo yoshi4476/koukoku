@@ -19,7 +19,6 @@ const HREF_FEATURE: Record<string, EditionFeature> = {
   '/approvals': 'approvals',
   '/connections': 'connections',
   '/import': 'imports',
-  '/knowledge': 'knowledge',
 };
 
 // 提供先版テナント(edition=client)では管理系(クライアント管理・テナント発行)も隠す
@@ -57,27 +56,6 @@ const NAV_MAIN: NavItem[] = [
     ),
   },
   {
-    href: '/dashboard',
-    label: 'ダッシュボード',
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-        <path d="M2 12V6h2v6zm4 0V2h2v10zm4 0V8h2v4z" fill="currentColor" />
-      </svg>
-    ),
-  },
-  {
-    href: '/boards',
-    label: 'カスタムボード',
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-        <rect x="2" y="2" width="4.5" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" />
-        <rect x="7.5" y="2" width="4.5" height="3.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" />
-        <rect x="2" y="9.5" width="4.5" height="2.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" />
-        <rect x="7.5" y="6.5" width="4.5" height="5.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1.4" />
-      </svg>
-    ),
-  },
-  {
     href: '/audit',
     label: 'AI診断',
     icon: (
@@ -97,42 +75,12 @@ const NAV_MAIN: NavItem[] = [
     ),
   },
   {
-    href: '/copy',
-    label: '広告文',
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-        <path d="M2 3h10M2 7h7M2 11h9" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
     href: '/deals',
     label: '成約パイプライン',
     icon: (
       <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
         <path d="M2 4.5h10v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" strokeWidth="1.3" />
         <path d="M5 4.5V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1.5M2 7.5h10" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    href: '/abtests',
-    label: 'A/Bテスト',
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-        <path d="M5.5 1.5v4L2.6 10.6A1 1 0 0 0 3.5 12h7a1 1 0 0 0 .9-1.4L8.5 5.5v-4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-        <path d="M4.5 1.5h5M4.6 8h4.8" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    href: '/knowledge',
-    label: '勝ちパターン',
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-        <path d="M3.5 2h7v2a3.5 3.5 0 0 1-7 0z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-        <path d="M3.5 3H2v1a1.5 1.5 0 0 0 1.5 1.5M10.5 3H12v1a1.5 1.5 0 0 1-1.5 1.5" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-        <path d="M7 7.5V10M5 12h4M5.5 12a1.5 1.5 0 0 1 3 0" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
@@ -155,38 +103,6 @@ const NAV_MAIN: NavItem[] = [
         <path d="M2 10.5a5 5 0 1 1 10 0" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
         <path d="M7 10.5 9.7 6.3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
         <circle cx="7" cy="10.5" r="1.1" fill="currentColor" />
-      </svg>
-    ),
-  },
-  {
-    href: '/calendar',
-    label: 'カレンダー',
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-        <rect x="2" y="3" width="10" height="9" rx="1.4" fill="none" stroke="currentColor" strokeWidth="1.3" />
-        <path d="M2 5.5h10M4.5 2v2M9.5 2v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    href: '/experiments',
-    label: '増分効果テスト',
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-        <path d="M5.5 2v3.2L3 10.2a1.3 1.3 0 0 0 1.2 1.9h5.6A1.3 1.3 0 0 0 11 10.2L8.5 5.2V2" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-        <path d="M4.5 2h5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    href: '/portal',
-    label: '媒体窓口',
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-        <rect x="2" y="2" width="4" height="4" rx="1" fill="currentColor" />
-        <rect x="8" y="2" width="4" height="4" rx="1" fill="currentColor" />
-        <rect x="2" y="8" width="4" height="4" rx="1" fill="currentColor" />
-        <rect x="8" y="8" width="4" height="4" rx="1" fill="currentColor" />
       </svg>
     ),
   },
@@ -241,6 +157,16 @@ const NAV_DATA: NavItem[] = [
       <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
         <circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" strokeWidth="1.4" />
         <path d="M7 4v3l2 1.4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    href: '/audit-log',
+    label: '監査ログ',
+    icon: (
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+        <path d="M3 1.5h5l3 3v8h-8z" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+        <path d="M4.8 7h4.4M4.8 9.2h4.4" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -317,12 +243,12 @@ interface NavPhase {
 
 // プロジェクト中心のシンプルなナビ。掲示・推移・アラート・改善はプロジェクト詳細に集約し、
 // グローバルには「横断で使うもの」だけを残す。
+// プロジェクト中心のナビ。案件単位の機能(診断/キーワード/予算ペース/変更履歴/レポート)は
+// すべてプロジェクト詳細のタブに統合済みのため、横断で必要なものだけをここに残す。
 const NAV_PHASES: NavPhase[] = [
   { label: null, hrefs: ['/', '/projects'] },
-  { label: '作る（横断）', hrefs: ['/copy', '/knowledge'] },
-  { label: '計画・検証', hrefs: ['/calendar', '/experiments'] },
-  { label: '報告する', hrefs: ['/report', '/deals'] },
-  { label: '管理・設定', hrefs: ['/clients', '/reseller', '/feedback', '/settings', '/guide'] },
+  { label: '横断で見る', hrefs: ['/approvals', '/deals'] },
+  { label: '管理・設定', hrefs: ['/clients', '/connections', '/import', '/audit-log', '/reseller', '/feedback', '/settings', '/guide'] },
 ];
 
 // 提供先(client)アクセス専用の最小ナビ (自分のクライアントの閲覧+フィードバックのみ)
