@@ -246,8 +246,15 @@ function ClientAccessPanel({ clientId }: { clientId: string }) {
       .catch((err: unknown) => setError(toApiError(err)))
       .finally(() => setBusy(false));
   };
-  const revoke = (userId: string) => {
-    apiDelete(`/clients/${clientId}/access/${userId}`).then(() => access.retry()).catch(() => undefined);
+  const revoke = (userId: string, mail: string) => {
+    if (busy) return;
+    if (!window.confirm(`${mail} のログインを無効化します。よろしいですか？`)) return;
+    setBusy(true);
+    setError(null);
+    apiDelete(`/clients/${clientId}/access/${userId}`)
+      .then(() => access.retry())
+      .catch((err: unknown) => setError(toApiError(err)))
+      .finally(() => setBusy(false));
   };
 
   const list = access.data ?? [];
@@ -259,7 +266,7 @@ function ClientAccessPanel({ clientId }: { clientId: string }) {
           {list.map((a) => (
             <div key={a.userId} className="cl-access-row">
               <span className="cl-access-mail">{a.email}</span>
-              <button type="button" className="btn sm sec" onClick={() => revoke(a.userId)}>無効化</button>
+              <button type="button" className="btn sm sec" onClick={() => revoke(a.userId, a.email)} disabled={busy}>無効化</button>
             </div>
           ))}
         </div>
@@ -281,10 +288,15 @@ function MeasurementForm({ initial, clientId, onSaved }: { initial: MeasurementC
   const [server, setServer] = useState(initial.serverSideEnabled);
   const [enhanced, setEnhanced] = useState(initial.enhancedConversions);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<ApiError | null>(null);
   const save = () => {
+    if (busy) return;
     setBusy(true);
+    setError(null);
     apiPut(`/clients/${clientId}/measurement`, { ga4MeasurementId: ga4, metaPixelId: pixel, serverSideEnabled: server, enhancedConversions: enhanced })
-      .then(() => onSaved()).finally(() => setBusy(false));
+      .then(() => onSaved())
+      .catch((err: unknown) => setError(toApiError(err)))
+      .finally(() => setBusy(false));
   };
   return (
     <div className="meas-form">
@@ -297,6 +309,7 @@ function MeasurementForm({ initial, clientId, onSaved }: { initial: MeasurementC
         <label className="set-check"><input type="checkbox" checked={enhanced} onChange={(e) => setEnhanced(e.target.checked)} /> 拡張コンバージョン</label>
       </div>
       {!initial.serverKeysReady && server ? <p className="meas-warn">※ サーバー送信の鍵 (META_CAPI_ACCESS_TOKEN / GA4_API_SECRET) が未設定です。.env に設定すると実送信されます。</p> : null}
+      {error ? <ErrorCard error={error} /> : null}
       <button className="btn sm pri" disabled={busy} onClick={save}>{busy ? '保存中…' : '計測設定を保存'}</button>
     </div>
   );
@@ -341,9 +354,17 @@ function SharePanel({ clientId }: { clientId: string }) {
   const { data, loading, error, retry, refresh } = useApi<ShareLinkDto>(`/clients/${clientId}/share`);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [actError, setActError] = useState<ApiError | null>(null);
   const link = data?.token ? `${typeof window !== 'undefined' ? window.location.origin : ''}/share/${data.token}` : '';
 
-  const act = (fn: () => Promise<unknown>) => { setBusy(true); fn().then(() => refresh()).finally(() => setBusy(false)); };
+  // 発行/停止の失敗を握りつぶすと、共有停止が失敗してもリンクが生きたまま
+  // 停止済みに見える (無認証公開のため実害大)。エラーは必ず表示する
+  const act = (fn: () => Promise<unknown>) => {
+    if (busy) return;
+    setBusy(true);
+    setActError(null);
+    fn().then(() => refresh()).catch((err: unknown) => setActError(toApiError(err))).finally(() => setBusy(false));
+  };
 
   return (
     <div className="access-panel">
@@ -351,6 +372,7 @@ function SharePanel({ clientId }: { clientId: string }) {
       <p className="ap-desc">ログイン不要で成果ダッシュボードを見せる共有リンクを発行します。数値は常に最新です。停止するといつでも無効化できます。</p>
       {loading ? <Skeleton w="100%" h={30} /> : null}
       {error ? <ErrorCard error={error} onRetry={retry} /> : null}
+      {actError ? <ErrorCard error={actError} /> : null}
       {data ? (
         data.enabled && link ? (
           <>

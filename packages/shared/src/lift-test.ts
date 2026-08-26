@@ -95,10 +95,15 @@ export function computeLift(input: LiftResultInput): LiftResult {
   const pValue = twoProportionPValue(cc, ca, ec, ea);
   const significant = pValue !== null && pValue < 0.05;
 
+  // 有意でも方向を見ないと危険。対照群が勝つ(=広告が逆効果)場合に
+  // 「この増分CPAが本当の獲得効率」と肯定すると、逆効果の配信を続けさせてしまう
+  const positive = exposedCvr > controlCvr;
   const note = !ea || !ca
     ? '露出群・対照群の規模を入力すると増分効果を算出します。'
     : significant
-      ? `広告による増分は統計的に有意です (p=${pValue?.toFixed(3)})。この増分CPAが本当の獲得効率です。`
+      ? positive
+        ? `広告による増分は統計的に有意です (p=${pValue?.toFixed(3)})。この増分CPAが本当の獲得効率です。`
+        : `対照群のほうが成果が高く、広告が逆効果の可能性が統計的に有意です (p=${pValue?.toFixed(3)})。配信内容の見直しを推奨します。`
       : `まだ有意差は出ていません (p=${pValue !== null ? pValue.toFixed(3) : '—'})。サンプルを増やすか期間を延ばしてください。`;
 
   return {

@@ -211,8 +211,9 @@ export class ConversionService {
       }],
       ...(process.env.META_TEST_EVENT_CODE ? { test_event_code: process.env.META_TEST_EVENT_CODE } : {}),
     };
-    const url = `https://graph.facebook.com/${META_VERSION}/${cfg.metaPixelId}/events?access_token=${encodeURIComponent(tokenEnv)}`;
-    const r = await postJson(url, body);
+    // access_token はURLクエリではなくPOSTボディに入れる (プロキシ/アクセスログへの残留を防ぐ)
+    const url = `https://graph.facebook.com/${META_VERSION}/${cfg.metaPixelId}/events`;
+    const r = await postJson(url, { ...body, access_token: tokenEnv });
     if (!r.ok) {
       errors.push(`Meta:${r.status} ${r.text}`);
       this.logger.warn(`Meta CAPI failed (${r.status})`);

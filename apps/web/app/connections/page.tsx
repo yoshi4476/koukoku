@@ -333,7 +333,7 @@ export default function ConnectionsPage() {
                 以後は3時間ごとに自動同期されます。
               </p>
               <div className="row-actions" style={{ justifyContent: 'center' }}>
-                <Link href={`/dashboard?platform=${done.platform}`} className="btn pri">ダッシュボードで見る</Link>
+                <Link href="/projects" className="btn pri">プロジェクトを見る</Link>
                 <button type="button" className="btn sec" onClick={resetWizard}>続けて別の媒体を接続</button>
               </div>
             </div>

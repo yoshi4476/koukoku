@@ -30,11 +30,15 @@ export function LaunchSheet({ projectId, platforms }: { projectId: string; platf
   const [copied, setCopied] = useState('');
 
   useEffect(() => {
+    // 媒体を素早く切り替えると、遅い応答が後着で上書きし「タブはMetaなのにGoogleの
+    // シートが表示される」ことがある。alive フラグで古い応答を破棄する
+    let alive = true;
     setLoading(true); setError(null); setSheet(null);
     apiGet<LaunchSheetDto>(`/projects/${projectId}/launch-sheet?platform=${platform}`)
-      .then(setSheet)
-      .catch((e: unknown) => setError(toApiError(e)))
-      .finally(() => setLoading(false));
+      .then((s) => { if (alive) setSheet(s); })
+      .catch((e: unknown) => { if (alive) setError(toApiError(e)); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
   }, [projectId, platform]);
 
   const flash = (key: string) => { setCopied(key); setTimeout(() => setCopied(''), 1600); };

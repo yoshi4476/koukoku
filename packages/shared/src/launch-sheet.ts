@@ -46,47 +46,76 @@ export interface LaunchSheetDto {
   ready: boolean;
 }
 
-/** 全角も1字として数える (媒体表記に合わせる) */
+type Counter = (s: string) => number;
+
+/** 文字数 (全角も1字)。Meta/LINE/TikTok 等、文字数で数える媒体向け */
 function len(s: string): number {
   return [...s].length;
+}
+
+/**
+ * 半角換算幅 (ASCII・半角カナ=1、全角=2)。Google/Yahoo検索の実仕様に合わせる。
+ * これらの媒体は全角を2字と数えるため (見出し30 = 全角15字)、文字数で判定すると
+ * 実制限の2倍まで「OK」になり、入稿時に審査で弾かれる
+ */
+function widthLen(s: string): number {
+  let units = 0;
+  for (const ch of s) {
+    const code = ch.codePointAt(0) ?? 0;
+    const isHalf = (code >= 0x20 && code <= 0x7e) || (code >= 0xff61 && code <= 0xff9f);
+    units += isHalf ? 1 : 2;
+  }
+  return units;
 }
 
 /**
  * 上限に収まるよう文単位で短縮する。文の途中で切らない (意味が壊れるため)。
  * 1文目すら収まらない場合は null を返し、呼び出し側で扱いを決める。
  */
-function shortenToFit(text: string, maxLen: number): string | null {
-  if (len(text) <= maxLen) return text;
+function shortenToFit(text: string, maxLen: number, count: Counter): string | null {
+  if (count(text) <= maxLen) return text;
+  // まず文単位で縮める (意味を壊さない)
   const sentences = text.split(/(?<=[。！？!?])/).map((x) => x.trim()).filter(Boolean);
   let acc = '';
   for (const sen of sentences) {
     const next = acc + sen;
-    if (len(next) > maxLen) break;
+    if (count(next) > maxLen) break;
     acc = next;
   }
-  return acc ? acc : null;
+  if (acc) return acc;
+  // 見出しのような一文は文分割できない。貼り付け可能にするため文字単位で切り詰める
+  // (…を1字ぶん残す)。Japaneseは語境界が無いため途中で切っても実用上問題ない
+  let hard = '';
+  for (const ch of text) {
+    if (count(hard + ch) > maxLen - 1) break;
+    hard += ch;
+  }
+  return hard ? hard + '…' : null;
 }
 
 /**
  * 上限に収まる候補を、元の優先順を保って選ぶ。
  * 超過するものは文単位で短縮し、それでも収まらず任意項目(min=0)なら採用しない。
+ * count は媒体ごとの字数の数え方 (検索系は幅、その他は文字数)。
  */
-function fit(texts: string[], spec: TextSpec): SheetTextItem[] {
+function fit(texts: string[], spec: TextSpec, count: Counter): SheetTextItem[] {
   const seen = new Set<string>();
   const out: SheetTextItem[] = [];
   for (const raw of texts) {
     const t = raw.trim();
     if (!t || seen.has(t)) continue;
     seen.add(t);
-    if (len(t) <= spec.maxLen) {
-      out.push({ text: t, len: len(t), ok: true });
+    if (count(t) <= spec.maxLen) {
+      out.push({ text: t, len: count(t), ok: true });
     } else {
-      const short = shortenToFit(t, spec.maxLen);
-      if (short) {
-        out.push({ text: short, len: len(short), ok: true, shortened: true });
-      } else if (spec.min > 0) {
+      const short = shortenToFit(t, spec.maxLen, count);
+      // 短縮後のテキストも重複排除する (別々の元文が同じ短縮結果になることがある)
+      if (short && !seen.has(short)) {
+        seen.add(short);
+        out.push({ text: short, len: count(short), ok: true, shortened: true });
+      } else if (!short && spec.min > 0) {
         // 必須項目は空にできないため、超過のまま出して修正を促す
-        out.push({ text: t, len: len(t), ok: false });
+        out.push({ text: t, len: count(t), ok: false });
       }
       // 任意項目(min=0)で収まらないものは採用しない (無理に載せない)
     }
@@ -129,9 +158,11 @@ export function buildLaunchSheet(input: LaunchSheetInput): LaunchSheetDto | null
   const spec: PlatformAdSpec | null = adSpecFor(input.platform);
   if (!spec) return null;
 
-  const headlines = fit(input.headlines, spec.headline);
-  const descriptions = fit(input.descriptions, spec.description);
-  const primaryTexts = spec.primaryText ? fit(input.primaryTexts, spec.primaryText) : [];
+  // 検索系(Google/Yahoo)は全角=2の幅で数える。他媒体は文字数
+  const count: Counter = isSearch(input.platform) ? widthLen : len;
+  const headlines = fit(input.headlines, spec.headline, count);
+  const descriptions = fit(input.descriptions, spec.description, count);
+  const primaryTexts = spec.primaryText ? fit(input.primaryTexts, spec.primaryText, count) : [];
 
   const daily = input.monthlyBudget > 0 ? input.monthlyBudget / 30.4 : 0;
   const search = isSearch(input.platform);

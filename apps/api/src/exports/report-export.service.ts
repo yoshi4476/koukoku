@@ -67,8 +67,14 @@ export class ReportExportService implements OnModuleDestroy {
     );
     const esc = (s: string) =>
       s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    // 期間終了は種別で変える。月次を常に +6日 で出すと「対象期間が1週間」になる
     const periodEnd = new Date(r.periodStart + 'T00:00:00Z');
-    periodEnd.setUTCDate(periodEnd.getUTCDate() + 6);
+    if (r.periodType === 'monthly') {
+      periodEnd.setUTCMonth(periodEnd.getUTCMonth() + 1);
+      periodEnd.setUTCDate(0); // 当月の末日
+    } else {
+      periodEnd.setUTCDate(periodEnd.getUTCDate() + 6);
+    }
     return `<!doctype html><html lang="ja"><head><meta charset="utf-8"><style>
       * { box-sizing: border-box; }
       body { font-family: "Noto Sans JP", "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif;

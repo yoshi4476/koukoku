@@ -129,13 +129,18 @@ export function buildKeywordPlan(input: KeywordPlanInput): KeywordPlanDto {
     for (const suf of EXPLORE_SUFFIX.slice(0, 1)) push(`${seed} ${suf}`, 'explore', '認知拡大用。CPAは悪化しやすいので予算に余裕がある場合のみ');
   }
 
+  const planned = keywords.slice(0, 60);
+  // 除外語は「実際に入稿するキーワード」とだけ突き合わせる。
+  // 全候補(explore「◯◯ とは」や61件目以降を含む)と照合すると、配信もしないのに
+  // 除外語「とは」が消され、情報収集クリックが素通りしてしまう
+  const launchable = planned.filter((k) => k.tier !== 'explore').map((k) => k.text);
   const negatives = safeNegatives(
     [...new Set([...BASE_NEGATIVES, ...(INDUSTRY_NEGATIVES[input.industryCode] ?? [])])],
-    keywords.map((k) => k.text),
+    launchable,
   );
 
   return {
-    keywords: keywords.slice(0, 60),
+    keywords: planned,
     negatives,
     note: areas.length > 0
       ? `${areas.join('・')}との掛け合わせを優先しています。地域名を含む検索は競合が少なく、同じ予算でも成約が取りやすくなります。`

@@ -68,8 +68,11 @@ export class AuditService {
       this.metrics.totals(tx, { adAccountId }, daysAgo(27), daysAgo(0)),
     ]);
 
+    // campaignId のみでグループ化する。campaignName も by に含めると、期間中に
+    // 名前が変わった同一キャンペーンが複数行になり、各行が campaignId 全体の
+    // フル合計を持つため費用が二重計上される
     const campaignRows = await tx.factAdPerformance.groupBy({
-      by: ['campaignId', 'campaignName'],
+      by: ['campaignId'],
       where: { adAccountId, date: { gte: daysAgo(27) } },
       _sum: { cost: true },
     });
@@ -89,6 +92,12 @@ export class AuditService {
             conversions: Number(a._sum.conversions ?? 0),
             conversionValue: Number(a._sum.conversionValue ?? 0),
           }));
+      // 表示名は最新日の値を採用する (名前変更後の新しい名前を出す)
+      const latest = await tx.factAdPerformance.findFirst({
+        where: { adAccountId, campaignId: row.campaignId },
+        orderBy: { date: 'desc' },
+        select: { campaignName: true },
+      });
       const [l7, p7, l28] = await Promise.all([
         wc(daysAgo(6), daysAgo(0)),
         wc(daysAgo(13), daysAgo(7)),
@@ -96,7 +105,7 @@ export class AuditService {
       ]);
       campaigns.push({
         campaignId: row.campaignId,
-        campaignName: row.campaignName,
+        campaignName: latest?.campaignName ?? row.campaignId,
         last7: l7,
         prior7: p7,
         last28: l28,

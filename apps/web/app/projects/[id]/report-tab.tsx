@@ -63,12 +63,16 @@ function SharePortal({ clientId }: { clientId: string }) {
   const share = useApi<ShareLinkDto>(`/clients/${clientId}/share`);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [actError, setActError] = useState<ApiError | null>(null);
   const link = share.data;
 
   const toggle = () => {
+    if (busy) return;
     setBusy(true);
+    setActError(null);
     const p = link?.enabled ? apiDelete(`/clients/${clientId}/share`) : apiPost(`/clients/${clientId}/share`, {});
-    p.then(() => share.retry()).finally(() => setBusy(false));
+    // 停止失敗を握りつぶすと、公開が続いているのに停止済みに見える (無認証公開のため実害大)
+    p.then(() => share.retry()).catch((e: unknown) => setActError(toApiError(e))).finally(() => setBusy(false));
   };
   const url = link?.token ? `${window.location.origin}/share/${link.token}` : '';
 
@@ -87,6 +91,7 @@ function SharePortal({ clientId }: { clientId: string }) {
               </button>
               <span className={`pill ${link?.enabled ? 'up' : 'flat'}`}>{link?.enabled ? '公開中' : '停止中'}</span>
             </div>
+            {actError ? <ErrorCard error={actError} /> : null}
             {link?.enabled && url ? (
               <div className="deliver-link" style={{ marginTop: 10 }}>
                 <input readOnly className="input" value={url} onFocus={(e) => e.currentTarget.select()} />

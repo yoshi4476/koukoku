@@ -21,18 +21,21 @@ const EDITION_DESC: Record<Edition, string> = {
 function EditionModeBar({ onSwitched }: { onSwitched: () => void }) {
   const { me, setMe } = useAuth();
   const [saving, setSaving] = useState<Edition | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
   const canEdit = me.role === 'owner';
   const editions: Edition[] = ['agency', 'client'];
 
   const switchTo = (edition: Edition) => {
     if (edition === me.edition || saving || !canEdit) return;
     setSaving(edition);
+    setError(null);
     apiPut<MeDto>('/auth/edition', { edition })
       .then((updated) => {
         setMe(updated);
         onSwitched();
       })
-      .catch(() => {})
+      // 握りつぶすと、切替に失敗してもボタンを押して何も起きない状態になる
+      .catch((e: unknown) => setError(toApiError(e)))
       .finally(() => setSaving(null));
   };
 
@@ -56,6 +59,7 @@ function EditionModeBar({ onSwitched }: { onSwitched: () => void }) {
       </div>
       <span className="mode-bar-desc">{EDITION_DESC[me.edition]}</span>
       {!canEdit ? <span className="mode-bar-note">切替はオーナーのみ</span> : null}
+      {error ? <span className="mode-bar-note" style={{ color: 'var(--bad)' }}>{error.message}</span> : null}
     </div>
   );
 }

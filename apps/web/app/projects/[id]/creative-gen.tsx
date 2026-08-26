@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CreativeGenDto, CreativeVariant } from '@adgrid/shared';
 import { apiGet, apiPost, toApiError, type ApiError } from '@/lib/api';
 import { ErrorCard, SkeletonLines } from '@/components/ui';
@@ -28,12 +28,16 @@ export function CreativeGenerator({
   const [count, setCount] = useState(4);
   const [busy, setBusy] = useState(false);
 
+  // 案数を素早く変えると複数リクエストが競合し、古い応答が後着で上書きする
+  // (「8案」を選んだのに4案が出る)。最新リクエストの応答だけ反映する
+  const reqId = useRef(0);
   const load = useCallback((n: number) => {
+    const my = ++reqId.current;
     setLoading(true); setError(null);
     apiGet<CreativeGenDto>(`/projects/${projectId}/creatives?count=${n}`)
-      .then((d) => { setData(d); setSel(new Set(d.variants.map((_, i) => i))); })
-      .catch((e: unknown) => setError(toApiError(e)))
-      .finally(() => setLoading(false));
+      .then((d) => { if (my === reqId.current) { setData(d); setSel(new Set(d.variants.map((_, i) => i))); } })
+      .catch((e: unknown) => { if (my === reqId.current) setError(toApiError(e)); })
+      .finally(() => { if (my === reqId.current) setLoading(false); });
   }, [projectId]);
 
   useEffect(() => { load(count); }, [load, count]);

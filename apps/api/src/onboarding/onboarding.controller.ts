@@ -1,9 +1,12 @@
 import { Controller, Get, Post } from '@nestjs/common';
 import type { OnboardingStatusDto, SampleDataResultDto } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import { TenantId } from '../common/tenant';
+import { SessionInfo, SessionInfoValue, TenantId } from '../common/tenant';
+import { assertEditor } from '../common/authz';
 import { AuditService } from '../ai/audit.service';
 import { daysAgo } from '../metrics/metrics.service';
+
+const SAMPLE_CLIENT_NAME = 'サンプル: 自社ECサイト';
 
 /** 決定的な擬似乱数 (seed と同方式。デモデータの再現性のため) */
 function wave(dayIndex: number, salt: number): number {
@@ -40,10 +43,20 @@ export class OnboardingController {
    * 初回診断まで自動実行してアハ体験に直行させる。
    */
   @Post('sample')
-  async sample(@TenantId() tenantId: string): Promise<SampleDataResultDto> {
+  async sample(
+    @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
+  ): Promise<SampleDataResultDto> {
+    // viewer/提供先は不可。連打で実データにサンプルが積み増しされるのも防ぐ
+    assertEditor(user);
     const { clientId, adAccountId } = await this.prisma.withTenant(tenantId, async (tx) => {
+      // 冪等性: 既にサンプルクライアントがあれば作り直さず、そのアカウントを使う
+      const dup = await tx.client.findFirst({ where: { name: SAMPLE_CLIENT_NAME }, include: { adAccounts: true } });
+      if (dup && dup.adAccounts[0]) {
+        return { clientId: dup.id, adAccountId: dup.adAccounts[0].id };
+      }
       const client = await tx.client.create({
-        data: { tenantId, name: 'サンプル: 自社ECサイト', industryCode: 'ec' },
+        data: { tenantId, name: SAMPLE_CLIENT_NAME, industryCode: 'ec' },
       });
       const account = await tx.adAccount.create({
         data: {

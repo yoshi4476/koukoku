@@ -65,7 +65,7 @@ export function buildKpiTree(input: KpiTreeInput): KpiTree {
     cpc: Math.round(cpc),
     cpm: Math.round(cpm),
     monthlyBudget,
-    dailyBudget: Math.round(monthlyBudget / 30),
+    dailyBudget: Math.round(monthlyBudget / 30.4), // 入稿シート(30.4)と揃える
     revenue,
     roas,
     assumptions: { ctr: +ctr.toFixed(2), cvr: +cvr.toFixed(2), cpa, source },

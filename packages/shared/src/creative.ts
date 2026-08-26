@@ -174,7 +174,10 @@ interface Tokens {
 }
 
 function truncate(s: string, max: number): string {
-  return s.length <= max ? s : s.slice(0, max - 1) + '…';
+  // コードポイント単位で扱う。s.slice はサロゲートペア(絵文字)を分断して
+  // 壊れた文字(U+FFFD)を残すため、[...s] で1文字ずつに分けてから切る
+  const chars = [...s];
+  return chars.length <= max ? s : chars.slice(0, max - 1).join('') + '…';
 }
 
 /**

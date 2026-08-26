@@ -22,7 +22,14 @@ function AddDeal({ clientId, onDone }: { clientId: string; onDone: () => void })
   const submit = () => {
     if (!name.trim() || busy) return;
     setBusy(true); setError(null);
-    const body: CreateDealInput = { clientId, name: name.trim(), stage, value: Number(value.replace(/,/g, '')) || 0, grossMarginPct: Number(margin) || 30, source: source.trim() };
+    // 粗利率は「空欄なら既定30%、0入力は0%」。Number('')は0になるため空欄と0を区別する
+    const marginPct = margin.trim() === '' ? 30 : Number(margin);
+    const body: CreateDealInput = {
+      clientId, name: name.trim(), stage,
+      value: Number(value.replace(/,/g, '')) || 0,
+      grossMarginPct: Number.isFinite(marginPct) ? marginPct : 30,
+      source: source.trim(),
+    };
     apiPost('/deals', body).then(() => { setName(''); setValue(''); setSource(''); onDone(); }).catch((e: unknown) => setError(toApiError(e))).finally(() => setBusy(false));
   };
   return (
@@ -52,9 +59,20 @@ export default function DealsPage() {
   const summary = useApi<DealSummaryDto>(cid ? `/deals/summary?clientId=${cid}` : null);
   const deals = useApi<DealDto[]>(cid ? `/deals?clientId=${cid}` : null);
   const refresh = () => { summary.refresh(); deals.refresh(); };
+  const [actBusy, setActBusy] = useState(false);
+  const [actError, setActError] = useState<ApiError | null>(null);
 
-  const setStage = (id: string, stage: DealStage) => apiPut(`/deals/${id}`, { stage }).then(refresh);
-  const del = (id: string) => apiDelete(`/deals/${id}`).then(refresh);
+  const setStage = (id: string, stage: DealStage) => {
+    if (actBusy) return;
+    setActBusy(true); setActError(null);
+    apiPut(`/deals/${id}`, { stage }).then(refresh).catch((e: unknown) => setActError(toApiError(e))).finally(() => setActBusy(false));
+  };
+  const del = (id: string) => {
+    if (actBusy) return;
+    if (!window.confirm('この案件を削除します。よろしいですか？')) return;
+    setActBusy(true); setActError(null);
+    apiDelete(`/deals/${id}`).then(refresh).catch((e: unknown) => setActError(toApiError(e))).finally(() => setActBusy(false));
+  };
   const clientName = clients.find((c) => c.id === cid)?.name ?? '';
 
   return (
@@ -63,6 +81,7 @@ export default function DealsPage() {
       <HintBar id="deals" title="成約パイプラインの使い方">
         広告で獲得したCVを<mark>商談→受注（成約）</mark>まで追跡します。ラストクリックの数だけでなく、<b>実際の受注額・粗利ROAS</b>で広告の本当の価値が分かり、成約まで一気通貫で見えます。
       </HintBar>
+      {actError ? <ErrorCard error={actError} /> : null}
 
       {!cid ? (
         <div className="card"><div className="c-body"><p style={{ margin: 0, color: 'var(--muted)' }}>上部の「クライアント」で対象を選ぶと、そのクライアントの成約状況が表示されます。</p></div></div>

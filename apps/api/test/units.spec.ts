@@ -718,6 +718,25 @@ describe('媒体別 入稿シート (F-58)', () => {
     expect(buildLaunchSheet({ ...base, platform: 'line_ads' })!.negatives.length).toBe(0);
   });
 
+  it('検索媒体は全角を2字として数え、超過分は幅に収まるよう切り詰める', () => {
+    // 全角18字 = 幅36 > Google見出し上限30(=全角15)。文字数(18)では通ってしまう
+    const h18 = '広告運用代行のことなら経験豊富な当社へ';
+    const g = buildLaunchSheet({ ...base, platform: 'google_ads', headlines: [h18] })!;
+    // ハード切り詰めで幅30以内に収め、貼り付け可能にする (印付き)
+    expect(g.headlines[0].ok).toBe(true);
+    expect(g.headlines[0].shortened).toBe(true);
+    // 出力見出しの幅(全角=2)が上限30以内であること
+    const width = (s: string) => [...s].reduce((n, ch) => {
+      const c = ch.codePointAt(0) ?? 0;
+      return n + ((c >= 0x20 && c <= 0x7e) || (c >= 0xff61 && c <= 0xff9f) ? 1 : 2);
+    }, 0);
+    expect(width(g.headlines[0].text)).toBeLessThanOrEqual(30);
+    // Metaは文字数(全角=1)なので同じ18字はそのまま通る
+    const m = buildLaunchSheet({ ...base, platform: 'meta', headlines: [h18] })!;
+    expect(m.headlines[0].ok).toBe(true);
+    expect(m.headlines[0].shortened).toBeFalsy();
+  });
+
   it('上限超過は文単位で短縮し、印を付ける', () => {
     const sheet = buildLaunchSheet({
       ...base, platform: 'line_ads',
@@ -730,11 +749,18 @@ describe('媒体別 入稿シート (F-58)', () => {
     expect(/[。！？]$/.test(d.text)).toBe(true);
   });
 
-  it('1文でも収まらない必須項目は超過として残し修正を促す', () => {
+  it('1文で収まらない見出しは幅に合わせて自動短縮し、確認を促す', () => {
     const sheet = buildLaunchSheet({ ...base, platform: 'google_ads' })!;
-    const over = sheet.headlines.filter((h) => !h.ok);
-    expect(over.length).toBeGreaterThan(0);
-    expect(sheet.issues.some((i) => i.includes('文字数超過'))).toBe(true);
+    // 長い一文の見出しも貼り付け可能なように短縮され、印が付く (要修正で放置しない)
+    const long = sheet.headlines.find((h) => h.shortened);
+    expect(long).toBeTruthy();
+    // すべての見出しが上限内 (幅30) に収まっている
+    const width = (s: string) => [...s].reduce((n, ch) => {
+      const c = ch.codePointAt(0) ?? 0;
+      return n + ((c >= 0x20 && c <= 0x7e) || (c >= 0xff61 && c <= 0xff9f) ? 1 : 2);
+    }, 0);
+    expect(sheet.headlines.every((h) => width(h.text) <= 30)).toBe(true);
+    expect(sheet.issues.some((i) => i.includes('自動短縮'))).toBe(true);
   });
 
   it('不足があれば ready=false、揃えば ready=true', () => {
