@@ -10,7 +10,13 @@ export class ShareController {
   constructor(private readonly share: ShareService) {}
 
   @Get(':clientId/share')
-  status(@TenantId() tenantId: string, @Param('clientId') clientId: string): Promise<ShareLinkDto> {
+  status(
+    @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
+    @Param('clientId') clientId: string,
+  ): Promise<ShareLinkDto> {
+    // 公開ポータルのtoken(ログイン不要URLの秘密)を返すため編集権限者に限定する
+    assertEditor(user);
     return this.share.status(tenantId, clientId);
   }
 

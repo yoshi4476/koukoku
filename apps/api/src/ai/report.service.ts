@@ -10,6 +10,7 @@ import type { SessionInfoValue } from '../common/tenant';
 import { TrailService } from '../common/trail.service';
 import { ShareService } from '../share/share.service';
 import { MetricsService, Totals, daysAgo, isoDate } from '../metrics/metrics.service';
+import { webOrigin } from '../common/web-origin';
 import { LlmService } from './llm.service';
 import { OUTPUT_SCHEMAS, PROMPTS } from './prompt-registry';
 
@@ -59,8 +60,7 @@ export class ReportService {
     });
 
     const token = await this.share.ensureToken(tenantId, report.clientId, user.userId);
-    const base = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
-    const url = `${base}/share/${token}`;
+    const url = `${webOrigin()}/share/${token}`;
     const period = isoDate(report.periodStart);
 
     let channel: ReportDeliveryDto['channel'] = 'link';

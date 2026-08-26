@@ -19,6 +19,10 @@ export interface SessionPayload {
 
 export const SESSION_COOKIE = 'adgrid_session';
 
+// タイミング攻撃対策用のダミーbcryptハッシュ (コスト10・実在しないパスワード)。
+// ユーザー不在時もこれと compare して応答時間を均一化する
+const DUMMY_HASH = '$2b$10$StMDAgrzL16KR34D0lcdcOln2YZixvR6V4ha/uNwUc5DsE8gVpeZq';
+
 function authSecret(): string {
   // 空文字も未設定として扱う (?? だと '' が漏れて jwt.sign が例外→500 になるため || を使う)。
   const s = process.env.AUTH_SECRET;
@@ -143,9 +147,10 @@ export class AuthService {
       where: { email: (email ?? '').trim().toLowerCase() },
       include: { memberships: true },
     });
-    if (!user) throw invalid();
-    const ok = await bcrypt.compare(password ?? '', user.passwordHash);
-    if (!ok) throw invalid();
+    // ユーザー不在でもダミーハッシュに対して compare を走らせ、応答時間を均一化する。
+    // 即 return するとメールアドレスの登録有無を応答時間差で判別できてしまう
+    const ok = await bcrypt.compare(password ?? '', user?.passwordHash ?? DUMMY_HASH);
+    if (!user || !ok) throw invalid();
     if (user.memberships.length === 0) {
       throw new AppError(
         HttpStatus.FORBIDDEN,

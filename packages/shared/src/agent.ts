@@ -25,20 +25,22 @@ export function parseInstruction(text: string): AgentHints {
   const t = (text ?? '').trim();
   const hints: AgentHints = {};
 
+  // 目標CPA: 「CPA4000」「CPA 4,000円」「CPA1.5万円」。万・小数に対応する。
+  // 先に確定させ、予算の万マッチが CPA の万を横取りしないようにする
+  const cpa = t.match(/CPA\s*[:：]?\s*(\d[\d,]*(?:\.\d+)?)\s*(万)?/i);
+  if (cpa) hints.targetCpa = Math.round(toNum(cpa[1]) * (cpa[2] ? 10000 : 1));
+
   // 予算: 「30万」「30万円」「予算50万」「月500,000円」。
-  // 「CPA4000円」等をCPAと誤認しないよう、円指定は予算/月の文脈がある時だけ採用する。
-  const man = t.match(/(\d[\d,]*(?:\.\d+)?)\s*万/);
-  const budgetYen = t.match(/(?:予算|月|ひと月|マンスリー)[はをにで:：\s]*(\d[\d,]{3,})\s*円/);
+  // CPA表記を除いた文字列で探し、「CPA1.5万」を予算15,000円と誤認しないようにする。
+  const withoutCpa = t.replace(/CPA\s*[:：]?\s*\d[\d,]*(?:\.\d+)?\s*万?\s*円?/gi, ' ');
+  const man = withoutCpa.match(/(\d[\d,]*(?:\.\d+)?)\s*万/);
+  const budgetYen = withoutCpa.match(/(?:予算|月|ひと月|マンスリー)[はをにで:：\s]*(\d[\d,]{3,})\s*円/);
   if (man) hints.budget = Math.round(toNum(man[1]) * 10000);
   else if (budgetYen) hints.budget = toNum(budgetYen[1]);
 
   // 目標CV: 「CV100」「100件」「月100件」
   const cv = t.match(/CV\s*[:：]?\s*(\d[\d,]*)/i) || t.match(/(\d[\d,]*)\s*件/);
   if (cv) hints.targetCv = toNum(cv[1]);
-
-  // 目標CPA: 「CPA4000」「CPA 4,000円」
-  const cpa = t.match(/CPA\s*[:：]?\s*(\d[\d,]*)/i);
-  if (cpa) hints.targetCpa = toNum(cpa[1]);
 
   // 地域
   const regions = (t.match(/(全国|首都圏|関東|関西|東京|大阪|名古屋|福岡|札幌|横浜|京都|神戸)/g) || []);

@@ -725,7 +725,13 @@ export interface CreateAbTestInput {
 }
 
 /* ---- 承認フロー付き適用 (F-16 / Phase 3) ---- */
-export type ProposalAction = 'adjust_budget' | 'adjust_bid' | 'pause_campaign';
+export type ProposalAction =
+  | 'adjust_budget'
+  | 'adjust_bid'
+  | 'pause_campaign'
+  // キーワード単位の操作 (F-57)。実API適用は媒体側で手動反映 (自動適用は非対応)
+  | 'pause_keyword'
+  | 'adjust_keyword_bid';
 export type ProposalStatus =
   | 'pending'
   | 'approved'

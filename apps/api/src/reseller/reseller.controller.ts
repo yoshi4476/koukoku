@@ -34,8 +34,8 @@ export class ResellerController {
   }
 
   @Get()
-  list(@TenantId() tenantId: string): Promise<ChildTenantDto[]> {
-    return this.reseller.list(tenantId);
+  list(@TenantId() tenantId: string, @SessionInfo() user: SessionInfoValue): Promise<ChildTenantDto[]> {
+    return this.reseller.list(tenantId, user);
   }
 
   @Post()

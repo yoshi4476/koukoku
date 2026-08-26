@@ -69,13 +69,16 @@ export class KeywordsService {
     }
 
     const actionLabel = r.action === 'increase' ? '増額' : r.action === 'decrease' ? '減額' : '停止';
+    // 対象キーワードは keyword フィールドで持つ。campaignId には流用しない。
+    // 流用すると適用時に「キーワード文字列をIDに持つ存在しないキャンペーン」への
+    // 操作になり、実APIでは失敗、フォールバックではアカウント全体を誤操作する
     const input: CreateProposalInput = {
       adAccountId: r.adAccountId,
-      actionType: r.action === 'pause' ? 'pause_campaign' : 'adjust_bid',
+      actionType: r.action === 'pause' ? 'pause_keyword' : 'adjust_keyword_bid',
       actionPayload:
         r.action === 'pause'
-          ? { keyword: r.keyword, campaignId: r.keyword, matchType: r.matchType, currentBid: r.currentBid }
-          : { keyword: r.keyword, campaignId: r.keyword, matchType: r.matchType, percent: r.bidChangePct, currentBid: r.currentBid, recommendedBid: r.recommendedBid },
+          ? { keyword: r.keyword, matchType: r.matchType, currentBid: r.currentBid }
+          : { keyword: r.keyword, matchType: r.matchType, percent: r.bidChangePct, currentBid: r.currentBid, recommendedBid: r.recommendedBid },
       title: `キーワード${actionLabel}: ${r.keyword}`,
       evidence: r.reason,
       risk: r.expectedImpact,

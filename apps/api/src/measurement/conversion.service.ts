@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { createHash, randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
@@ -117,25 +118,47 @@ export class ConversionService {
     const emailHash = hashPii(input.email, 'email');
     const phoneHash = hashPii(input.phone, 'phone');
 
-    // 重複排除: 同一 tenant/client/eventId は再送しない
-    const existing = await this.prisma.withTenant(cfg.tenantId, (tx) =>
-      tx.conversionEvent.findUnique({
-        where: { tenantId_clientId_eventId: { tenantId: cfg.tenantId, clientId: cfg.clientId, eventId } },
-      }),
-    );
-    if (existing) {
-      return {
-        accepted: true, eventId, duplicate: true,
-        meta: existing.metaStatus as CollectResult['meta'],
-        ga4: existing.ga4Status as CollectResult['ga4'],
-        message: '受信済みのイベントです（重複排除しました）。',
-      };
-    }
-
     const value = Number(input.value ?? 0) || 0;
     const currency = (input.currency ?? 'JPY').toUpperCase();
     const eventName = (input.eventName ?? 'Purchase').trim() || 'Purchase';
 
+    // 重複排除は「先に枠を取る」方式にする。findUnique→送信→create の check-then-act だと、
+    // サンクスページのダブルクリック等の並行リクエストが両方チェックを通過し、
+    // 外部へ二重送信した上に後着の create が unique 制約違反で500になる。
+    // 先に pending 行を作り、unique 制約で先勝ちさせてから送信する
+    try {
+      await this.prisma.withTenant(cfg.tenantId, (tx) =>
+        tx.conversionEvent.create({
+          data: {
+            tenantId: cfg.tenantId, clientId: cfg.clientId, eventId, eventName, value, currency,
+            occurredAt: occurred, emailHash, phoneHash,
+            gclid: input.gclid ?? '', fbclid: input.fbclid ?? '', fbp: input.fbp ?? '',
+            sourceUrl: (input.sourceUrl ?? '').slice(0, 500),
+            userAgent: (ctx.userAgent ?? '').slice(0, 300),
+            ipHash: hashIp(ctx.ip),
+            metaStatus: 'pending', ga4Status: 'pending', errorMessage: '',
+          },
+        }),
+      );
+    } catch (e) {
+      // 既に同一 eventId の行がある = 重複。送信せず既存の結果を返す
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        const existing = await this.prisma.withTenant(cfg.tenantId, (tx) =>
+          tx.conversionEvent.findUnique({
+            where: { tenantId_clientId_eventId: { tenantId: cfg.tenantId, clientId: cfg.clientId, eventId } },
+          }),
+        );
+        return {
+          accepted: true, eventId, duplicate: true,
+          meta: (existing?.metaStatus ?? 'skipped') as CollectResult['meta'],
+          ga4: (existing?.ga4Status ?? 'skipped') as CollectResult['ga4'],
+          message: '受信済みのイベントです（重複排除しました）。',
+        };
+      }
+      throw e;
+    }
+
+    // 枠を確保できたのでここは1リクエストだけ。安心して外部送信する
     const errors: string[] = [];
     const meta = await this.sendMeta(cfg, {
       eventId, eventName, value, currency, occurred, emailHash, phoneHash,
@@ -147,16 +170,9 @@ export class ConversionService {
     }, errors);
 
     await this.prisma.withTenant(cfg.tenantId, (tx) =>
-      tx.conversionEvent.create({
-        data: {
-          tenantId: cfg.tenantId, clientId: cfg.clientId, eventId, eventName, value, currency,
-          occurredAt: occurred, emailHash, phoneHash,
-          gclid: input.gclid ?? '', fbclid: input.fbclid ?? '', fbp: input.fbp ?? '',
-          sourceUrl: (input.sourceUrl ?? '').slice(0, 500),
-          userAgent: (ctx.userAgent ?? '').slice(0, 300),
-          ipHash: hashIp(ctx.ip),
-          metaStatus: meta, ga4Status: ga4, errorMessage: errors.join(' / ').slice(0, 500),
-        },
+      tx.conversionEvent.update({
+        where: { tenantId_clientId_eventId: { tenantId: cfg.tenantId, clientId: cfg.clientId, eventId } },
+        data: { metaStatus: meta, ga4Status: ga4, errorMessage: errors.join(' / ').slice(0, 500) },
       }),
     );
 

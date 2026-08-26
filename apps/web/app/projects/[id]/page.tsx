@@ -60,6 +60,7 @@ import { TabHint } from './tab-hints';
 import { LaunchSheet } from './launch-sheet';
 import { CONNECTION_STATUS_META, INDUSTRY_LABEL } from '@/lib/labels';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
+import { safeHref } from '@/lib/url';
 
 type Tab = 'agent' | 'cycle' | 'hearing' | 'settings' | 'assets' | 'delivery' | 'overview' | 'improve' | 'report';
 // 一気通貫の順序: 材料 → 設定 → 制作 → 配信 → 成果 → 改善 → 報告
@@ -695,8 +696,8 @@ function AssetCard({ asset, project, canPublish, canEdit, onChanged }: {
           ? <video className="asset-thumb" src={media} controls preload="metadata" />
           : <img className="asset-thumb" src={media} alt={asset.title} />
       ) : null}
-      {asset.url && !uploaded ? (
-        <a className="asset-url" href={asset.url} target="_blank" rel="noopener noreferrer">{asset.url} ↗</a>
+      {asset.url && !uploaded && safeHref(asset.url) ? (
+        <a className="asset-url" href={safeHref(asset.url)!} target="_blank" rel="noopener noreferrer">{asset.url} ↗</a>
       ) : null}
       {asset.publishedAt ? <div className="asset-pubdate">公開日: {formatDate(asset.publishedAt)}</div> : null}
       {error ? <div style={{ fontSize: 11.5, color: 'var(--bad)' }}>{error.message}</div> : null}

@@ -417,6 +417,17 @@ describe('AI運用エージェント: 指示の解釈 (F-43)', () => {
     expect(h.budget).toBe(500000);
     expect(h.regions).toContain('全国');
   });
+  it('CPAの万・小数表記を予算と取り違えない', () => {
+    const h = parseInstruction('CPA1.5万円で月100件獲得したい');
+    expect(h.targetCpa).toBe(15000);
+    expect(h.targetCv).toBe(100);
+    expect(h.budget).toBeUndefined(); // 予算は指定されていない
+  });
+  it('予算の万とCPAの万を同時に正しく分離する', () => {
+    const h = parseInstruction('予算30万でCPA8000円以内');
+    expect(h.budget).toBe(300000);
+    expect(h.targetCpa).toBe(8000);
+  });
 });
 
 describe('増分効果テスト (F-42)', () => {
@@ -477,6 +488,17 @@ describe('UTM・命名規則 (F-38)', () => {
     expect(r.ok).toBe(false); // utm_campaign欠落
     expect(r.issues.some((i) => i.level === 'error' && i.message.includes('utm_campaign'))).toBe(true);
     expect(r.issues.some((i) => i.level === 'warn' && i.message.includes('大文字'))).toBe(true);
+  });
+  it('不正な%エンコードを含むURLでも例外を投げない', () => {
+    // decodeURIComponent が URIError を投げる入力。検査関数がクラッシュしないこと
+    expect(() =>
+      checkUtmConsistency('https://x.jp/lp?utm_source=google&utm_medium=cpc&utm_campaign=50%off'),
+    ).not.toThrow();
+  });
+  it('フラグメント(#以降)をsourceに取り込まない', () => {
+    const r = checkUtmConsistency('https://x.jp/lp?utm_source=google&utm_medium=cpc&utm_campaign=spring#top');
+    // source=google と正しく読めていれば「未知のsource」warnは出ない
+    expect(r.issues.some((i) => i.message.includes('google#top'))).toBe(false);
   });
 });
 

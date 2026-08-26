@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import type { CreateFeedbackInput, FeedbackDto } from '@adgrid/shared';
 import { ClientScope, SessionInfo, SessionInfoValue, TenantId } from '../common/tenant';
+import { assertEditor } from '../common/authz';
 import { FeedbackService } from './feedback.service';
 
 @Controller('feedback')
@@ -18,14 +19,20 @@ export class FeedbackController {
     return this.feedback.create(tenantId, scope, user, body);
   }
 
-  /** 自社(運用)が確認 */
+  /** 自社(運用)が確認。viewer や提供先には見せない (提供先メッセージが含まれるため) */
   @Get()
-  list(@TenantId() tenantId: string): Promise<FeedbackDto[]> {
+  list(@TenantId() tenantId: string, @SessionInfo() user: SessionInfoValue): Promise<FeedbackDto[]> {
+    assertEditor(user);
     return this.feedback.list(tenantId);
   }
 
   @Post(':id/resolve')
-  resolve(@TenantId() tenantId: string, @Param('id') id: string): Promise<FeedbackDto> {
+  resolve(
+    @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
+    @Param('id') id: string,
+  ): Promise<FeedbackDto> {
+    assertEditor(user);
     return this.feedback.resolve(tenantId, id);
   }
 }

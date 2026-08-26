@@ -64,17 +64,23 @@ export function checkUtmConsistency(url: string): { ok: boolean; issues: UtmChec
   const raw = (url ?? '').trim();
   if (!raw) return { ok: false, issues: [{ level: 'error', message: 'URLが空です。' }] };
 
-  let qs = '';
-  try {
-    qs = raw.split('?')[1] ?? '';
-  } catch {
-    qs = '';
-  }
+  // クエリだけを取り出す。フラグメント(#以降)は UTM ではないので落とす
+  // (残すと "?utm_source=google#top" が source=google#top になり誤warn)
+  const qs = (raw.split('?')[1] ?? '').split('#')[0];
+  // 不正な%エンコード ("50%off" 等) で decodeURIComponent が例外を投げると
+  // 検査関数ごとクラッシュするため、失敗時は生値を使う
+  const dec = (s: string): string => {
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      return s;
+    }
+  };
   const params = new Map<string, string>();
   for (const pair of qs.split('&')) {
     if (!pair) continue;
     const [k, v = ''] = pair.split('=');
-    params.set(k.toLowerCase(), decodeURIComponent(v));
+    params.set(k.toLowerCase(), dec(v));
   }
   for (const req of ['utm_source', 'utm_medium', 'utm_campaign']) {
     if (!params.has(req)) issues.push({ level: 'error', message: `${req} がありません。` });

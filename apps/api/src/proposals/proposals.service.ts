@@ -217,7 +217,18 @@ export class ProposalsService {
       let note = '';
       let rollbackPayload: object | null = null;
 
-      if (proposal.actionType === 'adjust_budget') {
+      // キーワード単位の操作は、実APIコネクタが criterion(キーワード)IDでの
+      // 停止/入札変更を未実装のため、実データへは適用しない。承認は記録し、
+      // 媒体側での手動反映を促す (campaignId にキーワードを流用して誤操作するのを防ぐ)
+      const isKeywordAction = proposal.actionType === 'pause_keyword' || proposal.actionType === 'adjust_keyword_bid';
+
+      if (isKeywordAction) {
+        const kw = String(payload.keyword ?? '');
+        note = proposal.actionType === 'pause_keyword'
+          ? `キーワード「${kw}」の停止を承認しました。媒体の管理画面で除外/停止を反映してください。`
+          : `キーワード「${kw}」の入札調整を承認しました。媒体の管理画面で反映してください。`;
+        rollbackPayload = {}; // キーワード操作は自動復元しない (rollbackで弾く)
+      } else if (proposal.actionType === 'adjust_budget') {
         // ローカル管理値の実適用 (変更前値を保持しロールバック可能)
         const newBudget = Number(payload.newMonthlyBudget);
         const old = proposal.adAccount.monthlyBudget ? Number(proposal.adAccount.monthlyBudget) : null;
@@ -328,6 +339,18 @@ export class ProposalsService {
 
   async rollback(tenantId: string, user: SessionInfoValue, id: string): Promise<ProposalDto> {
     this.assertApprover(user);
+    // 自動で戻せるのは月予算 (ローカル管理値) だけ。媒体書込やキーワード操作は
+    // 変更前値を保持していないため、rolled_back にすると「戻した」という虚偽記録になる。
+    // 対象外は先に弾く (状態を変えない)
+    const target = await this.prisma.withTenant(tenantId, (tx) => tx.proposal.findUnique({ where: { id } }));
+    if (!target) throw new AppError(HttpStatus.NOT_FOUND, '提案が見つかりません。', '一覧を再読込してください。');
+    if (target.actionType !== 'adjust_budget') {
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        'この提案は自動で元に戻せません。',
+        '予算以外の変更は、媒体の管理画面で手動で戻してください。',
+      );
+    }
     const reverted = await this.prisma.withTenant(tenantId, async (tx) => {
       // executed→rolled_back をアトミックに確保してから復元 (二重ロールバック防止)
       const claimed = await tx.proposal.updateMany({
@@ -340,11 +363,8 @@ export class ProposalsService {
       const p = await tx.proposal.findUnique({ where: { id } });
       if (!p) return null;
       const rb = (p.rollbackPayload ?? {}) as Record<string, unknown>;
-      let restored: number | null = null;
-      if (p.actionType === 'adjust_budget' && 'monthlyBudget' in rb) {
-        restored = rb.monthlyBudget === null ? null : Number(rb.monthlyBudget);
-        await tx.adAccount.update({ where: { id: p.adAccountId }, data: { monthlyBudget: restored } });
-      }
+      const restored = 'monthlyBudget' in rb && rb.monthlyBudget !== null ? Number(rb.monthlyBudget) : null;
+      await tx.adAccount.update({ where: { id: p.adAccountId }, data: { monthlyBudget: restored } });
       await tx.proposal.update({
         where: { id },
         data: { executionNote: `${p.executionNote} → 変更前の値に戻しました。` },

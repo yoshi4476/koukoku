@@ -6,6 +6,7 @@ import { AppError } from '../common/errors';
 import { MailService } from '../common/mail.service';
 import { SessionGuard } from '../common/session.guard';
 import { TrailService } from '../common/trail.service';
+import { webOrigin } from '../common/web-origin';
 
 /** 有効期間。長すぎると盗まれたリンクの寿命が延びるため短くする */
 const TTL_MS = 60 * 60 * 1000;
@@ -21,8 +22,7 @@ function hashToken(raw: string): string {
 }
 
 export function passwordResetUrl(token: string): string {
-  const base = (process.env.WEB_ORIGIN ?? 'http://localhost:3000').split(',')[0].trim();
-  return `${base.replace(/\/$/, '')}/reset?token=${token}`;
+  return `${webOrigin()}/reset?token=${token}`;
 }
 
 /**

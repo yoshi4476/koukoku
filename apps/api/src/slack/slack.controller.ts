@@ -123,11 +123,14 @@ export class SlackController {
 
   private async resolveTenant(teamId?: string): Promise<string | null> {
     if (teamId) {
-      // tenant.settings.slackTeamId で紐付け (管理者接続で全テナント横断検索)
-      const tenants = await this.prisma.tenant.findMany({ where: { status: 'active' } });
+      // tenants はRLS対象。app.tenant_id 無しの通常接続では0件になるため、
+      // withPlatformAdmin で全テナント横断検索する (これをしないと常にDEVフォールバックに落ちる)
+      const tenants = await this.prisma.withPlatformAdmin((tx) => tx.tenant.findMany({ where: { status: 'active' } }));
       const match = tenants.find((t) => (t.settings as Record<string, unknown>)?.slackTeamId === teamId);
       if (match) return match.id;
     }
+    // 本番では team_id 未一致時に無関係テナントへ落とさない (DEVフォールバックは開発のみ)
+    if (process.env.NODE_ENV === 'production') return null;
     return process.env.DEV_TENANT_ID ?? null;
   }
 
@@ -145,7 +148,11 @@ export class SlackController {
     const raw = (req as Request & { rawBody?: Buffer }).rawBody?.toString() ?? '';
     const base = `v0:${timestamp}:${raw}`;
     const hmac = 'v0=' + crypto.createHmac('sha256', secret).update(base).digest('hex');
-    if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(signature))) {
+    const a = Buffer.from(hmac);
+    const b = Buffer.from(signature);
+    // timingSafeEqual は長さ不一致で RangeError を投げる。短い署名を送られるだけで
+    // 500 になるため、先に長さを比較する (不一致は署名不一致として扱う)
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
       throw new AppError(HttpStatus.UNAUTHORIZED, 'Slack署名が一致しません。', 'Signing Secret の設定を確認してください。');
     }
   }

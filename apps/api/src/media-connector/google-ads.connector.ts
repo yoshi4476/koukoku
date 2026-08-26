@@ -2,6 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import type { PrismaClient } from '@prisma/client';
 import { AppError } from '../common/errors';
 import { decryptSecret } from '../common/token-crypto';
+import { signOAuthState } from '../common/oauth-state';
 import {
   BaseConnector,
   type ApplyResult,
@@ -28,7 +29,6 @@ const OAUTH_TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const ADS_HOST = 'https://googleads.googleapis.com';
 const SCOPE = 'https://www.googleapis.com/auth/adwords';
 /** 1リクエストの上限。日次×キャンペーンなら十分 */
-const PAGE_SIZE = 10_000;
 const MAX_PAGES = 20;
 
 type Tokens = { accessToken: string; expiresAt: number };
@@ -97,7 +97,7 @@ export class GoogleAdsConnector extends BaseConnector {
       scope: SCOPE,
       access_type: 'offline',
       prompt: 'consent', // 毎回 refresh_token を確実に得るため
-      state: this.tenantId,
+      state: signOAuthState(this.tenantId), // 生のtenantIdは入れない (CSRF対策)
     });
     return { mode: 'oauth', authUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params}` };
   }
@@ -242,7 +242,9 @@ export class GoogleAdsConnector extends BaseConnector {
     const out: Record<string, any>[] = [];
     let pageToken: string | undefined;
     for (let i = 0; i < MAX_PAGES; i++) {
-      const body: Record<string, unknown> = { query, pageSize: PAGE_SIZE };
+      // pageSize は Google Ads API v17+ で廃止 (送ると PAGE_SIZE_NOT_SUPPORTED)。
+      // ページサイズは1万固定で、nextPageToken だけで追う
+      const body: Record<string, unknown> = { query };
       if (pageToken) body.pageToken = pageToken;
       const json = await this.call<{ results?: Record<string, any>[]; nextPageToken?: string }>(
         `customers/${cid}/googleAds:search`,
@@ -361,7 +363,11 @@ export class GoogleAdsConnector extends BaseConnector {
         throw new AppError(HttpStatus.BAD_REQUEST, '入札変更には広告グループIDとキーワードIDが必要です。',
           'キーワード最適化から申請した提案をご利用ください。');
       }
-      const bidYen = Number(payload.newBid ?? payload.cpcBid ?? 0);
+      const bidYen = Number(payload.recommendedBid ?? payload.newBid ?? payload.cpcBid ?? 0);
+      if (!Number.isFinite(bidYen) || bidYen <= 0) {
+        // 0円入札は配信停止に等しい誤設定。newBid 欠落の提案を素通しさせない
+        throw new AppError(HttpStatus.BAD_REQUEST, '入札単価が指定されていません。', '有効な入札単価を含む提案をご利用ください。');
+      }
       await this.call(`customers/${customerId}/adGroupCriteria:mutate`, {
         method: 'POST',
         body: {

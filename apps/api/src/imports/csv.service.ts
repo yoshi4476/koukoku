@@ -190,13 +190,20 @@ export class CsvService {
         '日付列が YYYY/MM/DD または YYYY-MM-DD 形式か確認してください。',
       );
     }
-    const minDate = new Date(Math.min(...entries.map((e) => e.date.getTime())));
-    const maxDate = new Date(Math.max(...entries.map((e) => e.date.getTime())));
+    // 洗い替え対象は「CSVに実在する日付」だけに限定する。
+    // gte:min〜lte:max の期間全消しだと、CSVに無い歯抜けの日や、
+    // API同期由来 (campaignId が csv: でない) の実績まで巻き添えで消える
+    const csvDates = [...new Set(entries.map((e) => e.date.getTime()))].map((t) => new Date(t));
 
     const inserted = await this.prisma.withTenant(tenantId, async (tx) => {
-      // 同一期間の既存CSV由来データを洗い替え (再取込に対応)
+      // 同一日のCSV由来データのみ洗い替え (再取込に対応)。
+      // campaignId が空 or 'csv:' 始まりの行が過去のCSV取込分
       await tx.factAdPerformance.deleteMany({
-        where: { adAccountId, date: { gte: minDate, lte: maxDate } },
+        where: {
+          adAccountId,
+          date: { in: csvDates },
+          OR: [{ campaignId: '' }, { campaignId: { startsWith: 'csv:' } }],
+        },
       });
       const created = await tx.factAdPerformance.createMany({
         data: entries.map((e) => ({

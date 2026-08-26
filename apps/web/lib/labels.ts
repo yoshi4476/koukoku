@@ -132,6 +132,8 @@ export const PROPOSAL_ACTION_LABEL: Record<ProposalAction, string> = {
   adjust_budget: '予算調整',
   adjust_bid: '入札調整',
   pause_campaign: '配信停止',
+  pause_keyword: 'キーワード停止',
+  adjust_keyword_bid: 'キーワード入札調整',
 };
 
 export const PROPOSAL_STATUS_LABEL: Record<ProposalStatus, string> = {

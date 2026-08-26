@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { LP_CHECK_ITEMS, lpScore } from '@adgrid/shared';
+import { safeHref } from '@/lib/url';
 
 /**
  * LP最適化(ポストクリック) (F-49)。LPのCVR要因をチェックし、100点満点のスコアと
@@ -35,7 +36,7 @@ export function LpOptimizer({ assetId, url }: { assetId: string; url: string }) 
     <div className="lpo">
       <p className="lpo-intro">
         クリック後のLPは<mark>成約率（CVR）を直接左右</mark>します。当てはまる項目にチェックすると、スコアと改善優先度が出ます。
-        {url ? <> 対象LP: <a href={url} target="_blank" rel="noopener noreferrer">{url} ↗</a></> : null}
+        {safeHref(url) ? <> 対象LP: <a href={safeHref(url)!} target="_blank" rel="noopener noreferrer">{url} ↗</a></> : null}
       </p>
 
       <div className={`lpo-score ${gradeCls}`}>

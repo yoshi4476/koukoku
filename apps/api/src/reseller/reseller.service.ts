@@ -22,7 +22,9 @@ export class ResellerService {
     }
   }
 
-  async list(parentTenantId: string): Promise<ChildTenantDto[]> {
+  async list(parentTenantId: string, actor: SessionInfoValue): Promise<ChildTenantDto[]> {
+    // 子テナントの管理者メールを含むため owner/admin 限定 (list だけ無防備だった)
+    this.assertManager(actor);
     // 親コンテキストでは RLS により子テナント(parent_tenant_id=親)も可視
     const children = await this.prisma.withTenant(parentTenantId, (tx) =>
       tx.tenant.findMany({ where: { parentTenantId }, orderBy: { createdAt: 'desc' } }),

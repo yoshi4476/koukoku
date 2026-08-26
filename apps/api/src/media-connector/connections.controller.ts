@@ -9,6 +9,8 @@ import { BillingService } from '../billing/billing.service';
 import { MediaSyncService } from './sync.service';
 import { GoogleAdsConnector } from './google-ads.connector';
 import { encryptSecret } from '../common/token-crypto';
+import { webOrigin } from '../common/web-origin';
+import { verifyOAuthState } from '../common/oauth-state';
 
 @Controller('connections')
 export class ConnectionsController {
@@ -59,15 +61,18 @@ export class ConnectionsController {
     @Query('error') error: string,
     @Res() res: Response,
   ): Promise<void> {
-    const web = process.env.WEB_ORIGIN ?? 'http://localhost:3000';
-    const back = (q: string) => res.redirect(`${web}/connections?${q}`);
+    const back = (q: string) => res.redirect(`${webOrigin()}/connections?${q}`);
     if (error) return back(`google=denied`);
     if (!code || !state) return back(`google=invalid`);
+    // state を検証して tenantId を取り出す。生tenantId受け取りだと、攻撃者が
+    // state=<被害者tenantId> に差し替えて被害者の接続を自分のトークンで乗っ取れる
+    const tenantId = verifyOAuthState(state);
+    if (!tenantId) return back('google=invalid');
     try {
       const { refreshToken } = await GoogleAdsConnector.exchangeCode(code);
-      await this.prisma.withTenant(state, (tx) =>
+      await this.prisma.withTenant(tenantId, (tx) =>
         tx.mediaConnection.upsert({
-          where: { tenantId_platform: { tenantId: state, platform: 'google_ads' } },
+          where: { tenantId_platform: { tenantId, platform: 'google_ads' } },
           update: {
             mode: 'oauth', status: 'connected', errorMessage: '',
             refreshTokenEnc: encryptSecret(refreshToken),
@@ -75,7 +80,7 @@ export class ConnectionsController {
             authorizedAt: new Date(),
           },
           create: {
-            tenantId: state, platform: 'google_ads', mode: 'oauth', status: 'connected',
+            tenantId, platform: 'google_ads', mode: 'oauth', status: 'connected',
             refreshTokenEnc: encryptSecret(refreshToken),
             loginCustomerId: (process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID ?? '').replace(/[^0-9]/g, ''),
             authorizedAt: new Date(),
