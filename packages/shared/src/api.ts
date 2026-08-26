@@ -70,6 +70,11 @@ export interface MeDto {
   clientScopeName: string | null;
   /** このユーザーが切り替えられるテナント (親+管理する子テナント)。1件ならスイッチャー非表示 */
   switchableTenants: SwitchableTenantDto[];
+  /**
+   * SaaS運営者(システム管理者)か (F-61)。
+   * テナント内の権限ではなく PLATFORM_ADMIN_EMAILS で決まるため、画面からは昇格できない。
+   */
+  platformAdmin: boolean;
 }
 
 export interface SwitchableTenantDto {
@@ -132,6 +137,81 @@ export interface CreateChildTenantInput {
   adminEmail: string;
   adminPassword: string;
   adminName?: string;
+}
+
+/* ---- システム管理 (F-61): SaaS運営者が全テナントを横断管理する ---- */
+
+/**
+ * 契約プラン。課金額そのものではなく請求区分を表す。
+ * 値は既存データに合わせてある (schema の既定が starter、シードが business)。
+ */
+export type TenantPlan = 'trial' | 'starter' | 'business' | 'enterprise';
+
+export const TENANT_PLANS: TenantPlan[] = ['trial', 'starter', 'business', 'enterprise'];
+
+export const TENANT_PLAN_LABEL: Record<TenantPlan, string> = {
+  trial: 'トライアル',
+  starter: 'スターター',
+  business: 'ビジネス',
+  enterprise: 'エンタープライズ',
+};
+
+/** 全テナント一覧の1行。リセラーの子かどうかに関わらず、システム上の全テナントが対象 */
+export interface PlatformTenantDto extends TenantUsageDto {
+  plan: string;
+  /** 親テナント (リセラー経由で発行された場合)。直接契約なら null */
+  parentTenantId: string | null;
+  parentTenantName: string | null;
+  /** 直近30日にひとつでも操作があったか。請求・解約判断の一次シグナル */
+  active30d: boolean;
+}
+
+/** システム全体のKPI。運営者がまず見る数字 */
+export interface PlatformOverviewDto {
+  tenantCount: number;
+  activeCount: number;
+  suspendedCount: number;
+  /** 直近30日に操作のあったテナント数 */
+  active30dCount: number;
+  /** 発行済みだが立ち上がっていないテナント数 (解約予備軍) */
+  stalledCount: number;
+  newIn30d: number;
+  /** 自分で登録した直接契約のテナント数 (通常のお客さん) */
+  directCount: number;
+  /** 提供元(リセラー)が発行した子テナント数 */
+  resoldCount: number;
+  userCount: number;
+  clientCount: number;
+  projectCount: number;
+  /** 全テナント合計の広告消化額 (直近30日・円) */
+  cost30d: number;
+  /** 全テナント合計のAI利用原価 (直近30日・円)。運営側の変動費 */
+  aiCostJpy30d: number;
+  planCounts: Record<string, number>;
+}
+
+/** 外部連携・実行基盤の稼働状況。障害の一次切り分けに使う */
+export interface PlatformHealthItem {
+  key: string;
+  label: string;
+  ok: boolean;
+  /** ok=false でも運用を止めない任意項目か */
+  optional: boolean;
+  detail: string;
+}
+
+export interface PlatformHealthDto {
+  /** アプリが接続しているDBロール。テーブル所有者だとRLSが効かない */
+  dbRole: string;
+  rlsEnforced: boolean;
+  schedulerEnabled: boolean;
+  nodeEnv: string;
+  items: PlatformHealthItem[];
+}
+
+export interface PlatformConsoleDto {
+  overview: PlatformOverviewDto;
+  tenants: PlatformTenantDto[];
 }
 
 /* ---- 提供先アクセス発行 (F-22) ---- */

@@ -355,6 +355,15 @@ export function Shell({ children }: { children: ReactNode }) {
             </div>
           );
         })}
+        {/* システム管理 (F-61)。SaaS運営者にだけ出す。判定はサーバ側の PLATFORM_ADMIN_EMAILS */}
+        {me.platformAdmin ? (
+          <div>
+            <div className="nav-sep">運営</div>
+            <Link href="/admin" className="nav-admin">
+              ⚙ システム管理
+            </Link>
+          </div>
+        ) : null}
       </aside>
       <div className="main">
         <div className="topbar">

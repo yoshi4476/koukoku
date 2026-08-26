@@ -86,4 +86,20 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       return fn(tx);
     });
   }
+
+  /**
+   * SaaS運営者(システム管理者)専用のコンテキスト (F-61)。
+   *
+   * 開くのは tenants テーブルの行の可視性だけで、業務データ(clients/projects/実績等)は
+   * 従来どおり分離されたまま。個別テナントの中身を集計するには withTenant で入り直す。
+   * これにより「運営者は契約状況を把握できるが、顧客の広告データを素通しで読めはしない」を保つ。
+   *
+   * 呼び出し元は必ず PlatformAdminGuard を通すこと。
+   */
+  withPlatformAdmin<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+    return this.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT set_config('app.platform_admin', 'on', true)`;
+      return fn(tx);
+    });
+  }
 }

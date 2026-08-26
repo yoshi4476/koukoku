@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import { AuthProvider } from '@/components/auth-context';
 import { ClientProvider } from '@/components/client-context';
 import { Shell } from '@/components/shell';
+import { AdminShell } from '@/components/admin-shell';
 
 /** シェル (サイドバー・トップバー) を出さない画面 */
 function isBarePath(pathname: string): boolean {
@@ -26,6 +27,16 @@ export function AppFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   if (isBarePath(pathname)) return <>{children}</>;
+
+  // システム管理 (F-61) はテナント運用のシェルを使わない。
+  // ClientProvider も通さない (運営者はテナントのクライアント一覧を持たないため)
+  if (pathname.startsWith('/admin')) {
+    return (
+      <AuthProvider>
+        <AdminShell>{children}</AdminShell>
+      </AuthProvider>
+    );
+  }
 
   return (
     <AuthProvider>

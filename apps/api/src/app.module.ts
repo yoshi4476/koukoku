@@ -57,6 +57,9 @@ import { FeedbackController } from './feedback/feedback.controller';
 import { ResellerService } from './reseller/reseller.service';
 import { TenantConsoleService } from './reseller/tenant-console.service';
 import { ResellerController } from './reseller/reseller.controller';
+import { PlatformService } from './platform/platform.service';
+import { PlatformController } from './platform/platform.controller';
+import { PlatformAdminGuard } from './platform/platform-admin.guard';
 import { ShareService } from './share/share.service';
 import { ShareController, PublicShareController } from './share/share.controller';
 import { AuditLogService } from './audit-log/audit-log.service';
@@ -95,6 +98,7 @@ import { IntegrationsController } from './integrations/integrations.controller';
     AccessController,
     FeedbackController,
     ResellerController,
+    PlatformController,
     ShareController,
     PublicShareController,
     AuditLogController,
@@ -134,6 +138,8 @@ import { IntegrationsController } from './integrations/integrations.controller';
     FeedbackService,
     ResellerService,
     TenantConsoleService,
+    PlatformService,
+    PlatformAdminGuard,
     ShareService,
     AuditLogService,
     LiftService,

@@ -5,6 +5,7 @@ import { randomUUID } from 'crypto';
 import type { Edition, MeDto, MemberRole, SwitchableTenantDto } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
+import { isPlatformAdminEmail } from '../platform/platform-admin';
 
 export interface SessionPayload {
   sub: string; // userId
@@ -119,6 +120,7 @@ export class AuthService {
         switchableTenants: [
           { id: tenantId, name: input.tenantName.trim(), edition: 'agency', role: 'owner', isChild: false },
         ],
+        platformAdmin: isPlatformAdminEmail(email),
       },
       token: signSession(payload),
     };
@@ -182,6 +184,7 @@ export class AuthService {
         clientScopeId: scopeId,
         clientScopeName,
         switchableTenants: await this.switchableTenantsOf(user.id),
+        platformAdmin: isPlatformAdminEmail(user.email),
       },
       token: signSession(payload),
     };
@@ -249,6 +252,7 @@ export class AuthService {
       clientScopeId: scopeId,
       clientScopeName,
       switchableTenants: await this.switchableTenantsOf(user.id),
+      platformAdmin: isPlatformAdminEmail(user.email),
     };
   }
 

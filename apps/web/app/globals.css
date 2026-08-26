@@ -1649,3 +1649,49 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .tn-warn{margin-top:10px;background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:9px 12px;font-size:12.5px;line-height:1.7}
 .tn-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:11px}
 .tn-confirm{font-size:12.5px;color:var(--warn);font-weight:700;line-height:1.6}
+
+.nav-admin{display:block;font-size:12.5px;font-weight:700;color:var(--ink-2);text-decoration:none;
+  padding:7px 10px;border-radius:8px;border:1px dashed var(--line-2)}
+.nav-admin:hover{color:var(--primary);border-color:var(--primary);background:var(--primary-soft)}
+
+/* システム管理コンソール (F-61)。運用画面と混同しないよう上部バーを濃色にする */
+.adm{min-height:100vh;background:var(--bg)}
+.adm-bar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:10px 20px;background:var(--ink);color:#fff;border-bottom:2px solid var(--primary)}
+.adm-logo{font-weight:900;letter-spacing:.04em;font-size:14px}
+.adm-tag{font-size:11px;font-weight:700;background:var(--primary);color:#fff;border-radius:99px;padding:2px 10px}
+.adm-nav{display:flex;gap:4px;margin-left:8px}
+.adm-nav a{font-size:12.5px;font-weight:700;color:#fff;opacity:.78;text-decoration:none;padding:4px 10px;border-radius:7px}
+.adm-nav a:hover{opacity:1;background:rgba(255,255,255,.14)}
+.adm-who{margin-left:auto;font-size:11.5px;opacity:.72;font-variant-numeric:tabular-nums}
+.adm-bar .btn.sec{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.24);color:#fff}
+.adm-bar .btn.sec:hover{background:rgba(255,255,255,.22)}
+.adm-main{max-width:1180px;margin:0 auto;padding:22px 20px 60px}
+.adm-deny{display:flex;align-items:center;justify-content:center;min-height:70vh;padding:20px}
+
+.adm-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:9px;margin-bottom:14px}
+.adm-kpi{border:1px solid var(--line);border-radius:10px;padding:10px 13px;background:var(--bg-sub);min-width:0}
+.adm-kpi>span{display:block;font-size:11px;color:var(--muted)}
+.adm-kpi>b{display:block;font-size:19px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.4}
+.adm-kpi>b.sm{font-size:12.5px;font-weight:700;line-height:1.6}
+.adm-kpi>b.up{color:var(--good)}
+.adm-kpi>small{display:block;font-size:10.5px;color:var(--muted);margin-top:2px;line-height:1.6}
+.adm-kpi.warn{background:var(--warn-soft);border-color:transparent}
+.adm-kpi.warn>b,.adm-kpi.warn>span,.adm-kpi.warn>small{color:var(--warn)}
+.adm-kpi.bad{background:var(--bad-soft);border-color:transparent}
+.adm-kpi.bad>b,.adm-kpi.bad>span,.adm-kpi.bad>small{color:var(--bad)}
+
+.adm-filters{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px}
+.adm-count{font-size:11.5px;color:var(--muted);margin-left:auto;font-variant-numeric:tabular-nums}
+.adm-plan{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted)}
+.pill.flat.direct{background:var(--primary-soft);color:var(--primary)}
+
+.adm-health{display:grid;grid-template-columns:repeat(auto-fit,minmax(268px,1fr));gap:9px}
+.adm-hitem{display:flex;gap:10px;border:1px solid var(--line);border-radius:10px;padding:10px 13px}
+.adm-hitem b{display:block;font-size:13px;color:var(--ink)}
+.adm-hitem small{display:block;font-size:11px;color:var(--muted);line-height:1.7;margin-top:2px}
+.adm-hmark{font-size:11px;line-height:1.9}
+.adm-hitem.ok .adm-hmark{color:var(--good)}
+.adm-hitem.ng{background:var(--bad-soft);border-color:transparent}
+.adm-hitem.ng .adm-hmark{color:var(--bad)}
+.adm-hitem.opt .adm-hmark{color:var(--muted)}

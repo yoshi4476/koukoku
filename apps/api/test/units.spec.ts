@@ -44,6 +44,7 @@ import { normalizeHeader, parseCsv, parseDate, parseNumber } from '../src/import
 import { readSettings } from '../src/common/tenant-settings';
 import { runAllSuites } from '../src/eval/runner';
 import { efficiencyScore, recommendKeyword } from '../src/keywords/keyword-scoring';
+import { isPlatformAdminEmail } from '../src/platform/platform-admin';
 
 describe('widthUnits (全角=2/半角=1)', () => {
   it('半角英数は1、全角は2で数える', () => {
@@ -731,5 +732,54 @@ describe('媒体別 入稿シート (F-58)', () => {
   it('テキスト書き出しに主要セクションが含まれる', () => {
     const t = sheetToText(buildLaunchSheet({ ...base, platform: 'google_ads' })!);
     for (const sec of ['【設定】', '【見出し】', '【キーワード】', '【入稿前チェック】']) expect(t).toContain(sec);
+  });
+});
+
+/**
+ * システム管理者の判定 (F-61)。
+ * 権限昇格の経路になるため、false を返すべきケースを厚めに確認する。
+ */
+describe('システム管理者の判定', () => {
+  const original = process.env.PLATFORM_ADMIN_EMAILS;
+  const withEnv = (v: string | undefined, fn: () => void) => {
+    if (v === undefined) delete process.env.PLATFORM_ADMIN_EMAILS;
+    else process.env.PLATFORM_ADMIN_EMAILS = v;
+    try {
+      fn();
+    } finally {
+      if (original === undefined) delete process.env.PLATFORM_ADMIN_EMAILS;
+      else process.env.PLATFORM_ADMIN_EMAILS = original;
+    }
+  };
+
+  it('未設定なら誰も管理者にならない (fail-closed)', () => {
+    withEnv(undefined, () => expect(isPlatformAdminEmail('anyone@example.com')).toBe(false));
+    withEnv('', () => expect(isPlatformAdminEmail('anyone@example.com')).toBe(false));
+  });
+
+  it('列挙されたメールだけが管理者になる', () => {
+    withEnv('ops@adgrid.jp, boss@adgrid.jp', () => {
+      expect(isPlatformAdminEmail('ops@adgrid.jp')).toBe(true);
+      expect(isPlatformAdminEmail('boss@adgrid.jp')).toBe(true);
+      expect(isPlatformAdminEmail('other@adgrid.jp')).toBe(false);
+    });
+  });
+
+  it('大文字小文字・前後の空白は同一視する', () => {
+    withEnv('  OPS@Adgrid.JP  ', () => {
+      expect(isPlatformAdminEmail('ops@adgrid.jp')).toBe(true);
+      expect(isPlatformAdminEmail(' Ops@Adgrid.jp ')).toBe(true);
+    });
+  });
+
+  it('空・null・部分一致では管理者にならない', () => {
+    withEnv('ops@adgrid.jp', () => {
+      expect(isPlatformAdminEmail(null)).toBe(false);
+      expect(isPlatformAdminEmail(undefined)).toBe(false);
+      expect(isPlatformAdminEmail('')).toBe(false);
+      // 前方/後方一致で通ってしまわないこと
+      expect(isPlatformAdminEmail('ops@adgrid.jp.attacker.com')).toBe(false);
+      expect(isPlatformAdminEmail('xops@adgrid.jp')).toBe(false);
+    });
   });
 });
