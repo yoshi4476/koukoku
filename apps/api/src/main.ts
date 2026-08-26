@@ -12,6 +12,16 @@ async function bootstrap() {
     rawBody: true,
   });
   app.use(cookieParser());
+  // CV受信 (/collect/:token) はクライアント各社のサイト (任意のオリジン) から
+  // ブラウザ直送されるため、ここだけ全オリジンを許可する。認証はトークンのみで
+  // Cookieを使わない (credentialsなし) ので、全開放してもセッションは危険に晒されない
+  app.use('/collect', (req: import('express').Request, res: import('express').Response, next: import('express').NextFunction) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'content-type');
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  });
   // アップロードした画像・動画を /uploads/ で配信 (表示のみ。URLはcuidで推測困難)
   app.useStaticAssets(UPLOAD_DIR, { prefix: '/uploads/' });
   // 許可オリジン。WEB_ORIGIN はカンマ区切りで複数指定できる (本番URL + プレビュー等)。

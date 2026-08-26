@@ -57,6 +57,10 @@ const MAX_CACHE = 5_000;
 export class SessionGuard implements CanActivate {
   private static tenantCache = new Map<string, { active: boolean; at: number }>();
   private static userCache = new Map<string, { tokenVersion: number | null; at: number }>();
+  private static memberCache = new Map<
+    string,
+    { found: boolean; role: string; clientId: string | null; at: number }
+  >();
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -68,6 +72,11 @@ export class SessionGuard implements CanActivate {
   /** パスワード再設定の直後に呼ぶ */
   static invalidateUser(userId: string) {
     SessionGuard.userCache.delete(userId);
+  }
+
+  /** アクセス剥奪・権限変更の直後に呼ぶ */
+  static invalidateMembership(userId: string, tenantId: string) {
+    SessionGuard.memberCache.delete(`${userId}:${tenantId}`);
   }
 
   /**
@@ -111,6 +120,21 @@ export class SessionGuard implements CanActivate {
     return tokenVersion;
   }
 
+  /** セッションが主張する所属 (テナント・ロール・限定クライアント) が今もDBと一致するか */
+  private async membershipOf(userId: string, tenantId: string) {
+    const key = `${userId}:${tenantId}`;
+    const hit = SessionGuard.memberCache.get(key);
+    if (hit && Date.now() - hit.at < TTL_MS) return hit;
+    const m = await this.prisma.tenantMember.findFirst({
+      where: { userId, tenantId },
+      select: { role: true, clientId: true },
+    });
+    const value = { found: m != null, role: m?.role ?? '', clientId: m?.clientId ?? null, at: Date.now() };
+    SessionGuard.prune(SessionGuard.memberCache);
+    SessionGuard.memberCache.set(key, value);
+    return value;
+  }
+
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const req = ctx.switchToHttp().getRequest<Request>();
     // Expressは末尾スラッシュ付きでも同じルートに到達させるため、比較前に正規化する。
@@ -124,12 +148,25 @@ export class SessionGuard implements CanActivate {
     const session = verifySession(token);
     if (!session) return true;
 
-    if (!tenantCheckExempt(path) && !(await this.isTenantActive(session.tenantId))) {
-      throw new AppError(
-        HttpStatus.FORBIDDEN,
-        'このワークスペースは現在ご利用いただけません。',
-        'ご契約状況について、発行元の担当者にお問い合わせください。',
-      );
+    if (!tenantCheckExempt(path)) {
+      if (!(await this.isTenantActive(session.tenantId))) {
+        throw new AppError(
+          HttpStatus.FORBIDDEN,
+          'このワークスペースは現在ご利用いただけません。',
+          'ご契約状況について、発行元の担当者にお問い合わせください。',
+        );
+      }
+      // JWTが主張する所属が今も実在するかを確認する。確認しないと、
+      // アクセスを剥奪しても古いJWTで有効期限まで(最大7日)読み書きできてしまう。
+      // ロールや限定クライアントの変更も同様に、変更後のJWT再取得を強制する
+      const m = await this.membershipOf(session.sub, session.tenantId);
+      if (!m.found || m.role !== session.role || (m.clientId ?? null) !== (session.clientScopeId ?? null)) {
+        throw new AppError(
+          HttpStatus.UNAUTHORIZED,
+          'アクセス権が変更されました。ログインし直してください。',
+          '権限が取り消されたか変更されています。心当たりが無い場合は管理者にお問い合わせください。',
+        );
+      }
     }
 
     // 世代が変わっていたら無効。時刻ではなく世代で見るので「同一秒」の曖昧さが無く、

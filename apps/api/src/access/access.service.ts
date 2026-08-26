@@ -3,6 +3,7 @@ import * as bcrypt from 'bcryptjs';
 import type { ClientAccessDto, CreateClientAccessInput } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
+import { SessionGuard } from '../common/session.guard';
 import type { SessionInfoValue } from '../common/tenant';
 
 /**
@@ -75,6 +76,8 @@ export class AccessService {
       throw new AppError(HttpStatus.NOT_FOUND, '対象のアクセスが見つかりません。', '一覧を再読み込みしてください。');
     }
     await this.prisma.tenantMember.delete({ where: { id: member.id } });
+    // 発行済みセッションにも即座に効かせる (キャッシュ経由で最大30秒残るのを防ぐ)
+    SessionGuard.invalidateMembership(userId, tenantId);
     // このユーザーが他テナントに属していなければユーザーごと削除
     const remaining = await this.prisma.tenantMember.count({ where: { userId } });
     if (remaining === 0) await this.prisma.user.delete({ where: { id: userId } });
