@@ -22,8 +22,11 @@ export class PacingService {
     });
 
     const now = new Date();
-    const daysInMonth = new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 0).getUTCDate();
-    const dayOfMonth = now.getUTCDate();
+    // 日付は metrics 規約 (startOfDay=ローカル暦日をUTC深夜に固定) に揃える。
+    // monthStart はローカル暦日基準なので、daysInMonth/dayOfMonth も getUTC* ではなく
+    // ローカルフィールドで数えないと、非UTCサーバ(JST)で月初/月末に予算計算が1日ずれる
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dayOfMonth = now.getDate();
     const daysLeft = daysInMonth - dayOfMonth;
     const monthStart = startOfDay(now);
     monthStart.setUTCDate(1);

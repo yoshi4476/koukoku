@@ -731,6 +731,12 @@ describe('媒体別 入稿シート (F-58)', () => {
       return n + ((c >= 0x20 && c <= 0x7e) || (c >= 0xff61 && c <= 0xff9f) ? 1 : 2);
     }, 0);
     expect(width(g.headlines[0].text)).toBeLessThanOrEqual(30);
+    // 奇数幅ケース(先頭半角+全角): 末尾「…」は全角=幅2。予約が1だと1超過するため回帰防止
+    for (const odd of ['X' + 'あ'.repeat(15), 'AI' + 'あ'.repeat(15), 'お得🎁' + 'あ'.repeat(20)]) {
+      const go = buildLaunchSheet({ ...base, platform: 'google_ads', headlines: [odd] })!;
+      expect(width(go.headlines[0].text)).toBeLessThanOrEqual(30);
+      expect(go.headlines[0].text.includes('�')).toBe(false); // 絵文字を分断しない
+    }
     // Metaは文字数(全角=1)なので同じ18字はそのまま通る
     const m = buildLaunchSheet({ ...base, platform: 'meta', headlines: [h18] })!;
     expect(m.headlines[0].ok).toBe(true);

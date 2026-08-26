@@ -75,7 +75,14 @@ export class BriefExtractService {
     return u;
   }
 
-  /** リダイレクトを手動で追い、各ホップで内部宛でないことを検証しながら取得する */
+  /**
+   * リダイレクトを手動で追い、各ホップで内部宛でないことを検証しながら取得する。
+   *
+   * 注意 (残存リスク): 検証(DNS解決)と取得(fetchによる再解決)の間で応答IPを
+   * 差し替える DNSリバインディング は完全には塞げない。ただし各ホップで解決IPを
+   * 全件検証し内部宛を弾くため、標準的なSSRFは防げる。接続IPのピン留めは
+   * Nodeのfetch(組込みundici)に外部undiciのdispatcherを渡すと版差で壊れるため見送る。
+   */
   private async fetchPublicPage(raw: string): Promise<{ finalUrl: string; html: string }> {
     let current = raw;
     for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {

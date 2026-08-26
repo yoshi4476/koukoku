@@ -406,10 +406,18 @@ export class ProjectsService {
       }
       if (typeof input.note === 'string') data.note = input.note;
       if (input.status && ASSET_STATUSES.includes(input.status)) {
+        // 「公開」への遷移は updateAsset では許可しない。公開は publishAsset に一本化する
+        // (owner/admin限定・client版拒否・監査記録の3重ガードを updateAsset の
+        //  assertEditor(operatorも通る) で回避できてしまうため)。
+        if (input.status === 'published') {
+          throw new AppError(
+            HttpStatus.FORBIDDEN,
+            'この操作では公開できません。',
+            '公開は「公開する」操作から行ってください（オーナー・管理者のみ）。',
+          );
+        }
         data.status = input.status;
-        // 公開/公開解除で publishedAt を整合させる
-        if (input.status === 'published') data.publishedAt = new Date();
-        else data.publishedAt = null;
+        data.publishedAt = null;
       }
       return tx.projectAsset.update({ where: { id: assetId }, data });
     });

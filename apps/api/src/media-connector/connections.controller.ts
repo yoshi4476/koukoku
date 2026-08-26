@@ -3,7 +3,8 @@ import type { Response } from 'express';
 import type { AuthorizeResultDto, ConnectionDto, ConnectionStatus, Platform, SyncResultDto } from '@adgrid/shared';
 import { ALL_PLATFORMS } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
-import { TenantId } from '../common/tenant';
+import { SessionInfo, SessionInfoValue, TenantId } from '../common/tenant';
+import { assertEditor } from '../common/authz';
 import { AppError } from '../common/errors';
 import { BillingService } from '../billing/billing.service';
 import { MediaSyncService } from './sync.service';
@@ -43,7 +44,12 @@ export class ConnectionsController {
 
   /** ウィザードStep2: 認可 (実API未設定時はデモ接続候補を返す) */
   @Post(':platform/authorize')
-  authorize(@TenantId() tenantId: string, @Param('platform') platform: string): Promise<AuthorizeResultDto> {
+  authorize(
+    @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
+    @Param('platform') platform: string,
+  ): Promise<AuthorizeResultDto> {
+    assertEditor(user);
     if (!ALL_PLATFORMS.includes(platform as Platform)) {
       throw new AppError(HttpStatus.BAD_REQUEST, '不明な媒体です。', '媒体を選び直してください。');
     }
@@ -97,10 +103,12 @@ export class ConnectionsController {
   @Post(':platform/complete')
   async complete(
     @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
     @Param('platform') platform: string,
     @Body()
     body: { accounts?: Array<{ externalAccountId: string; name: string; clientId: string; monthlyBudget?: number }> },
   ): Promise<{ connection: ConnectionDto; sync: SyncResultDto }> {
+    assertEditor(user);
     const accounts = body?.accounts ?? [];
     if (!ALL_PLATFORMS.includes(platform as Platform) || accounts.length === 0) {
       throw new AppError(
@@ -153,13 +161,23 @@ export class ConnectionsController {
   }
 
   @Post(':id/sync')
-  runSync(@TenantId() tenantId: string, @Param('id') id: string): Promise<SyncResultDto> {
+  runSync(
+    @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
+    @Param('id') id: string,
+  ): Promise<SyncResultDto> {
+    assertEditor(user);
     return this.sync.sync(tenantId, id);
   }
 
   /** 切断 (実績データとアカウントは保持し、自動同期のみ停止) */
   @Delete(':id')
-  async disconnect(@TenantId() tenantId: string, @Param('id') id: string): Promise<{ ok: true }> {
+  async disconnect(
+    @TenantId() tenantId: string,
+    @SessionInfo() user: SessionInfoValue,
+    @Param('id') id: string,
+  ): Promise<{ ok: true }> {
+    assertEditor(user);
     await this.prisma.withTenant(tenantId, (tx) =>
       tx.mediaConnection.update({ where: { id }, data: { status: 'not_connected' } }),
     );

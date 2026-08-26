@@ -35,7 +35,12 @@ async function bootstrap() {
       if (!origin) return cb(null, true);
       const o = origin.replace(/\/$/, '');
       if (allowed.includes(o)) return cb(null, true);
-      if (previewSuffix && o.endsWith(previewSuffix)) return cb(null, true);
+      // 末尾一致はドット境界を要求する。単なる endsWith だと VERCEL_PREVIEW_SUFFIX=
+      // 'vercel.app' のとき evil-vercel.app のような別ドメインも通ってしまう
+      if (previewSuffix) {
+        const dotted = previewSuffix.startsWith('.') ? previewSuffix : `.${previewSuffix}`;
+        if (o.endsWith(dotted)) return cb(null, true);
+      }
       return cb(null, false); // 例外にせず、CORSヘッダを付けないことで拒否する
     },
     credentials: true,

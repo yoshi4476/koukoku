@@ -83,11 +83,13 @@ function shortenToFit(text: string, maxLen: number, count: Counter): string | nu
     acc = next;
   }
   if (acc) return acc;
-  // 見出しのような一文は文分割できない。貼り付け可能にするため文字単位で切り詰める
-  // (…を1字ぶん残す)。Japaneseは語境界が無いため途中で切っても実用上問題ない
+  // 見出しのような一文は文分割できない。貼り付け可能にするため文字単位で切り詰める。
+  // 末尾に付ける「…」の実際の幅ぶんを空けておく (検索系では … は全角=幅2なので、
+  // maxLen-1 だと … を足したとき1超過する)
+  const ellipsisW = count('…');
   let hard = '';
   for (const ch of text) {
-    if (count(hard + ch) > maxLen - 1) break;
+    if (count(hard + ch) > maxLen - ellipsisW) break;
     hard += ch;
   }
   return hard ? hard + '…' : null;

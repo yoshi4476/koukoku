@@ -47,7 +47,9 @@ export class AbTestsService {
     const pValue = twoProportionPValue(aNum, aDen, bNum, bDen);
     const enoughData = aNum >= MIN_SAMPLE && bNum >= MIN_SAMPLE;
     const significant = pValue !== null && pValue < 0.05 && enoughData;
-    const lift = aRate && bRate && aRate > 0 ? +(((bRate - aRate) / aRate) * 100).toFixed(1) : null;
+    // aRate===0 は truthy 判定で弾かれるため != null で明示チェックする
+    // (B案0%で有意にAが勝つケース等で lift が欠けるのを防ぐ)。分母のA率が0だと算出不能
+    const lift = aRate !== null && bRate !== null && aRate > 0 ? +(((bRate - aRate) / aRate) * 100).toFixed(1) : null;
 
     let winner: 'a' | 'b' | 'none' = 'none';
     if (significant && aRate !== null && bRate !== null) winner = bRate > aRate ? 'b' : 'a';
