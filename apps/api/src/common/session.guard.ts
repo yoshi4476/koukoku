@@ -4,11 +4,39 @@ import { AppError } from './errors';
 import { PrismaService } from '../prisma/prisma.service';
 import { SESSION_COOKIE, verifySession } from '../auth/auth.service';
 
-/** ログアウトだけは常に通す (クッキーを消せないと画面から抜けられなくなるため) */
-const ALWAYS_ALLOWED = new Set(['/auth/logout']);
+/**
+ * セッションを作り直す/捨てる入口は必ず通す。
+ *
+ * ここを塞ぐと詰む: 端末Aにログイン中のまま端末Bでパスワードを再設定すると、
+ * 端末Aは古いCookieを持ったままになる。ログイン要求にもそのCookieが付くため、
+ * 除外しないと「ログインしようとすると古いセッションを理由に弾かれる」状態になり、
+ * Cookieを手で消すまで二度とログインできない (実測で確認)。
+ */
+const ALWAYS_ALLOWED = new Set([
+  '/auth/login',
+  '/auth/signup',
+  '/auth/logout',
+  '/auth/forgot',
+  '/auth/reset',
+]);
+
+/**
+ * テナント停止の遮断を適用しない経路 (セッション世代のチェックは適用する)。
+ *
+ * - /platform/*: システム管理者の権限はテナントではなくメールで決まる。
+ *   自テナントを停止した運営者が管理画面ごと締め出されるのを防ぐ
+ * - /auth/tenant: テナント切替。停止された子テナントに切替中の親管理者が
+ *   自社(親)へ戻る唯一の経路のため、塞ぐと詰む (切替先の停止チェックは切替処理側で行う)
+ */
+function tenantCheckExempt(path: string): boolean {
+  return path.startsWith('/platform/') || path === '/auth/tenant';
+}
 
 /** 状態の参照はリクエストごとに発生するため短時間キャッシュする */
 const TTL_MS = 30_000;
+
+/** キャッシュの上限。超えたら期限切れを掃除し、それでも溢れる場合は全捨てする */
+const MAX_CACHE = 5_000;
 
 /**
  * セッションが今も有効かをリクエストごとに確認する (F-61 / F-62)。
@@ -38,6 +66,20 @@ export class SessionGuard implements CanActivate {
     SessionGuard.userCache.delete(userId);
   }
 
+  /**
+   * 際限なく増えないようにする。利用者が増えるほどキーが増え続けるため、
+   * 上限に達したら期限切れを掃除し、それでも収まらなければ捨てて作り直す
+   * (キャッシュなので失っても正しさには影響しない)。
+   */
+  private static prune(cache: Map<string, { at: number }>) {
+    if (cache.size < MAX_CACHE) return;
+    const now = Date.now();
+    for (const [k, v] of cache) {
+      if (now - v.at >= TTL_MS) cache.delete(k);
+    }
+    if (cache.size >= MAX_CACHE) cache.clear();
+  }
+
   private async isTenantActive(tenantId: string): Promise<boolean> {
     const hit = SessionGuard.tenantCache.get(tenantId);
     if (hit && Date.now() - hit.at < TTL_MS) return hit.active;
@@ -46,6 +88,7 @@ export class SessionGuard implements CanActivate {
     );
     // 行が見つからない場合は判定できないため通す (認証・RLS側で弾かれる)
     const active = tenant == null || tenant.status === 'active';
+    SessionGuard.prune(SessionGuard.tenantCache);
     SessionGuard.tenantCache.set(tenantId, { active, at: Date.now() });
     return active;
   }
@@ -59,6 +102,7 @@ export class SessionGuard implements CanActivate {
       select: { tokenVersion: true },
     });
     const tokenVersion = user ? user.tokenVersion : null;
+    SessionGuard.prune(SessionGuard.userCache);
     SessionGuard.userCache.set(userId, { tokenVersion, at: Date.now() });
     return tokenVersion;
   }
@@ -73,7 +117,7 @@ export class SessionGuard implements CanActivate {
     const session = verifySession(token);
     if (!session) return true;
 
-    if (!(await this.isTenantActive(session.tenantId))) {
+    if (!tenantCheckExempt(req.path) && !(await this.isTenantActive(session.tenantId))) {
       throw new AppError(
         HttpStatus.FORBIDDEN,
         'このワークスペースは現在ご利用いただけません。',

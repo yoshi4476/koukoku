@@ -5,9 +5,15 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 import { MailService } from '../common/mail.service';
 import { SessionGuard } from '../common/session.guard';
+import { TrailService } from '../common/trail.service';
 
 /** 有効期間。長すぎると盗まれたリンクの寿命が延びるため短くする */
 const TTL_MS = 60 * 60 * 1000;
+
+/** 申請の流量制限。メール単位は厳しく、IP単位は緩く (社内の共有IPで複数人が同時に忘れるため) */
+const RATE_WINDOW_MS = 15 * 60 * 1000;
+const RATE_MAX_EMAIL = 5;
+const RATE_MAX_IP = 30;
 
 /** 生の値は保存しない。DBが漏れてもリンクを再現できないようにする */
 function hashToken(raw: string): string {
@@ -35,7 +41,29 @@ export class PasswordResetService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
+    private readonly trail: TrailService,
   ) {}
+
+  /** 申請の流量制限 (メール爆撃・トークン乱発を防ぐ)。キーは IP とメールの両方 */
+  private hits = new Map<string, number[]>();
+
+  private rateLimited(key: string, max: number): boolean {
+    const now = Date.now();
+    const arr = (this.hits.get(key) ?? []).filter((t) => now - t < RATE_WINDOW_MS);
+    if (arr.length >= max) {
+      this.hits.set(key, arr);
+      return true;
+    }
+    arr.push(now);
+    this.hits.set(key, arr);
+    // 溜まりすぎたら古いキーを掃除する
+    if (this.hits.size > 10_000) {
+      for (const [k, v] of this.hits) {
+        if (v.every((t) => now - t >= RATE_WINDOW_MS)) this.hits.delete(k);
+      }
+    }
+    return false;
+  }
 
   /** トークンを発行して生の値を返す。呼び出し元が渡し方 (メール/画面) を決める */
   private async issue(userId: string, issuedBy: string): Promise<string> {
@@ -60,8 +88,14 @@ export class PasswordResetService {
    * 本人からの再設定申請。
    * アカウントの有無に関わらず常に成功を返す (存在するメールを探る手口を防ぐ)。
    */
-  async requestReset(email: string): Promise<{ ok: true }> {
+  async requestReset(email: string, ip?: string): Promise<{ ok: true }> {
     const normalized = (email ?? '').trim().toLowerCase();
+    // 流量制限に達しても成功を返す (429を返すと「そのメールは登録済み」を推測する材料になる)。
+    // 内部的に発行を止めるだけで、外から見える挙動は変えない
+    if (this.rateLimited(`e:${normalized}`, RATE_MAX_EMAIL) || (ip && this.rateLimited(`ip:${ip}`, RATE_MAX_IP))) {
+      this.logger.warn(`パスワード再設定の申請が流量制限に達しました (email=${normalized} ip=${ip ?? '-'})`);
+      return { ok: true };
+    }
     const user = normalized ? await this.prisma.user.findUnique({ where: { email: normalized } }) : null;
     if (!user) return { ok: true };
 
@@ -101,6 +135,16 @@ export class PasswordResetService {
       );
     }
     const raw = await this.issue(user.id, issuedBy);
+    // 発行自体も監査に残す (リンクの乱発が調査で追えるように)
+    const memberships = await this.prisma.tenantMember.findMany({ where: { userId: user.id } });
+    for (const m of memberships) {
+      await this.trail.record({
+        tenantId: m.tenantId,
+        userId: user.id,
+        action: 'password_reset_link_issued',
+        resource: `issued_by:${issuedBy}`,
+      });
+    }
     return { url: passwordResetUrl(raw), email: user.email };
   }
 
@@ -151,6 +195,17 @@ export class PasswordResetService {
       this.prisma.passwordReset.update({ where: { id: row.id }, data: { usedAt: now } }),
     ]);
     SessionGuard.invalidateUser(row.userId);
+    // 監査ログに残す (アカウント乗っ取りの調査で最初に見る事象のため)。
+    // 所属する全テナントに記録する。どのテナントの管理者からも見えるようにする
+    const memberships = await this.prisma.tenantMember.findMany({ where: { userId: row.userId } });
+    for (const m of memberships) {
+      await this.trail.record({
+        tenantId: m.tenantId,
+        userId: row.userId,
+        action: 'password_reset',
+        resource: `issued_by:${row.issuedBy}`,
+      });
+    }
     return { ok: true };
   }
 }

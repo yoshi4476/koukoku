@@ -146,29 +146,41 @@ export class AuthService {
     if (!user) throw invalid();
     const ok = await bcrypt.compare(password ?? '', user.passwordHash);
     if (!ok) throw invalid();
-    const membership = user.memberships[0];
-    if (!membership) {
+    if (user.memberships.length === 0) {
       throw new AppError(
         HttpStatus.FORBIDDEN,
         '所属するワークスペースがありません。',
         '招待メールを確認するか、新規登録からワークスペースを作成してください。',
       );
     }
-    const scopeId = membership.role === 'client' ? membership.clientId ?? null : null;
-    const { tenant, clientScopeName } = await this.prisma.withTenant(membership.tenantId, async (tx) => {
-      const tenant = await tx.tenant.findUnique({ where: { id: membership.tenantId } });
-      const client = scopeId ? await tx.client.findUnique({ where: { id: scopeId } }) : null;
-      return { tenant, clientScopeName: client?.name ?? null };
-    });
-    // 提供先テナントが停止されている場合はログインさせない (F-60)。
-    // 停止操作が実効性を持たないと、管理コンソールの「停止」が形だけになる
-    if (tenant && tenant.status !== 'active') {
+
+    // 入り先は「稼働中のテナント」を優先する (F-60)。
+    // 先頭固定にすると、たまたま1番目が停止テナントの複数所属ユーザーは
+    // 他に生きているテナントがあってもログインできなくなる
+    let membership: (typeof user.memberships)[number] | null = null;
+    let tenant: Awaited<ReturnType<typeof this.tenantOf>> = null;
+    for (const m of user.memberships) {
+      const t = await this.tenantOf(m.tenantId);
+      if (t?.status === 'active') {
+        membership = m;
+        tenant = t;
+        break;
+      }
+    }
+    // 全テナントが停止中の場合のみログイン不可。停止の実効性はここで担保される
+    if (!membership) {
       throw new AppError(
         HttpStatus.FORBIDDEN,
         'このワークスペースは現在ご利用いただけません。',
         'ご契約状況について、発行元の担当者にお問い合わせください。',
       );
     }
+    const scopeId = membership.role === 'client' ? membership.clientId ?? null : null;
+    const clientScopeName = scopeId
+      ? await this.prisma.withTenant(membership.tenantId, async (tx) =>
+          (await tx.client.findUnique({ where: { id: scopeId } }))?.name ?? null,
+        )
+      : null;
     const payload: SessionPayload = {
       sub: user.id,
       tenantId: membership.tenantId,
@@ -193,6 +205,11 @@ export class AuthService {
       },
       token: signSession(payload),
     };
+  }
+
+  /** テナント行の取得 (RLSがあるため必ずそのテナントの文脈で読む) */
+  private tenantOf(tenantId: string) {
+    return this.prisma.withTenant(tenantId, (tx) => tx.tenant.findUnique({ where: { id: tenantId } }));
   }
 
   /** ユーザーが切り替えられるテナント一覧 (所属する全テナント)。各テナント文脈で名前を取得 */
@@ -221,6 +238,16 @@ export class AuthService {
     const membership = await this.prisma.tenantMember.findFirst({ where: { userId: session.sub, tenantId } });
     if (!membership) {
       throw new AppError(HttpStatus.FORBIDDEN, 'このテナントへの権限がありません。', '所属するテナントを選んでください。');
+    }
+    // 停止中テナントへの切替は拒否する。切替経路自体は停止チェックを免除しているため、
+    // ここで確認しないと停止テナントに入り直せてしまう
+    const target = await this.tenantOf(tenantId);
+    if (target && target.status !== 'active') {
+      throw new AppError(
+        HttpStatus.FORBIDDEN,
+        'このワークスペースは停止中のため切り替えられません。',
+        '利用を再開してから切り替えてください。',
+      );
     }
     const scopeId = membership.role === 'client' ? membership.clientId ?? null : null;
     // 世代は引き継ぐ (テナント切替はパスワード変更ではないため)

@@ -45,8 +45,8 @@ export class AuthController {
    * アカウントの有無に関わらず常に成功を返す (登録済みメールを探る手口を防ぐ)。
    */
   @Post('forgot')
-  forgot(@Body() body: { email?: string }): Promise<{ ok: true }> {
-    return this.reset.requestReset(body?.email ?? '');
+  forgot(@Body() body: { email?: string }, @Req() req: Request): Promise<{ ok: true }> {
+    return this.reset.requestReset(body?.email ?? '', req.ip);
   }
 
   /** 再設定画面を開いた時点でリンクが生きているかを確認する */
