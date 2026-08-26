@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import type { IntentTier, KeywordPlanDto, PlannedKeyword, ProjectBrief, ProjectSettings } from '@adgrid/shared';
-import { DEFAULT_PROJECT_BRIEF, DEFAULT_PROJECT_SETTINGS, buildKeywordPlan, industryProfileFor } from '@adgrid/shared';
+import { DEFAULT_PROJECT_BRIEF, DEFAULT_PROJECT_SETTINGS, buildKeywordPlan, industryProfileFor, safeNegatives } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 import { LlmService } from '../ai/llm.service';
@@ -89,9 +89,15 @@ export class KeywordPlanService {
           if (!keywords.some((x) => x.text === f.text)) keywords.push(f);
         }
       }
+      const finalKeywords = keywords.slice(0, 60);
+      // 自分の配信キーワードを塞ぐ除外語は落とす (例: オファーが「無料相談」なのに「無料」を除外)
+      const finalNegatives = safeNegatives(
+        negatives.length >= 5 ? negatives : fallback.negatives,
+        finalKeywords.map((k) => k.text),
+      );
       return {
-        keywords: keywords.slice(0, 60),
-        negatives: (negatives.length >= 5 ? negatives : fallback.negatives).slice(0, 40),
+        keywords: finalKeywords,
+        negatives: finalNegatives.slice(0, 40),
         note: typeof parsed.note === 'string' && parsed.note.trim() ? parsed.note.trim().slice(0, 300) : fallback.note,
         mocked: false,
       };

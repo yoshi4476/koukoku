@@ -1627,3 +1627,25 @@ button.avatar:focus-visible { outline: 2px solid var(--primary); outline-offset:
 .ls-img b{display:block;font-size:12.5px;color:var(--ink)}
 .ls-img span{display:block;font-size:11.5px;color:var(--primary);font-weight:600}
 .ls-img small{display:block;font-size:10.5px;color:var(--muted);line-height:1.5;margin-top:2px}
+
+/* テナント横断管理コンソール (F-60) */
+.tn-totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:9px;margin-bottom:14px}
+.tn-totals>div{border:1px solid var(--line);border-radius:9px;padding:9px 12px;background:var(--bg-sub)}
+.tn-totals span{display:block;font-size:11px;color:var(--muted)}
+.tn-totals b{display:block;font-size:17px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.tn-totals b.up{color:var(--good)}
+.tn-list{display:flex;flex-direction:column;gap:11px}
+.tn-row{border:1px solid var(--line);border-radius:11px;padding:13px 15px}
+.tn-row.off{opacity:.62;background:var(--bg-sub)}
+.tn-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:10px}
+.tn-name{font-size:14px;font-weight:800;color:var(--ink)}
+.tn-mail{font-size:11.5px;color:var(--muted)}
+.tn-since{margin-left:auto;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tn-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:7px}
+.tn-stats>div{border:1px solid var(--line);border-radius:8px;padding:7px 10px;min-width:0}
+.tn-stats span{display:block;font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tn-stats b{display:block;font-size:14px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.tn-stats b.sm{font-size:11px;font-weight:600;color:var(--ink-2)}
+.tn-warn{margin-top:10px;background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:9px 12px;font-size:12.5px;line-height:1.7}
+.tn-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:11px}
+.tn-confirm{font-size:12.5px;color:var(--warn);font-weight:700;line-height:1.6}

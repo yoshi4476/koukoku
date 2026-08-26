@@ -35,14 +35,17 @@ const EXPLORE_SUFFIX = ['とは', 'やり方', '方法'];
 
 /**
  * ほぼ確実に成果につながらない検索。除外しないと予算を溶かす。
- * 「無料/自分で」= 発注意思なし、「求人/転職」= 求職者、「事例/とは」= 情報収集のみ。
+ *
+ * 注意: 「無料」のような単独の語は除外しない。
+ * 「無料相談」「無料診断」を売りにしている広告主では、最も成約に近いキーワードを
+ * 自分で塞いでしまうため。除外は「自分でやりたい/求職/情報収集」が明確な複合語に限る。
  */
 const BASE_NEGATIVES = [
-  '無料', '自分で', 'やり方', '独学', '練習',
-  '求人', 'バイト', '転職', '採用', '年収', '正社員',
-  '意味', 'とは', 'wiki', 'とは何',
-  '苦情', 'クレーム', '炎上', '訴訟', '詐欺',
-  '中古', '無料ツール', 'フリーソフト', 'テンプレート 無料',
+  '自分で', 'やり方', '独学', '練習', '作り方', '手順',
+  '求人', 'バイト', '転職', '採用', '年収', '正社員', 'アルバイト',
+  '意味', 'とは', 'wiki', '用語',
+  '苦情', 'クレーム', '炎上', '訴訟', '詐欺', '評判 悪い',
+  '中古', 'フリーソフト', '無料ツール', 'テンプレート 無料', '無料アプリ',
 ];
 
 /** 業種ごとに追加で外すべき語 (発注意思が無い検索) */
@@ -126,7 +129,10 @@ export function buildKeywordPlan(input: KeywordPlanInput): KeywordPlanDto {
     for (const suf of EXPLORE_SUFFIX.slice(0, 1)) push(`${seed} ${suf}`, 'explore', '認知拡大用。CPAは悪化しやすいので予算に余裕がある場合のみ');
   }
 
-  const negatives = [...new Set([...BASE_NEGATIVES, ...(INDUSTRY_NEGATIVES[input.industryCode] ?? [])])];
+  const negatives = safeNegatives(
+    [...new Set([...BASE_NEGATIVES, ...(INDUSTRY_NEGATIVES[input.industryCode] ?? [])])],
+    keywords.map((k) => k.text),
+  );
 
   return {
     keywords: keywords.slice(0, 60),
@@ -136,6 +142,21 @@ export function buildKeywordPlan(input: KeywordPlanInput): KeywordPlanDto {
       : '発注意図の強い語から順に並べています。情報収集の語は原則除外し、無駄クリックを抑えます。',
     mocked: true,
   };
+}
+
+/**
+ * 自分の配信キーワードを塞いでしまう除外語を取り除く (F-57 安全装置)。
+ *
+ * 例: オファーが「無料相談」なのに除外に「無料」を入れると、最も成約に近い
+ * キーワードが配信されなくなる。除外語が配信キーワードに含まれる場合は落とす。
+ */
+export function safeNegatives(negatives: string[], keywords: string[]): string[] {
+  return negatives.filter((n) => {
+    const t = n.trim();
+    if (!t) return false;
+    // 除外語が、配信するキーワードの一部として現れるなら採用しない
+    return !keywords.some((k) => k.includes(t));
+  });
 }
 
 /** 入稿に使う語だけを取り出す (情報収集層は既定で除外) */

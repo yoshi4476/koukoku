@@ -90,6 +90,43 @@ export interface ChildTenantDto {
   adminEmail: string;
   createdAt: string;
 }
+
+/** テナント横断管理コンソールの1行 (F-60)。発行済みテナントの利用状況 */
+export interface TenantUsageDto {
+  id: string;
+  name: string;
+  edition: Edition;
+  /** active = 利用中 / suspended = 停止中 */
+  status: string;
+  adminEmail: string;
+  createdAt: string;
+  /* ---- 利用状況 (直近30日) ---- */
+  clientCount: number;
+  projectCount: number;
+  accountCount: number;
+  userCount: number;
+  /** 直近30日の広告消化額 (円) */
+  cost30d: number;
+  conversions30d: number;
+  /** 直近30日のAI利用原価 (円) */
+  aiCostJpy30d: number;
+  /** 最後にログインまたは操作した日時 */
+  lastActiveAt: string | null;
+  /** 立ち上げが進んでいるか (クライアント登録・広告出稿の有無) */
+  onboarded: boolean;
+}
+
+export interface TenantConsoleDto {
+  tenants: TenantUsageDto[];
+  totals: {
+    tenantCount: number;
+    activeCount: number;
+    suspendedCount: number;
+    clientCount: number;
+    cost30d: number;
+    aiCostJpy30d: number;
+  };
+}
 export interface CreateChildTenantInput {
   companyName: string;
   adminEmail: string;

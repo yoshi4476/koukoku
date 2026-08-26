@@ -55,6 +55,7 @@ import { AccessController } from './access/access.controller';
 import { FeedbackService } from './feedback/feedback.service';
 import { FeedbackController } from './feedback/feedback.controller';
 import { ResellerService } from './reseller/reseller.service';
+import { TenantConsoleService } from './reseller/tenant-console.service';
 import { ResellerController } from './reseller/reseller.controller';
 import { ShareService } from './share/share.service';
 import { ShareController, PublicShareController } from './share/share.controller';
@@ -132,6 +133,7 @@ import { IntegrationsController } from './integrations/integrations.controller';
     AccessService,
     FeedbackService,
     ResellerService,
+    TenantConsoleService,
     ShareService,
     AuditLogService,
     LiftService,

@@ -56,6 +56,7 @@ import { ExperimentTools } from './experiment-tools';
 import { SeasonCalendar } from './season-calendar';
 import { LaunchPanel } from './launch-panel';
 import { KeywordPlanner } from './keyword-planner';
+import { TabHint } from './tab-hints';
 import { LaunchSheet } from './launch-sheet';
 import { CONNECTION_STATUS_META, INDUSTRY_LABEL } from '@/lib/labels';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
@@ -1045,6 +1046,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
           {tab === 'cycle' ? <OpsCycleTab project={d} goTab={(t) => setTab(t as Tab)} /> : null}
 
           {/* --- 概要（推移） --- */}
+          <TabHint tab={tab} />
+
           {tab === 'overview' ? (
             <>
               <KpiProgressCard project={d} />

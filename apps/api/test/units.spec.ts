@@ -30,6 +30,7 @@ import {
   buildPacingProposals,
   buildKeywordPlan,
   launchableKeywords,
+  safeNegatives,
   buildLaunchSheet,
   adSpecFor,
   sheetToText,
@@ -620,7 +621,21 @@ describe('検索キーワードの自動設計 (F-57)', () => {
 
   it('発注意思のない検索を除外キーワードに含める', () => {
     const p = buildKeywordPlan(base);
-    for (const w of ['求人', '無料', '自分で', '転職']) expect(p.negatives).toContain(w);
+    for (const w of ['求人', '自分で', '転職']) expect(p.negatives).toContain(w);
+  });
+
+  it('単独の「無料」は除外しない（無料相談・無料診断を塞ぐため）', () => {
+    const p = buildKeywordPlan(base);
+    expect(p.negatives).not.toContain('無料');
+  });
+
+  it('自分の配信キーワードを塞ぐ除外語は自動で取り除く', () => {
+    // 「無料相談」を配信するのに「無料」を除外したら、その語は落とされる
+    expect(safeNegatives(['無料', '求人'], ['広告運用 無料相談'])).toEqual(['求人']);
+    // 重ならない除外語はそのまま残る
+    expect(safeNegatives(['求人', '転職'], ['広告運用代行 依頼'])).toEqual(['求人', '転職']);
+    // 空文字は落とす
+    expect(safeNegatives(['', '  ', '求人'], [])).toEqual(['求人']);
   });
 
   it('業種ごとの除外キーワードが追加される', () => {

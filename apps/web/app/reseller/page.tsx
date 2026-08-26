@@ -5,6 +5,7 @@ import type { ChildTenantDto, CreateChildTenantInput } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useAuth } from '@/components/auth-context';
 import { EmptyState, ErrorCard, HintBar, SkeletonLines } from '@/components/ui';
+import { TenantConsole } from './console';
 import { apiPost, ApiError, toApiError } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 
@@ -107,6 +108,9 @@ export default function ResellerPage() {
           ))}
         </div>
       ) : null}
+
+      {/* 発行済みテナントの利用状況・停止/再開 (F-60) */}
+      <TenantConsole />
     </>
   );
 }

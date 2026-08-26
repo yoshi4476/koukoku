@@ -154,6 +154,15 @@ export class AuthService {
       const client = scopeId ? await tx.client.findUnique({ where: { id: scopeId } }) : null;
       return { tenant, clientScopeName: client?.name ?? null };
     });
+    // 提供先テナントが停止されている場合はログインさせない (F-60)。
+    // 停止操作が実効性を持たないと、管理コンソールの「停止」が形だけになる
+    if (tenant && tenant.status !== 'active') {
+      throw new AppError(
+        HttpStatus.FORBIDDEN,
+        'このワークスペースは現在ご利用いただけません。',
+        'ご契約状況について、発行元の担当者にお問い合わせください。',
+      );
+    }
     const payload: SessionPayload = {
       sub: user.id,
       tenantId: membership.tenantId,
