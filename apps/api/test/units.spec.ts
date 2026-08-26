@@ -45,6 +45,7 @@ import { readSettings } from '../src/common/tenant-settings';
 import { runAllSuites } from '../src/eval/runner';
 import { efficiencyScore, recommendKeyword } from '../src/keywords/keyword-scoring';
 import { isPlatformAdminEmail } from '../src/platform/platform-admin';
+import { passwordResetUrl } from '../src/auth/password-reset.service';
 
 describe('widthUnits (全角=2/半角=1)', () => {
   it('半角英数は1、全角は2で数える', () => {
@@ -780,6 +781,45 @@ describe('システム管理者の判定', () => {
       // 前方/後方一致で通ってしまわないこと
       expect(isPlatformAdminEmail('ops@adgrid.jp.attacker.com')).toBe(false);
       expect(isPlatformAdminEmail('xops@adgrid.jp')).toBe(false);
+    });
+  });
+});
+
+/** パスワード再設定リンクの組み立て (F-62) */
+describe('パスワード再設定リンク', () => {
+  const original = process.env.WEB_ORIGIN;
+  const withOrigin = (v: string | undefined, fn: () => void) => {
+    if (v === undefined) delete process.env.WEB_ORIGIN;
+    else process.env.WEB_ORIGIN = v;
+    try {
+      fn();
+    } finally {
+      if (original === undefined) delete process.env.WEB_ORIGIN;
+      else process.env.WEB_ORIGIN = original;
+    }
+  };
+
+  it('WEB_ORIGIN を基点にした再設定URLを作る', () => {
+    withOrigin('https://app.example.co.jp', () => {
+      expect(passwordResetUrl('abc123')).toBe('https://app.example.co.jp/reset?token=abc123');
+    });
+  });
+
+  it('末尾スラッシュがあっても二重にならない', () => {
+    withOrigin('https://app.example.co.jp/', () => {
+      expect(passwordResetUrl('t')).toBe('https://app.example.co.jp/reset?token=t');
+    });
+  });
+
+  it('WEB_ORIGIN が複数指定なら先頭を使う (CORS用に列挙されるため)', () => {
+    withOrigin('https://app.example.co.jp, https://preview.example.co.jp', () => {
+      expect(passwordResetUrl('t')).toBe('https://app.example.co.jp/reset?token=t');
+    });
+  });
+
+  it('未設定ならローカル開発のURLになる', () => {
+    withOrigin(undefined, () => {
+      expect(passwordResetUrl('t')).toBe('http://localhost:3000/reset?token=t');
     });
   });
 });

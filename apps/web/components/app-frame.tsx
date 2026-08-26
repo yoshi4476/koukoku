@@ -12,6 +12,9 @@ function isBarePath(pathname: string): boolean {
   return (
     pathname === '/login' ||
     pathname === '/signup' ||
+    // パスワード再設定は未ログインで開くため、認証ゲートを通さない (F-62)
+    pathname === '/forgot' ||
+    pathname === '/reset' ||
     pathname.startsWith('/onboarding') ||
     pathname.startsWith('/report/print') ||
     pathname.startsWith('/share/')

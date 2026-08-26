@@ -5,7 +5,7 @@ import type { PlatformConsoleDto, PlatformTenantDto } from '@adgrid/shared';
 import { TENANT_PLANS, TENANT_PLAN_LABEL } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { ErrorCard, SkeletonLines } from '@/components/ui';
-import { apiPut, toApiError, type ApiError } from '@/lib/api';
+import { apiPost, apiPut, toApiError, type ApiError } from '@/lib/api';
 import { formatDate, formatNumber, formatYen } from '@/lib/format';
 
 type Contract = 'all' | 'direct' | 'resold';
@@ -23,7 +23,18 @@ function TenantRow({ t, onChanged }: { t: PlatformTenantDto; onChanged: () => vo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [confirm, setConfirm] = useState(false);
+  const [resetUrl, setResetUrl] = useState('');
+  const [copied, setCopied] = useState(false);
   const suspended = t.status !== 'active';
+
+  // メール基盤が無くても再設定できるよう、リンクをその場で発行して手渡す
+  const issueResetLink = () => {
+    setBusy(true); setError(null); setCopied(false);
+    apiPost<{ url: string }>('/platform/password-reset-link', { email: t.adminEmail })
+      .then((r) => setResetUrl(r.url))
+      .catch((e: unknown) => setError(toApiError(e)))
+      .finally(() => setBusy(false));
+  };
 
   const run = (p: Promise<unknown>) => {
     setBusy(true);
@@ -107,6 +118,32 @@ function TenantRow({ t, onChanged }: { t: PlatformTenantDto; onChanged: () => vo
             <button type="button" className="btn sm sec" onClick={() => setConfirm(false)} disabled={busy}>やめる</button>
           </>
         )}
+
+        {t.adminEmail && !confirm ? (
+          <button type="button" className="btn sm sec" onClick={issueResetLink} disabled={busy}>
+            パスワード再設定リンクを発行
+          </button>
+        ) : null}
+
+        {resetUrl ? (
+          <div className="adm-link">
+            <b>1時間有効・1回限り</b>
+            <input className="input sm" readOnly value={resetUrl} onFocus={(e) => e.currentTarget.select()} />
+            <button
+              type="button"
+              className="btn sm pri"
+              onClick={() => {
+                navigator.clipboard?.writeText(resetUrl).then(() => setCopied(true)).catch(() => setCopied(false));
+              }}
+            >
+              {copied ? 'コピーしました' : 'コピー'}
+            </button>
+            <button type="button" className="btn sm sec" onClick={() => setResetUrl('')}>閉じる</button>
+            <span style={{ flexBasis: '100%', color: 'var(--muted)' }}>
+              {t.adminEmail} 宛。<b>本人にだけ</b>お渡しください。
+            </span>
+          </div>
+        ) : null}
       </div>
     </div>
   );

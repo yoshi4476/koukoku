@@ -1,0 +1,156 @@
+import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
+import { createHash, randomBytes, timingSafeEqual } from 'crypto';
+import { PrismaService } from '../prisma/prisma.service';
+import { AppError } from '../common/errors';
+import { MailService } from '../common/mail.service';
+import { SessionGuard } from '../common/session.guard';
+
+/** 有効期間。長すぎると盗まれたリンクの寿命が延びるため短くする */
+const TTL_MS = 60 * 60 * 1000;
+
+/** 生の値は保存しない。DBが漏れてもリンクを再現できないようにする */
+function hashToken(raw: string): string {
+  return createHash('sha256').update(raw).digest('hex');
+}
+
+export function passwordResetUrl(token: string): string {
+  const base = (process.env.WEB_ORIGIN ?? 'http://localhost:3000').split(',')[0].trim();
+  return `${base.replace(/\/$/, '')}/reset?token=${token}`;
+}
+
+/**
+ * パスワード再設定 (F-62)。
+ *
+ * 設計の要点:
+ *  - トークンはSHA-256で保存し、生の値はメール/リンクにしか存在しない
+ *  - 「本人申請」はメール未設定でも成功を返す (アカウントの有無を推測させない)
+ *  - 管理者はリンクを直接発行できる。メール基盤が無くても運用が回るようにするため
+ *  - 再設定するとそれ以前のセッションは全て無効になる
+ */
+@Injectable()
+export class PasswordResetService {
+  private readonly logger = new Logger(PasswordResetService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mail: MailService,
+  ) {}
+
+  /** トークンを発行して生の値を返す。呼び出し元が渡し方 (メール/画面) を決める */
+  private async issue(userId: string, issuedBy: string): Promise<string> {
+    const raw = randomBytes(32).toString('base64url');
+    // 未使用の古いトークンは無効化する (同時に複数生きている状態を作らない)
+    await this.prisma.passwordReset.updateMany({
+      where: { userId, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+    await this.prisma.passwordReset.create({
+      data: {
+        userId,
+        tokenHash: hashToken(raw),
+        expiresAt: new Date(Date.now() + TTL_MS),
+        issuedBy,
+      },
+    });
+    return raw;
+  }
+
+  /**
+   * 本人からの再設定申請。
+   * アカウントの有無に関わらず常に成功を返す (存在するメールを探る手口を防ぐ)。
+   */
+  async requestReset(email: string): Promise<{ ok: true }> {
+    const normalized = (email ?? '').trim().toLowerCase();
+    const user = normalized ? await this.prisma.user.findUnique({ where: { email: normalized } }) : null;
+    if (!user) return { ok: true };
+
+    const raw = await this.issue(user.id, 'self');
+    const url = passwordResetUrl(raw);
+    const sent = await this.mail.send({
+      to: user.email,
+      subject: '【ADGRID】パスワード再設定のご案内',
+      text: [
+        `${user.name} 様`,
+        '',
+        'パスワード再設定のリクエストを受け付けました。',
+        '下記のリンクから1時間以内に新しいパスワードを設定してください。',
+        '',
+        url,
+        '',
+        'このリクエストに心当たりが無い場合は、このメールを破棄してください。',
+        'リンクを開かない限り、パスワードは変更されません。',
+      ].join('\n'),
+    });
+    if (!sent) {
+      // メール基盤が無い環境では、運営がログから拾って手渡しできるようにする
+      this.logger.warn(`パスワード再設定リンクを発行しました (メール未送信): user=${user.email}`);
+    }
+    return { ok: true };
+  }
+
+  /** 管理者による発行。メールに頼らず、その場でリンクを渡せるようにする */
+  async issueLinkFor(email: string, issuedBy: 'platform' | 'owner'): Promise<{ url: string; email: string }> {
+    const normalized = (email ?? '').trim().toLowerCase();
+    const user = normalized ? await this.prisma.user.findUnique({ where: { email: normalized } }) : null;
+    if (!user) {
+      throw new AppError(
+        HttpStatus.NOT_FOUND,
+        'そのメールアドレスのユーザーが見つかりません。',
+        '一覧に表示されているメールアドレスを確認してください。',
+      );
+    }
+    const raw = await this.issue(user.id, issuedBy);
+    return { url: passwordResetUrl(raw), email: user.email };
+  }
+
+  /** トークンが今使えるかだけを確認する (画面を開いた時点での判定用) */
+  async verify(token: string): Promise<{ valid: boolean }> {
+    const row = await this.find(token);
+    return { valid: row != null };
+  }
+
+  private async find(token: string) {
+    const raw = (token ?? '').trim();
+    if (!raw) return null;
+    const row = await this.prisma.passwordReset.findUnique({ where: { tokenHash: hashToken(raw) } });
+    if (!row || row.usedAt || row.expiresAt.getTime() < Date.now()) return null;
+    // ハッシュ一致は findUnique で保証されるが、比較を定数時間にして念のため揃える
+    const a = Buffer.from(row.tokenHash);
+    const b = Buffer.from(hashToken(raw));
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+    return row;
+  }
+
+  async reset(token: string, password: string): Promise<{ ok: true }> {
+    if ((password ?? '').length < 8) {
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        'パスワードが短すぎます。',
+        '8文字以上のパスワードを設定してください。',
+      );
+    }
+    const row = await this.find(token);
+    if (!row) {
+      throw new AppError(
+        HttpStatus.BAD_REQUEST,
+        'このリンクは使用できません。',
+        '有効期限が切れているか、既に使用済みです。もう一度パスワード再設定をやり直してください。',
+      );
+    }
+
+    const now = new Date();
+    const passwordHash = await bcrypt.hash(password, 10);
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: row.userId },
+        // 世代を進めて発行済みセッションを全て無効化する。乗っ取られた状態で
+        // 再設定しても攻撃者のセッションが残っては意味がないため
+        data: { passwordHash, passwordChangedAt: now, tokenVersion: { increment: 1 } },
+      }),
+      this.prisma.passwordReset.update({ where: { id: row.id }, data: { usedAt: now } }),
+    ]);
+    SessionGuard.invalidateUser(row.userId);
+    return { ok: true };
+  }
+}

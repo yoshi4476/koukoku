@@ -20,10 +20,34 @@ model User {
   passwordHash String   @map("password_hash")
   name         String
   createdAt    DateTime @default(now()) @map("created_at")
+  /// パスワード変更時刻 (表示・監査用)
+  passwordChangedAt DateTime? @map("password_changed_at")
+  /// セッション世代 (F-62)。パスワード再設定で+1し、古い世代のJWTを一括無効化する。
+  /// JWTのiatは秒精度しか無く「同一秒」を正しく扱えないため、時刻ではなく世代で判定する
+  tokenVersion      Int       @default(0) @map("token_version")
 
-  memberships TenantMember[]
+  memberships    TenantMember[]
+  passwordResets PasswordReset[]
 
   @@map("users")
+}
+
+/// パスワード再設定トークン (F-62)。生の値は保存せずSHA-256のみ保持する
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  /// 誰が発行したか。self=本人申請 / platform=運営 / owner=テナント管理者
+  issuedBy  String    @default("self") @map("issued_by")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_resets")
 }
 
 model TenantMember {

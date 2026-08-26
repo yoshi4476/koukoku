@@ -4,6 +4,7 @@ import type { Edition, MeDto } from '@adgrid/shared';
 import { AppError } from '../common/errors';
 import { TrailService } from '../common/trail.service';
 import { AuthService, SESSION_COOKIE, verifySession } from './auth.service';
+import { PasswordResetService } from './password-reset.service';
 
 /**
  * セッションCookieの設定。
@@ -36,7 +37,35 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly trail: TrailService,
+    private readonly reset: PasswordResetService,
   ) {}
+
+  /**
+   * パスワード再設定の申請 (F-62)。
+   * アカウントの有無に関わらず常に成功を返す (登録済みメールを探る手口を防ぐ)。
+   */
+  @Post('forgot')
+  forgot(@Body() body: { email?: string }): Promise<{ ok: true }> {
+    return this.reset.requestReset(body?.email ?? '');
+  }
+
+  /** 再設定画面を開いた時点でリンクが生きているかを確認する */
+  @Get('reset')
+  verifyReset(@Req() req: Request): Promise<{ valid: boolean }> {
+    const token = typeof req.query.token === 'string' ? req.query.token : '';
+    return this.reset.verify(token);
+  }
+
+  @Post('reset')
+  async doReset(
+    @Body() body: { token?: string; password?: string },
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<{ ok: true }> {
+    const out = await this.reset.reset(body?.token ?? '', body?.password ?? '');
+    // 再設定した本人が古いセッションを持っている場合に備えて消しておく
+    res.clearCookie(SESSION_COOKIE, CLEAR_OPTS);
+    return out;
+  }
 
   @Post('signup')
   async signup(

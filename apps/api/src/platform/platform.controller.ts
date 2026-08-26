@@ -1,7 +1,8 @@
-import { Body, Controller, Get, HttpStatus, Param, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Post, Put, UseGuards } from '@nestjs/common';
 import type { PlatformConsoleDto, PlatformHealthDto } from '@adgrid/shared';
 import { AppError } from '../common/errors';
 import { PlatformService } from './platform.service';
+import { PasswordResetService } from '../auth/password-reset.service';
 import { PlatformAdmin, PlatformAdminGuard, type PlatformAdminValue } from './platform-admin.guard';
 
 /**
@@ -11,7 +12,22 @@ import { PlatformAdmin, PlatformAdminGuard, type PlatformAdminValue } from './pl
 @Controller('platform')
 @UseGuards(PlatformAdminGuard)
 export class PlatformController {
-  constructor(private readonly platform: PlatformService) {}
+  constructor(
+    private readonly platform: PlatformService,
+    private readonly reset: PasswordResetService,
+  ) {}
+
+  /**
+   * パスワード再設定リンクの発行 (F-62)。
+   * メール基盤が無くても運用できるよう、運営がリンクを直接渡せるようにする。
+   */
+  @Post('password-reset-link')
+  async passwordResetLink(
+    @PlatformAdmin() admin: PlatformAdminValue,
+    @Body() body: { email?: string },
+  ): Promise<{ url: string; email: string }> {
+    return this.reset.issueLinkFor(body?.email ?? '', 'platform');
+  }
 
   /** ログイン中のユーザーがシステム管理者かの確認 (画面のガードに使う) */
   @Get('me')

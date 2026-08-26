@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
 import { ClientScopeGuard } from './common/client-scope.guard';
-import { TenantActiveGuard } from './common/tenant-active.guard';
+import { SessionGuard } from './common/session.guard';
 import { MetricsService } from './metrics/metrics.service';
 import { DashboardController } from './metrics/dashboard.controller';
 import { ClientsController } from './clients/clients.controller';
@@ -20,6 +20,8 @@ import { ReportController } from './ai/report.controller';
 import { CsvService } from './imports/csv.service';
 import { ImportsController } from './imports/imports.controller';
 import { AuthService } from './auth/auth.service';
+import { PasswordResetService } from './auth/password-reset.service';
+import { MailService } from './common/mail.service';
 import { TrailService } from './common/trail.service';
 import { AuthController } from './auth/auth.controller';
 import { OnboardingController } from './onboarding/onboarding.controller';
@@ -119,9 +121,11 @@ import { IntegrationsController } from './integrations/integrations.controller';
   ],
   providers: [
     // 停止中テナントは既存セッションでも通さない (ClientScopeGuard より先に評価される)
-    { provide: APP_GUARD, useClass: TenantActiveGuard },
+    { provide: APP_GUARD, useClass: SessionGuard },
     { provide: APP_GUARD, useClass: ClientScopeGuard },
     AuthService,
+    PasswordResetService,
+    MailService,
     TrailService,
     AlertsService,
     SchedulerService,

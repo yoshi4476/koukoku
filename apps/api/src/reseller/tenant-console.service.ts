@@ -3,7 +3,7 @@ import type { Edition, TenantConsoleDto, TenantUsageDto } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 import { TrailService } from '../common/trail.service';
-import { TenantActiveGuard } from '../common/tenant-active.guard';
+import { SessionGuard } from '../common/session.guard';
 import type { SessionInfoValue } from '../common/tenant';
 import { daysAgo } from '../metrics/metrics.service';
 
@@ -122,7 +122,7 @@ export class TenantConsoleService {
       tx.tenant.update({ where: { id: childId }, data: { status } }),
     );
     // 既存セッションにも即座に効かせる
-    TenantActiveGuard.invalidate(childId);
+    SessionGuard.invalidateTenant(childId);
     await this.trail.record({
       tenantId: parentTenantId,
       userId: user.userId,

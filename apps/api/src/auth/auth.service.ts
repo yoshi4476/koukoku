@@ -13,6 +13,8 @@ export interface SessionPayload {
   role: MemberRole;
   /** 提供先(client)アクセスの場合の限定クライアントID */
   clientScopeId?: string | null;
+  /** セッション世代 (F-62)。users.tokenVersion と一致しないセッションは無効 */
+  tv?: number;
 }
 
 export const SESSION_COOKIE = 'adgrid_session';
@@ -43,6 +45,8 @@ export function verifySession(token: string): SessionPayload | null {
       tenantId: d.tenantId,
       role: (d.role as MemberRole) ?? 'operator',
       clientScopeId: typeof d.clientScopeId === 'string' ? d.clientScopeId : null,
+      // 世代を持たない既存セッションは初期世代(0)とみなす
+      tv: typeof d.tv === 'number' ? d.tv : 0,
     };
   } catch {
     return null;
@@ -105,7 +109,7 @@ export class AuthService {
       data: { userId: user.id, tenantId, role: 'owner' },
     });
 
-    const payload: SessionPayload = { sub: user.id, tenantId, role: 'owner' };
+    const payload: SessionPayload = { sub: user.id, tenantId, role: 'owner', tv: user.tokenVersion };
     return {
       me: {
         userId: user.id,
@@ -170,6 +174,7 @@ export class AuthService {
       tenantId: membership.tenantId,
       role: membership.role as MemberRole,
       clientScopeId: scopeId,
+      tv: user.tokenVersion,
     };
     return {
       me: {
@@ -218,7 +223,8 @@ export class AuthService {
       throw new AppError(HttpStatus.FORBIDDEN, 'このテナントへの権限がありません。', '所属するテナントを選んでください。');
     }
     const scopeId = membership.role === 'client' ? membership.clientId ?? null : null;
-    const payload: SessionPayload = { sub: session.sub, tenantId, role: membership.role as MemberRole, clientScopeId: scopeId };
+    // 世代は引き継ぐ (テナント切替はパスワード変更ではないため)
+    const payload: SessionPayload = { sub: session.sub, tenantId, role: membership.role as MemberRole, clientScopeId: scopeId, tv: session.tv };
     return { me: await this.me(payload), token: signSession(payload) };
   }
 

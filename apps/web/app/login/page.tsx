@@ -70,6 +70,9 @@ export default function LoginPage() {
         </form>
 
         <p className="auth-alt">
+          <Link href="/forgot">パスワードをお忘れですか？</Link>
+        </p>
+        <p className="auth-alt">
           アカウントをお持ちでない方は <Link href="/signup">無料で始める</Link>
         </p>
         <p className="auth-demo">
