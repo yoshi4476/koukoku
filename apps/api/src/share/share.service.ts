@@ -64,6 +64,12 @@ export class ShareService {
       throw new AppError(HttpStatus.NOT_FOUND, '共有リンクが無効です。', 'リンクの発行者にお問い合わせください。');
     }
     return this.prisma.withTenant(link.tenantId, async (tx) => {
+      // テナント停止中は公開ポータルも止める (F-61)。ログインだけ塞いでも、
+      // 発行済みの公開URLから実績が見え続けては停止の意味が無い
+      const tenant = await tx.tenant.findUnique({ where: { id: link.tenantId }, select: { status: true } });
+      if (tenant && tenant.status !== 'active') {
+        throw new AppError(HttpStatus.NOT_FOUND, '共有リンクが無効です。', 'リンクの発行者にお問い合わせください。');
+      }
       const client = await tx.client.findUnique({ where: { id: link.clientId } });
       if (!client) {
         throw new AppError(HttpStatus.NOT_FOUND, 'データが見つかりません。', 'リンクの発行者にお問い合わせください。');

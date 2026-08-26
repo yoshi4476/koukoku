@@ -185,15 +185,27 @@ export class PasswordResetService {
 
     const now = new Date();
     const passwordHash = await bcrypt.hash(password, 10);
-    await this.prisma.$transaction([
-      this.prisma.user.update({
+    await this.prisma.$transaction(async (tx) => {
+      // 「未使用のときだけ使用済みにする」を原子的に行う。事前チェックだけだと
+      // 同一トークンの同時POSTが両方通り、1回限りの保証が破れる
+      const claimed = await tx.passwordReset.updateMany({
+        where: { id: row.id, usedAt: null },
+        data: { usedAt: now },
+      });
+      if (claimed.count === 0) {
+        throw new AppError(
+          HttpStatus.BAD_REQUEST,
+          'このリンクは使用できません。',
+          '有効期限が切れているか、既に使用済みです。もう一度パスワード再設定をやり直してください。',
+        );
+      }
+      // 世代を進めて発行済みセッションを全て無効化する。乗っ取られた状態で
+      // 再設定しても攻撃者のセッションが残っては意味がないため
+      await tx.user.update({
         where: { id: row.userId },
-        // 世代を進めて発行済みセッションを全て無効化する。乗っ取られた状態で
-        // 再設定しても攻撃者のセッションが残っては意味がないため
         data: { passwordHash, passwordChangedAt: now, tokenVersion: { increment: 1 } },
-      }),
-      this.prisma.passwordReset.update({ where: { id: row.id }, data: { usedAt: now } }),
-    ]);
+      });
+    });
     SessionGuard.invalidateUser(row.userId);
     // 監査ログに残す (アカウント乗っ取りの調査で最初に見る事象のため)。
     // 所属する全テナントに記録する。どのテナントの管理者からも見えるようにする

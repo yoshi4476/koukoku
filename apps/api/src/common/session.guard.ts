@@ -48,6 +48,10 @@ const MAX_CACHE = 5_000;
  * どちらも「止めたのに止まらない」ため、状態をDBで確認する。
  * 30秒キャッシュし、停止/再開・パスワード再設定の時点で該当キャッシュを落とすので
  * 反映は即時。
+ *
+ * 注意: invalidate はプロセス内キャッシュにしか効かない。APIを複数インスタンスで
+ * 動かす場合、他インスタンスへの反映はTTL(最大30秒)遅れる。それ以上の即時性が
+ * 必要になったら Redis 等の共有キャッシュに移すこと。
  */
 @Injectable()
 export class SessionGuard implements CanActivate {
@@ -109,7 +113,10 @@ export class SessionGuard implements CanActivate {
 
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const req = ctx.switchToHttp().getRequest<Request>();
-    if (ALWAYS_ALLOWED.has(req.path)) return true;
+    // Expressは末尾スラッシュ付きでも同じルートに到達させるため、比較前に正規化する。
+    // しないと /auth/login/ が除外に一致せず、古いCookie持ちがログインできない抜け道が残る
+    const path = req.path.length > 1 && req.path.endsWith('/') ? req.path.slice(0, -1) : req.path;
+    if (ALWAYS_ALLOWED.has(path)) return true;
 
     // セッションが無い経路 (ログイン・共有ポータル・CV受信など) はここでは扱わない
     const token = (req.cookies ?? {})[SESSION_COOKIE] as string | undefined;
@@ -117,7 +124,7 @@ export class SessionGuard implements CanActivate {
     const session = verifySession(token);
     if (!session) return true;
 
-    if (!tenantCheckExempt(req.path) && !(await this.isTenantActive(session.tenantId))) {
+    if (!tenantCheckExempt(path) && !(await this.isTenantActive(session.tenantId))) {
       throw new AppError(
         HttpStatus.FORBIDDEN,
         'このワークスペースは現在ご利用いただけません。',
