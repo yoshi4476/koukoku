@@ -34,5 +34,6 @@ COPY --from=build /app/apps/api ./apps/api
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/pnpm-workspace.yaml ./pnpm-workspace.yaml
 WORKDIR /app/apps/api
-# 起動前に未適用のマイグレーションを流す (DATABASE_URL は管理者ロール)
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+# 起動前に (1)マイグレーション適用 (2)アプリ用DBロールの用意・権限付与 を行う。
+# ロール準備をマイグレーション後に置くことで、新しいテーブルへのGRANT忘れを防ぐ。
+CMD ["sh", "-c", "npx prisma migrate deploy && node scripts/ensure-app-role.js && node dist/main.js"]
