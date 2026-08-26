@@ -11,6 +11,7 @@ import { TENANT_PLANS } from '@adgrid/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/errors';
 import { TrailService } from '../common/trail.service';
+import { TenantActiveGuard } from '../common/tenant-active.guard';
 import { daysAgo } from '../metrics/metrics.service';
 import type { PlatformAdminValue } from './platform-admin.guard';
 
@@ -139,6 +140,8 @@ export class PlatformService {
   async setStatus(admin: PlatformAdminValue, tenantId: string, status: 'active' | 'suspended') {
     await this.findTenant(tenantId);
     await this.prisma.withPlatformAdmin((tx) => tx.tenant.update({ where: { id: tenantId }, data: { status } }));
+    // 既存セッションにも即座に効かせる (キャッシュを残すと最大30秒使い続けられる)
+    TenantActiveGuard.invalidate(tenantId);
     // 記録は対象テナント側に残す (顧客側の監査ログからも経緯が追えるようにする)
     await this.trail.record({
       tenantId,

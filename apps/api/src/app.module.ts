@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
 import { ClientScopeGuard } from './common/client-scope.guard';
+import { TenantActiveGuard } from './common/tenant-active.guard';
 import { MetricsService } from './metrics/metrics.service';
 import { DashboardController } from './metrics/dashboard.controller';
 import { ClientsController } from './clients/clients.controller';
@@ -117,6 +118,8 @@ import { IntegrationsController } from './integrations/integrations.controller';
     ImportsController,
   ],
   providers: [
+    // 停止中テナントは既存セッションでも通さない (ClientScopeGuard より先に評価される)
+    { provide: APP_GUARD, useClass: TenantActiveGuard },
     { provide: APP_GUARD, useClass: ClientScopeGuard },
     AuthService,
     TrailService,
