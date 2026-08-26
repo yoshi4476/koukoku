@@ -29,7 +29,9 @@ export function UtmTool({
     const d = new Date();
     return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}`;
   }, []);
-  const rows = platforms.length ? platforms : (['google_ads', 'meta'] as Platform[]);
+  // 媒体で重複排除する。同一媒体の複数アカウントがあると platforms が重複し、
+  // key={p} が衝突して行が二重表示され、CopyBtn の「✓」状態も混線する
+  const rows = [...new Set(platforms.length ? platforms : (['google_ads', 'meta'] as Platform[]))];
   const result = check.trim() ? checkUtmConsistency(check) : null;
 
   return (

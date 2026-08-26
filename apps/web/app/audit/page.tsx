@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import type {
   AdAccountDto,
@@ -347,11 +347,16 @@ export default function AuditPage() {
     }
   }, []);
 
-  // トップバーでクライアントを切り替えたら診断対象にも反映する。
-  // ただしディープリンク解決中 (pendingAccountId が残っている間) は上書きしない
+  // トップバーでクライアントを「実際に切り替えた」ときだけ診断対象に反映する。
+  // pendingAccountId を依存に含めると、その解決時(→null)に再実行して
+  // ディープリンクの clientId をグローバル選択で上書きしてしまうため、
+  // selectedClientId の実変化のみを見る (初回マウントは初期値と一致するので発火しない)。
+  const lastGlobalClient = useRef(selectedClientId);
   useEffect(() => {
-    if (selectedClientId && !pendingAccountId) setClientId(selectedClientId);
-  }, [selectedClientId, pendingAccountId]);
+    if (selectedClientId === lastGlobalClient.current) return;
+    lastGlobalClient.current = selectedClientId;
+    if (selectedClientId) setClientId(selectedClientId);
+  }, [selectedClientId]);
 
   const accounts = useApi<AdAccountDto[]>(clientId ? `/clients/${clientId}/accounts` : null);
 
@@ -368,6 +373,12 @@ export default function AuditPage() {
       setPendingAccountId(null);
     }
   }, [pendingAccountId, accounts.data]);
+
+  // アカウントを切り替えたら旧アカウントの診断結果を消す (セレクタと不一致のまま残さない)。
+  // ディープリンクの自動表示は autoOpenLatest 側が run=null を見て latest を入れ直す
+  useEffect(() => {
+    setRun(null);
+  }, [adAccountId]);
 
   const history = useApi<AuditRunDto[]>(adAccountId ? `/audits?adAccountId=${encodeURIComponent(adAccountId)}` : '/audits');
 

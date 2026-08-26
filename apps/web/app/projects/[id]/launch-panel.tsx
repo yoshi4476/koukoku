@@ -84,13 +84,13 @@ export function LaunchPanel({ projectId }: { projectId: string }) {
             <summary>入稿される広告文を確認する</summary>
             <div className="launch-copy">
               <div className="lc-h">見出し</div>
-              {p.headlines.map((h, i) => <div className="lc-row" key={i}><span className="lc-n">{i + 1}</span>{h}<span className="lc-len">{h.length}字</span></div>)}
+              {p.headlines.map((h, i) => <div className="lc-row" key={`h-${i}`}><span className="lc-n">{i + 1}</span>{h}<span className="lc-len">{h.length}字</span></div>)}
               <div className="lc-h">説明文</div>
-              {p.descriptions.map((d, i) => <div className="lc-row" key={i}><span className="lc-n">{i + 1}</span>{d}<span className="lc-len">{d.length}字</span></div>)}
+              {p.descriptions.map((d, i) => <div className="lc-row" key={`d-${i}`}><span className="lc-n">{i + 1}</span>{d}<span className="lc-len">{d.length}字</span></div>)}
               {p.keywords.length > 0 ? (
                 <>
                   <div className="lc-h">キーワード（フレーズ一致）</div>
-                  <div className="lc-kws">{p.keywords.map((k, i) => <span className="tag" key={i}>{k}</span>)}</div>
+                  <div className="lc-kws">{p.keywords.map((k, i) => <span className="tag" key={`k-${i}`}>{k}</span>)}</div>
                 </>
               ) : null}
             </div>
@@ -100,7 +100,9 @@ export function LaunchPanel({ projectId }: { projectId: string }) {
         {p.accounts.length > 1 ? (
           <div className="field" style={{ marginTop: 12 }}>
             <label>入稿先アカウント</label>
-            <select className="select" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+            {/* 入稿後は変更不可。ここで別アカウントに切り替えると、B配下のcampaignIdを
+                Aに対して配信開始する不整合が起きるため result 確定後はロックする */}
+            <select className="select" value={accountId} disabled={busy || !!result} onChange={(e) => setAccountId(e.target.value)}>
               {p.accounts.map((a) => <option key={a.adAccountId} value={a.adAccountId}>{a.name}</option>)}
             </select>
           </div>

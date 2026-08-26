@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReportRunDto, ReportDeliveryDto } from '@adgrid/shared';
 import { useApi } from '@/components/use-api';
 import { useClients } from '@/components/client-context';
@@ -126,13 +126,17 @@ export default function ReportPage() {
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState<ApiError | null>(null);
 
+  // ディープリンク (?clientId=) を尊重するため、グローバル選択による初回上書きを1度だけ抑止する
+  const skipGlobalOnce = useRef(false);
   // クライアント管理などからの遷移 (?clientId=) を反映する
   useEffect(() => {
     const qClientId = new URLSearchParams(window.location.search).get('clientId');
-    if (qClientId) setClientId(qClientId);
+    if (qClientId) { setClientId(qClientId); skipGlobalOnce.current = true; }
   }, []);
 
   useEffect(() => {
+    // 初回マウントではディープリンクを優先。以降のグローバル選択変更には追従する
+    if (skipGlobalOnce.current) { skipGlobalOnce.current = false; return; }
     if (selectedClientId) setClientId(selectedClientId);
   }, [selectedClientId]);
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type {
   AuthorizeResultDto,
   ConnectionDto,
@@ -134,6 +134,7 @@ export default function ConnectionsPage() {
 
   /* ウィザード */
   const [step, setStep] = useState(1);
+  const authReqId = useRef(0); // 認可リクエストの世代。古い応答の反映を防ぐ
   const [platform, setPlatform] = useState<Platform | null>(null);
   const [authorizing, setAuthorizing] = useState(false);
   const [authError, setAuthError] = useState<ApiError | null>(null);
@@ -190,11 +191,14 @@ export default function ConnectionsPage() {
 
   /* Step 1 → 2: 媒体選択で認可開始 */
   const authorize = (p: Platform) => {
+    const my = ++authReqId.current;
     setAuthorizing(true);
     setAuthError(null);
     setAuthResult(null);
     apiPost<AuthorizeResultDto>(`/connections/${p}/authorize`, {})
       .then((r) => {
+        // ウィザードを戻る/リセットした後に古い認可応答が届いて step3 を強制するのを防ぐ
+        if (my !== authReqId.current) return;
         setAuthResult(r);
         setAuthorizing(false);
         if (r.mode === 'mock') {
@@ -212,6 +216,7 @@ export default function ConnectionsPage() {
         }
       })
       .catch((e: unknown) => {
+        if (my !== authReqId.current) return;
         setAuthError(toApiError(e));
         setAuthorizing(false);
       });
@@ -229,6 +234,7 @@ export default function ConnectionsPage() {
   };
 
   const resetWizard = () => {
+    authReqId.current++; // 進行中の認可応答を無効化する (戻った後に step3 へ飛ばされない)
     setStep(1);
     setPlatform(null);
     setAuthorizing(false);

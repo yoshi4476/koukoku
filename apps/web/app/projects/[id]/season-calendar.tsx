@@ -24,7 +24,8 @@ export function SeasonCalendar({ industryCode, startDate, endDate }: {
 }) {
   const profile = industryProfileFor(industryCode);
   const now = new Date();
-  const thisMonth = now.getUTCMonth() + 1;
+  // ローカル月に統一 (getUTCMonth だと JST の毎月1日 0-9時に「今月」が前月へずれる)
+  const thisMonth = now.getMonth() + 1;
   const s = monthOf(startDate);
   const e = monthOf(endDate);
 

@@ -32,12 +32,17 @@ function CreateProjectForm({ onDone, onCancel }: { onDone: () => void; onCancel:
       setSelected(new Set());
       return;
     }
+    // クライアントを素早く切り替えると、遅い応答が後着で上書きし、表示中の
+    // クライアントに別クライアントのアカウント一覧が適用される。alive で破棄する
+    let alive = true;
     apiGet<AdAccountDto[]>(`/clients/${clientId}/accounts`)
       .then((a) => {
+        if (!alive) return;
         setAccounts(a);
         setSelected(new Set(a.map((x) => x.id)));
       })
-      .catch(() => setAccounts([]));
+      .catch(() => { if (alive) setAccounts([]); });
+    return () => { alive = false; };
   }, [clientId]);
 
   const toggle = (id: string) =>

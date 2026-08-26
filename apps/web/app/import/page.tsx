@@ -20,15 +20,20 @@ export default function ImportPage() {
   // クライアント管理などからの遷移 (?clientId=) では先頭アカウントを自動選択する
   const [autoSelectAccount, setAutoSelectAccount] = useState(false);
 
+  // ディープリンク (?clientId=) をグローバル選択の初回上書きから守る
+  const skipGlobalOnce = useRef(false);
   useEffect(() => {
     const qClientId = new URLSearchParams(window.location.search).get('clientId');
     if (qClientId) {
       setClientId(qClientId);
       setAutoSelectAccount(true);
+      skipGlobalOnce.current = true;
     }
   }, []);
 
   useEffect(() => {
+    // 初回マウントではディープリンクを優先。以降のグローバル選択変更には追従する
+    if (skipGlobalOnce.current) { skipGlobalOnce.current = false; return; }
     if (selectedClientId) setClientId(selectedClientId);
   }, [selectedClientId]);
 
